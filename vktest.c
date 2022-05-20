@@ -14,13 +14,15 @@ static const uint32_t vktest_fs[] = {
 };
 
 struct vktest {
-    VkFormat format;
+    VkFormat color_format;
+    VkFormat depth_format;
     uint32_t width;
     uint32_t height;
 
     struct vk vk;
     struct vk_buffer *vb;
-    struct vk_image *tex;
+
+    struct vk_image *depth_tex;
 
     struct vk_image *rt;
     struct vk_framebuffer *fb;
@@ -35,21 +37,7 @@ vktest_init_descriptor_set(struct vktest *test)
     struct vk *vk = &test->vk;
 
     test->set = vk_create_descriptor_set(vk, test->pipeline);
-
-    const VkWriteDescriptorSet write_set = { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                             .dstSet = test->set->set,
-                                             .dstBinding = 0,
-                                             .dstArrayElement = 0,
-                                             .descriptorCount = 1,
-                                             .descriptorType =
-                                                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                             .pImageInfo = &(VkDescriptorImageInfo){
-                                                 .sampler = test->tex->sampler,
-                                                 .imageView = test->tex->view,
-                                                 .imageLayout =
-                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                             } };
-    vk->UpdateDescriptorSets(vk->dev, 1, &write_set, 0, NULL);
+    vk_write_descriptor_set(vk, test->set, test->depth_tex);
 }
 
 static void
@@ -71,23 +59,22 @@ vktest_init_framebuffer(struct vktest *test)
 {
     struct vk *vk = &test->vk;
 
-    test->rt = vk_create_image(vk, test->format, test->width, test->height,
+    test->rt = vk_create_image(vk, test->color_format, test->width, test->height,
                                VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    vk_create_image_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
+    vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
 
     test->fb = vk_create_framebuffer(vk, test->rt, NULL);
 }
 
 static void
-vktest_init_texture(struct vktest *test)
+vktest_init_depth_texture(struct vktest *test)
 {
     struct vk *vk = &test->vk;
 
-    test->tex =
-        vk_create_image(vk, test->format, test->width, test->height, VK_IMAGE_TILING_LINEAR,
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-    vk_create_image_view(vk, test->tex, VK_IMAGE_ASPECT_COLOR_BIT);
-    vk_create_image_sampler(vk, test->tex);
+    test->depth_tex = vk_create_image(
+        vk, test->depth_format, test->width, test->height, VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+    vk_create_image_sample_view(vk, test->depth_tex, VK_IMAGE_ASPECT_STENCIL_BIT);
 }
 
 static void
@@ -112,7 +99,7 @@ vktest_init(struct vktest *test)
     vk_init(vk);
     vktest_init_vb(test);
 
-    vktest_init_texture(test);
+    vktest_init_depth_texture(test);
     vktest_init_framebuffer(test);
     vktest_init_pipeline(test);
     vktest_init_descriptor_set(test);
@@ -129,7 +116,8 @@ vktest_cleanup(struct vktest *test)
     vk_destroy_image(vk, test->rt);
     vk_destroy_framebuffer(vk, test->fb);
 
-    vk_destroy_image(vk, test->tex);
+    vk_destroy_image(vk, test->depth_tex);
+
     vk_destroy_buffer(vk, test->vb);
 
     vk_cleanup(vk);
@@ -181,7 +169,7 @@ vktest_draw_triangle(struct vktest *test, VkCommandBuffer cmd)
         .clearValueCount = 1,
         .pClearValues = &(VkClearValue){
             .color = {
-                .float32 = { 0.0f, 0.0f, 0.0f, 0.0f },
+                .float32 = { 0.2f, 0.2f, 0.2f, 1.0f },
             },
         },
     };
@@ -207,7 +195,7 @@ vktest_draw_prep_texture(struct vktest *test, VkCommandBuffer cmd)
     struct vk *vk = &test->vk;
 
     const VkImageSubresourceRange subres_range = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
         .levelCount = 1,
         .layerCount = 1,
     };
@@ -217,7 +205,7 @@ vktest_draw_prep_texture(struct vktest *test, VkCommandBuffer cmd)
         .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        .image = test->tex->img,
+        .image = test->depth_tex->img,
         .subresourceRange = subres_range,
     };
     const VkImageMemoryBarrier barrier2 = {
@@ -226,16 +214,18 @@ vktest_draw_prep_texture(struct vktest *test, VkCommandBuffer cmd)
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        .image = test->tex->img,
+        .image = test->depth_tex->img,
         .subresourceRange = subres_range,
     };
-    const VkClearColorValue clear_val = {
-        .float32 = { 1.0f, 1.0f, 0.0f, 1.0f },
+    const VkClearDepthStencilValue clear_val = {
+        .depth = 0.5f,
+        .stencil = 8,
     };
 
     vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                            0, 0, NULL, 0, NULL, 1, &barrier1);
-    vk->CmdClearColorImage(cmd, test->tex->img, barrier1.newLayout, &clear_val, 1, &subres_range);
+    vk->CmdClearDepthStencilImage(cmd, test->depth_tex->img, barrier1.newLayout, &clear_val, 1,
+                                  &subres_range);
     vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
                            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1,
                            &barrier2);
@@ -253,7 +243,6 @@ vktest_draw(struct vktest *test)
 
     vk_end_cmd(vk);
 
-    vk_dump_image(vk, test->tex, VK_IMAGE_ASPECT_COLOR_BIT, "tex.ppm");
     vk_dump_image(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
 }
 
@@ -261,7 +250,8 @@ int
 main(void)
 {
     struct vktest test = {
-        .format = VK_FORMAT_B8G8R8A8_UNORM,
+        .color_format = VK_FORMAT_B8G8R8A8_UNORM,
+        .depth_format = VK_FORMAT_D24_UNORM_S8_UINT,
         .width = 300,
         .height = 300,
     };

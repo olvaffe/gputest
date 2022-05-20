@@ -31,9 +31,12 @@ struct vk {
     VkInstance instance;
 
     VkPhysicalDevice physical_dev;
-    VkPhysicalDeviceFeatures features;
+    VkPhysicalDeviceFeatures2 features;
+    VkPhysicalDeviceFeatures2 custom_border_color_features;
     VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t mt_index;
+
+    bool EXT_custom_border_color;
 
     VkDevice dev;
     VkQueue queue;
@@ -61,9 +64,9 @@ struct vk_image {
     VkDeviceMemory mem;
     VkDeviceSize mem_size;
 
-    VkImageView view;
-    VkImageAspectFlags view_aspect_mask;
+    VkImageView render_view;
 
+    VkImageView sample_view;
     VkSampler sampler;
 };
 
@@ -215,7 +218,12 @@ vk_init_physical_device(struct vk *vk)
     if (props.apiVersion < VKUTIL_MIN_API_VERSION)
         vk_die("physical device api version %d < %d", props.apiVersion, VKUTIL_MIN_API_VERSION);
 
-    vk->GetPhysicalDeviceFeatures(vk->physical_dev, &vk->features);
+    vk->custom_border_color_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
+    vk->features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    vk->features.pNext = &vk->custom_border_color_features;
+    vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
+
     vk->GetPhysicalDeviceMemoryProperties(vk->physical_dev, &vk->mem_props);
 
     const VkMemoryPropertyFlags mt_flags =
@@ -248,6 +256,16 @@ vk_init_device_dispatch(struct vk *vk)
 static inline void
 vk_init_device(struct vk *vk)
 {
+    const char *exts[32];
+    uint32_t ext_count = 0;
+    const VkPhysicalDeviceFeatures2 *features = NULL;
+
+#if 0
+    exts[ext_count++] = "VK_EXT_custom_border_color";
+    vk->EXT_custom_border_color = true;
+    features = &vk->features;
+#endif
+
     vk->queue_family_index = 0;
 
     VkQueueFamilyProperties queue_props;
@@ -258,6 +276,7 @@ vk_init_device(struct vk *vk)
 
     const VkDeviceCreateInfo dev_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = features,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos =
             &(VkDeviceQueueCreateInfo){
@@ -266,6 +285,8 @@ vk_init_device(struct vk *vk)
                 .queueCount = 1,
                 .pQueuePriorities = &(float){ 1.0f },
             },
+        .enabledExtensionCount = ext_count,
+        .ppEnabledExtensionNames = exts,
     };
     vk->result = vk->CreateDevice(vk->physical_dev, &dev_info, NULL, &vk->dev);
     vk_check(vk, "failed to create device");
@@ -442,7 +463,7 @@ vk_create_image(struct vk *vk,
 }
 
 static inline void
-vk_create_image_view(struct vk *vk, struct vk_image *img, VkImageAspectFlags aspect_mask)
+vk_create_image_render_view(struct vk *vk, struct vk_image *img, VkImageAspectFlags aspect_mask)
 {
     const VkImageViewCreateInfo view_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -450,28 +471,58 @@ vk_create_image_view(struct vk *vk, struct vk_image *img, VkImageAspectFlags asp
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = img->info.format,
         .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask = aspect_mask,
             .levelCount = img->info.mipLevels,
             .layerCount = img->info.arrayLayers,
         },
     };
-    vk->result = vk->CreateImageView(vk->dev, &view_info, NULL, &img->view);
-    vk_check(vk, "failed to create image view");
-
-    img->view_aspect_mask = aspect_mask;
+    vk->result = vk->CreateImageView(vk->dev, &view_info, NULL, &img->render_view);
+    vk_check(vk, "failed to create image render view");
 }
 
 static inline void
-vk_create_image_sampler(struct vk *vk, struct vk_image *img)
+vk_create_image_sample_view(struct vk *vk, struct vk_image *img, VkImageAspectFlagBits aspect)
 {
+    const VkImageViewCreateInfo view_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = img->img,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = img->info.format,
+        .subresourceRange = {
+            .aspectMask = aspect,
+            .levelCount = img->info.mipLevels,
+            .layerCount = img->info.arrayLayers,
+        },
+    };
+    vk->result = vk->CreateImageView(vk->dev, &view_info, NULL, &img->sample_view);
+    vk_check(vk, "failed to create image sample view");
+
+    VkClearColorValue custom_border_color = { 0 };
+    VkBorderColor border_color;
+    if (vk->EXT_custom_border_color) {
+        custom_border_color = (VkClearColorValue){
+            .uint32 = { 10, 0, 0, 0 },
+        };
+        border_color = VK_BORDER_COLOR_INT_CUSTOM_EXT;
+    } else {
+        border_color = VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+    }
+
     const VkSamplerCreateInfo sampler_info = {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext =
+            &(VkSamplerCustomBorderColorCreateInfoEXT){
+                .sType = VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT,
+                .customBorderColor = custom_border_color,
+                .format = img->info.format,
+            },
         .magFilter = VK_FILTER_NEAREST,
         .minFilter = VK_FILTER_NEAREST,
         .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
         .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
         .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
         .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+        .borderColor = border_color,
     };
     vk->result = vk->CreateSampler(vk->dev, &sampler_info, NULL, &img->sampler);
     vk_check(vk, "failed to create sampler");
@@ -481,7 +532,9 @@ static inline void
 vk_destroy_image(struct vk *vk, struct vk_image *img)
 {
     vk->DestroySampler(vk->dev, img->sampler, NULL);
-    vk->DestroyImageView(vk->dev, img->view, NULL);
+    vk->DestroyImageView(vk->dev, img->sample_view, NULL);
+
+    vk->DestroyImageView(vk->dev, img->render_view, NULL);
 
     vk->FreeMemory(vk->dev, img->mem, NULL);
     vk->DestroyImage(vk->dev, img->img, NULL);
@@ -577,7 +630,7 @@ vk_create_framebuffer(struct vk *vk, struct vk_image *color, struct vk_image *de
             .attachment = att_count,
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         };
-        views[att_count] = color->view;
+        views[att_count] = color->render_view;
         att_count++;
     }
 
@@ -596,7 +649,7 @@ vk_create_framebuffer(struct vk *vk, struct vk_image *color, struct vk_image *de
             .attachment = att_count,
             .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         };
-        views[att_count] = depth->view;
+        views[att_count] = depth->render_view;
         att_count++;
     }
 
@@ -857,6 +910,27 @@ vk_create_descriptor_set(struct vk *vk, const struct vk_pipeline *pipeline)
     vk_check(vk, "failed to allocate descriptor set");
 
     return set;
+}
+
+static inline void
+vk_write_descriptor_set(struct vk *vk, struct vk_descriptor_set *set, const struct vk_image *img)
+{
+    const VkWriteDescriptorSet write_info = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = set->set,
+        .dstBinding = 0,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .pImageInfo =
+            &(VkDescriptorImageInfo){
+                .sampler = img->sampler,
+                .imageView = img->sample_view,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+    };
+
+    vk->UpdateDescriptorSets(vk->dev, 1, &write_info, 0, NULL);
 }
 
 static inline void
