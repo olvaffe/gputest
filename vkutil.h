@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <vulkan/vulkan.h>
 
 #ifdef __ANDROID__
@@ -40,7 +41,7 @@ struct vk {
     VkPhysicalDeviceFeatures2 features;
     VkPhysicalDeviceFeatures2 custom_border_color_features;
     VkPhysicalDeviceMemoryProperties mem_props;
-    uint32_t mt_index;
+    uint32_t buf_mt_index;
 
     bool EXT_custom_border_color;
 
@@ -69,6 +70,7 @@ struct vk_image {
 
     VkDeviceMemory mem;
     VkDeviceSize mem_size;
+    bool mem_mappable;
 
     VkImageView render_view;
 
@@ -238,13 +240,13 @@ vk_init_physical_device(struct vk *vk)
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
         const VkMemoryType *mt = &vk->mem_props.memoryTypes[i];
         if ((mt->propertyFlags & mt_flags) == mt_flags) {
-            vk->mt_index = i;
+            vk->buf_mt_index = i;
             mt_found = true;
             break;
         }
     }
     if (!mt_found)
-        vk_die("failed to find a coherent and visible memory type");
+        vk_die("failed to find a coherent and visible memory type for buffers");
 }
 
 static inline void
@@ -366,12 +368,12 @@ vk_cleanup(struct vk *vk)
 }
 
 static inline VkDeviceMemory
-vk_alloc_memory(struct vk *vk, VkDeviceSize size)
+vk_alloc_memory(struct vk *vk, VkDeviceSize size, uint32_t mt_index)
 {
     const VkMemoryAllocateInfo alloc_info = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize = size,
-        .memoryTypeIndex = vk->mt_index,
+        .memoryTypeIndex = mt_index,
     };
 
     VkDeviceMemory mem;
@@ -399,10 +401,10 @@ vk_create_buffer(struct vk *vk, VkDeviceSize size, VkBufferUsageFlags usage)
 
     VkMemoryRequirements reqs;
     vk->GetBufferMemoryRequirements(vk->dev, buf->buf, &reqs);
-    if (!(reqs.memoryTypeBits & (1u << vk->mt_index)))
-        vk_die("failed to meet buf memory reqs");
+    if (!(reqs.memoryTypeBits & (1u << vk->buf_mt_index)))
+        vk_die("failed to meet buf memory reqs: 0x%x", reqs.memoryTypeBits);
 
-    buf->mem = vk_alloc_memory(vk, reqs.size);
+    buf->mem = vk_alloc_memory(vk, reqs.size, vk->buf_mt_index);
     buf->mem_size = reqs.size;
 
     vk->result = vk->MapMemory(vk->dev, buf->mem, 0, buf->mem_size, 0, &buf->mem_ptr);
@@ -456,10 +458,17 @@ vk_create_image(struct vk *vk,
 
     VkMemoryRequirements reqs;
     vk->GetImageMemoryRequirements(vk->dev, img->img, &reqs);
-    if (!(reqs.memoryTypeBits & (1u << vk->mt_index)))
-        vk_die("failed to meet img memory reqs");
 
-    img->mem = vk_alloc_memory(vk, reqs.size);
+    uint32_t mt_index;
+    if (reqs.memoryTypeBits & (1u << vk->buf_mt_index)) {
+        mt_index = vk->buf_mt_index;
+        img->mem_mappable = true;
+    } else {
+        mt_index = ffs(reqs.memoryTypeBits) - 1;
+        img->mem_mappable = false;
+    }
+
+    img->mem = vk_alloc_memory(vk, reqs.size, mt_index);
     img->mem_size = reqs.size;
 
     vk->result = vk->BindImageMemory(vk->dev, img->img, img->mem, 0);
@@ -592,6 +601,9 @@ vk_dump_image(struct vk *vk,
               VkImageAspectFlagBits aspect,
               const char *filename)
 {
+    if (!img->mem_mappable)
+        vk_die("cannot dump non-mappable image");
+
     if (img->info.tiling != VK_IMAGE_TILING_LINEAR)
         vk_log("dumping non-linear image");
 
