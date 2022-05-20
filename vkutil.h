@@ -15,8 +15,14 @@
 #include <string.h>
 #include <vulkan/vulkan.h>
 
+#ifdef __ANDROID__
+#define LIBVULKAN_NAME "libvulkan.so"
+#else
 #define LIBVULKAN_NAME "libvulkan.so.1"
-#define PRINTFLIKE(f, a) __attribute((format(printf, f, a)))
+#endif
+
+#define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
+#define NORETURN __attribute__((noreturn))
 #define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_1
 
 struct vk {
@@ -112,7 +118,7 @@ vk_logv(const char *format, va_list ap)
     printf("\n");
 }
 
-static inline void
+static inline void NORETURN
 vk_diev(const char *format, va_list ap)
 {
     vk_logv(format, ap);
@@ -127,7 +133,7 @@ static inline void PRINTFLIKE(1, 2) vk_log(const char *format, ...)
     va_end(ap);
 }
 
-static inline void PRINTFLIKE(1, 2) vk_die(const char *format, ...)
+static inline void PRINTFLIKE(1, 2) NORETURN vk_die(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);

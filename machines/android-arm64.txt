@@ -1,0 +1,27 @@
+[constants]
+ndk = '/ndks/android-ndk-r23b'
+toolchain = ndk / 'toolchains/llvm/prebuilt/linux-x86_64/bin'
+common_flags = []
+
+[binaries]
+ar = toolchain / 'llvm-ar'
+c = toolchain / 'aarch64-linux-android21-clang'
+cpp = toolchain / 'aarch64-linux-android21-clang++'
+strip = toolchain / 'llvm-strip'
+pkgconfig = '/usr/bin/pkg-config'
+
+[built-in options]
+c_args = common_flags + []
+c_link_args = common_flags + []
+cpp_args = common_flags + []
+cpp_link_args = common_flags + []
+
+[properties]
+sys_root = '/notexist'
+pkg_config_libdir = '/notexist'
+
+[host_machine]
+system = 'linux'
+cpu_family = 'aarch64'
+cpu = 'aarch64'
+endian = 'little'
