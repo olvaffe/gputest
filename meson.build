@@ -33,18 +33,24 @@ idep_vkutil = declare_dependency(
   dependencies: [dep_dl],
 )
 
-spirv_incs = []
-foreach stage : ['vert', 'frag']
-  spirv_incs += custom_target(
-    'vktest.' + stage + '.inc',
-    input: ['vktest.' + stage],
-    output: ['vktest.' + stage + '.inc'],
-    command: [prog_glslang, '--quiet', '-V', '-x', '-o', '@OUTPUT@', '@INPUT@']
+tests = [
+  'vktest',
+]
+
+foreach t : tests
+  spirv_incs = []
+  foreach stage : ['vert', 'frag']
+    spirv_incs += custom_target(
+      t + '.' + stage + '.inc',
+      input: [t + '.' + stage],
+      output: [t + '.' + stage + '.inc'],
+      command: [prog_glslang, '--quiet', '-V', '-x', '-o', '@OUTPUT@', '@INPUT@']
+    )
+  endforeach
+
+  executable(
+    t,
+    sources: [t + '.c', spirv_incs],
+    dependencies: [idep_vkutil],
   )
 endforeach
-
-vktest = executable(
-  'vktest',
-  sources: ['vktest.c', spirv_incs],
-  dependencies: [idep_vkutil],
-)

@@ -13,6 +13,12 @@ static const uint32_t vktest_fs[] = {
 #include "vktest.frag.inc"
 };
 
+static const float vktest_vertices[3][2] = {
+    { -1.0f, -1.0f },
+    { 0.0f, 1.0f },
+    { 1.0f, -1.0f },
+};
+
 struct vktest {
     VkFormat color_format;
     VkFormat depth_format;
@@ -49,7 +55,11 @@ vktest_init_pipeline(struct vktest *test)
 
     vk_set_pipeline_shaders(vk, test->pipeline, vktest_vs, sizeof(vktest_vs), vktest_fs,
                             sizeof(vktest_fs));
-    vk_set_pipeline_layout(vk, test->pipeline);
+    vk_set_pipeline_layout(vk, test->pipeline, true);
+
+    const uint32_t comp_count = ARRAY_SIZE(vktest_vertices[0]);
+    vk_set_pipeline_vertices(vk, test->pipeline, &comp_count, 1);
+
     vk_setup_pipeline(vk, test->pipeline, test->fb);
     vk_compile_pipeline(vk, test->pipeline);
 }
@@ -59,11 +69,12 @@ vktest_init_framebuffer(struct vktest *test)
 {
     struct vk *vk = &test->vk;
 
-    test->rt = vk_create_image(vk, test->color_format, test->width, test->height,
-                               VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    test->rt =
+        vk_create_image(vk, test->color_format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
+                        VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    test->fb = vk_create_framebuffer(vk, test->rt, NULL);
+    test->fb = vk_create_framebuffer(vk, test->rt, NULL, NULL);
 }
 
 static void
@@ -72,8 +83,8 @@ vktest_init_depth_texture(struct vktest *test)
     struct vk *vk = &test->vk;
 
     test->depth_tex = vk_create_image(
-        vk, test->depth_format, test->width, test->height, VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+        vk, test->depth_format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
+        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     vk_create_image_sample_view(vk, test->depth_tex, VK_IMAGE_ASPECT_STENCIL_BIT);
 }
 
@@ -81,14 +92,9 @@ static void
 vktest_init_vb(struct vktest *test)
 {
     struct vk *vk = &test->vk;
-    const float vertices[3][2] = {
-        { -1.0f, -1.0f },
-        { 0.0f, 1.0f },
-        { 1.0f, -1.0f },
-    };
 
-    test->vb = vk_create_buffer(vk, sizeof(vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    memcpy(test->vb->mem_ptr, vertices, sizeof(vertices));
+    test->vb = vk_create_buffer(vk, sizeof(vktest_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    memcpy(test->vb->mem_ptr, vktest_vertices, sizeof(vktest_vertices));
 }
 
 static void

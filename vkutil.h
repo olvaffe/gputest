@@ -24,6 +24,7 @@
 
 #define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
 #define NORETURN __attribute__((noreturn))
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_1
 
 struct vk {
@@ -84,6 +85,7 @@ struct vk_framebuffer {
 
     uint32_t width;
     uint32_t height;
+    VkSampleCountFlagBits samples;
 };
 
 struct vk_pipeline {
@@ -94,7 +96,9 @@ struct vk_pipeline {
     VkPipelineLayout pipeline_layout;
 
     VkVertexInputBindingDescription vi_binding;
-    VkVertexInputAttributeDescription vi_attr;
+    VkVertexInputAttributeDescription vi_attrs[16];
+    uint32_t vi_attr_count;
+
     VkPipelineInputAssemblyStateCreateInfo ia_info;
     VkViewport viewport;
     VkRect2D scissor;
@@ -316,7 +320,7 @@ vk_init_desc_pool(struct vk *vk)
     const VkDescriptorPoolCreateInfo pool_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .maxSets = 256,
-        .poolSizeCount = sizeof(pool_sizes) / sizeof(pool_sizes[0]),
+        .poolSizeCount = ARRAY_SIZE(pool_sizes),
         .pPoolSizes = pool_sizes,
     };
 
@@ -429,6 +433,7 @@ vk_create_image(struct vk *vk,
                 VkFormat format,
                 uint32_t width,
                 uint32_t height,
+                VkSampleCountFlagBits samples,
                 VkImageTiling tiling,
                 VkImageUsageFlags usage)
 {
@@ -447,7 +452,7 @@ vk_create_image(struct vk *vk,
             },
             .mipLevels = 1,
             .arrayLayers = 1,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .samples = samples,
             .tiling = tiling,
             .usage = usage,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -624,15 +629,20 @@ vk_dump_image(struct vk *vk,
 }
 
 static inline struct vk_framebuffer *
-vk_create_framebuffer(struct vk *vk, struct vk_image *color, struct vk_image *depth)
+vk_create_framebuffer(struct vk *vk,
+                      struct vk_image *color,
+                      struct vk_image *resolve,
+                      struct vk_image *depth)
 {
     struct vk_framebuffer *fb = calloc(1, sizeof(*fb));
     if (!fb)
         vk_die("failed to alloc fb");
 
-    VkAttachmentDescription att_descs[2];
-    VkAttachmentReference att_refs[2];
-    VkImageView views[2];
+    VkAttachmentReference color_ref = { .attachment = VK_ATTACHMENT_UNUSED };
+    VkAttachmentReference resolve_ref = { .attachment = VK_ATTACHMENT_UNUSED };
+    VkAttachmentReference depth_ref = { .attachment = VK_ATTACHMENT_UNUSED };
+    VkAttachmentDescription att_descs[3];
+    VkImageView views[3];
     uint32_t att_count = 0;
 
     if (color) {
@@ -644,11 +654,28 @@ vk_create_framebuffer(struct vk *vk, struct vk_image *color, struct vk_image *de
             .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         };
-        att_refs[att_count] = (VkAttachmentReference){
+        color_ref = (VkAttachmentReference){
             .attachment = att_count,
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         };
         views[att_count] = color->render_view;
+        att_count++;
+    }
+
+    if (resolve) {
+        att_descs[att_count] = (VkAttachmentDescription){
+            .format = resolve->info.format,
+            .samples = resolve->info.samples,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        };
+        resolve_ref = (VkAttachmentReference){
+            .attachment = att_count,
+            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        };
+        views[att_count] = resolve->render_view;
         att_count++;
     }
 
@@ -663,7 +690,7 @@ vk_create_framebuffer(struct vk *vk, struct vk_image *color, struct vk_image *de
             .initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         };
-        att_refs[att_count] = (VkAttachmentReference){
+        depth_ref = (VkAttachmentReference){
             .attachment = att_count,
             .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         };
@@ -680,8 +707,9 @@ vk_create_framebuffer(struct vk *vk, struct vk_image *color, struct vk_image *de
             &(VkSubpassDescription){
                 .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
                 .colorAttachmentCount = color ? 1 : 0,
-                .pColorAttachments = color ? &att_refs[0] : NULL,
-                .pDepthStencilAttachment = depth ? &att_refs[att_count - 1] : NULL,
+                .pColorAttachments = &color_ref,
+                .pResolveAttachments = &resolve_ref,
+                .pDepthStencilAttachment = &depth_ref,
             },
     };
 
@@ -703,6 +731,7 @@ vk_create_framebuffer(struct vk *vk, struct vk_image *color, struct vk_image *de
 
     fb->width = fb_info.width;
     fb->height = fb_info.height;
+    fb->samples = color ? color->info.samples : depth->info.samples;
 
     return fb;
 }
@@ -754,27 +783,29 @@ vk_set_pipeline_shaders(struct vk *vk,
 }
 
 static inline void
-vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline)
+vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline, bool has_set)
 {
-    const VkDescriptorSetLayoutCreateInfo set_layout_info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 1,
-        .pBindings =
-            &(VkDescriptorSetLayoutBinding){
-                .binding = 0,
-                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .descriptorCount = 1,
-                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            },
-    };
+    if (has_set) {
+        const VkDescriptorSetLayoutCreateInfo set_layout_info = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindings =
+                &(VkDescriptorSetLayoutBinding){
+                    .binding = 0,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .descriptorCount = 1,
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                },
+        };
 
-    vk->result =
-        vk->CreateDescriptorSetLayout(vk->dev, &set_layout_info, NULL, &pipeline->set_layout);
-    vk_check(vk, "failed to create descriptor set layout");
+        vk->result =
+            vk->CreateDescriptorSetLayout(vk->dev, &set_layout_info, NULL, &pipeline->set_layout);
+        vk_check(vk, "failed to create descriptor set layout");
+    }
 
     const VkPipelineLayoutCreateInfo pipeline_layout_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
+        .setLayoutCount = has_set,
         .pSetLayouts = &pipeline->set_layout,
     };
     vk->result = vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL,
@@ -783,19 +814,52 @@ vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline)
 }
 
 static inline void
-vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_framebuffer *fb)
+vk_set_pipeline_vertices(struct vk *vk,
+                         struct vk_pipeline *pipeline,
+                         const uint32_t *comp_counts,
+                         uint32_t attr_count)
 {
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < attr_count; i++) {
+        VkFormat format;
+        switch (comp_counts[i]) {
+        case 1:
+            format = VK_FORMAT_R32_SFLOAT;
+            break;
+        case 2:
+            format = VK_FORMAT_R32G32_SFLOAT;
+            break;
+        case 3:
+            format = VK_FORMAT_R32G32B32_SFLOAT;
+            break;
+        case 4:
+            format = VK_FORMAT_R32G32B32A32_SFLOAT;
+            break;
+        default:
+            vk_die("unsupported vertex attribute format %d", comp_counts[i]);
+            break;
+        }
+
+        pipeline->vi_attrs[i] = (VkVertexInputAttributeDescription){
+            .location = i,
+            .binding = 0,
+            .format = format,
+            .offset = offset,
+        };
+        offset += sizeof(float) * comp_counts[i];
+    }
+
+    pipeline->vi_attr_count = attr_count;
+
     pipeline->vi_binding = (VkVertexInputBindingDescription){
         .binding = 0,
-        .stride = sizeof(float[2]),
+        .stride = offset,
     };
-    pipeline->vi_attr = (VkVertexInputAttributeDescription){
-        .location = 0,
-        .binding = 0,
-        .format = VK_FORMAT_R32G32_SFLOAT,
-        .offset = 0,
-    };
+}
 
+static inline void
+vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_framebuffer *fb)
+{
     pipeline->ia_info = (VkPipelineInputAssemblyStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
@@ -821,7 +885,7 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
 
     pipeline->msaa_info = (VkPipelineMultisampleStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+        .rasterizationSamples = fb->samples,
     };
 
     pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
@@ -858,8 +922,8 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .vertexBindingDescriptionCount = 1,
         .pVertexBindingDescriptions = &pipeline->vi_binding,
-        .vertexAttributeDescriptionCount = 1,
-        .pVertexAttributeDescriptions = &pipeline->vi_attr,
+        .vertexAttributeDescriptionCount = pipeline->vi_attr_count,
+        .pVertexAttributeDescriptions = pipeline->vi_attrs,
     };
 
     const VkPipelineViewportStateCreateInfo vp_info = {
