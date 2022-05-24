@@ -36,6 +36,7 @@ idep_vkutil = declare_dependency(
 tests = [
   'vktest',
   'msaa',
+  'tri',
 ]
 
 foreach t : tests
