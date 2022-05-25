@@ -23,19 +23,21 @@ static const float tri_vertices[3][5] = {
     },
     {
         -1.0f,
-        0.0f,
+        1.0f,
         0.0f,
         1.0f,
         0.0f,
     },
     {
-        0.0f,
+        1.0f,
         -1.0f,
         0.0f,
         0.0f,
         1.0f,
     },
 };
+
+const uint32_t tri_border = 10;
 
 struct tri_test {
     VkFormat color_format;
@@ -66,6 +68,14 @@ tri_test_init_pipeline(struct tri_test *test)
     vk_set_pipeline_vertices(vk, test->pipeline, comp_counts, ARRAY_SIZE(comp_counts));
 
     vk_setup_pipeline(vk, test->pipeline, test->fb);
+    test->pipeline->viewport.x += (float)tri_border;
+    test->pipeline->viewport.y += (float)tri_border;
+    test->pipeline->viewport.width -= (float)tri_border * 2.0f;
+    test->pipeline->viewport.height -= (float)tri_border * 2.0f;
+    test->pipeline->scissor.offset.x += tri_border;
+    test->pipeline->scissor.offset.y += tri_border;
+    test->pipeline->scissor.extent.width -= tri_border * 2;
+    test->pipeline->scissor.extent.height -= tri_border * 2;
     vk_compile_pipeline(vk, test->pipeline);
 }
 
@@ -77,6 +87,7 @@ tri_test_init_framebuffer(struct tri_test *test)
     test->rt =
         vk_create_image(vk, test->color_format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
                         VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vk_fill_image(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT, 0x11);
     vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
 
     test->fb = vk_create_framebuffer(vk, test->rt, NULL, NULL);
@@ -156,9 +167,13 @@ tri_test_draw_triangle(struct tri_test *test, VkCommandBuffer cmd)
         .renderPass = test->fb->pass,
         .framebuffer = test->fb->fb,
         .renderArea = {
+            .offset = {
+                .x = tri_border,
+                .y = tri_border,
+            },
             .extent = {
-                .width = test->width,
-                .height = test->height,
+                .width = test->width - tri_border * 2,
+                .height = test->height - tri_border * 2,
             },
         },
         .clearValueCount = 1,

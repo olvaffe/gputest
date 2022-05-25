@@ -562,6 +562,24 @@ vk_destroy_image(struct vk *vk, struct vk_image *img)
 }
 
 static inline void
+vk_fill_image(struct vk *vk,
+              struct vk_image *img,
+              VkImageAspectFlagBits aspect,
+              uint8_t val)
+{
+    if (!img->mem_mappable)
+        vk_die("cannot fill non-mappable image");
+
+    if (img->info.tiling != VK_IMAGE_TILING_LINEAR)
+        vk_log("filling non-linear image");
+
+    void *ptr;
+    vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
+    memset(ptr, val, img->mem_size);
+    vk->UnmapMemory(vk->dev, img->mem);
+}
+
+static inline void
 vk_write_ppm(const char *filename,
              const void *data,
              VkFormat format,
