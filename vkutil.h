@@ -100,10 +100,15 @@ struct vk_pipeline {
     uint32_t vi_attr_count;
 
     VkPipelineInputAssemblyStateCreateInfo ia_info;
+
     VkViewport viewport;
     VkRect2D scissor;
+
     VkPipelineRasterizationStateCreateInfo rast_info;
+
     VkPipelineMultisampleStateCreateInfo msaa_info;
+    VkSampleMask sample_mask;
+
     VkPipelineDepthStencilStateCreateInfo depth_info;
     VkPipelineColorBlendAttachmentState color_att;
 
@@ -562,10 +567,7 @@ vk_destroy_image(struct vk *vk, struct vk_image *img)
 }
 
 static inline void
-vk_fill_image(struct vk *vk,
-              struct vk_image *img,
-              VkImageAspectFlagBits aspect,
-              uint8_t val)
+vk_fill_image(struct vk *vk, struct vk_image *img, VkImageAspectFlagBits aspect, uint8_t val)
 {
     if (!img->mem_mappable)
         vk_die("cannot fill non-mappable image");
@@ -630,6 +632,9 @@ vk_dump_image(struct vk *vk,
     if (img->info.tiling != VK_IMAGE_TILING_LINEAR)
         vk_log("dumping non-linear image");
 
+    if (img->info.samples != VK_SAMPLE_COUNT_1_BIT)
+        vk_log("dumping msaa image");
+
     const VkImageSubresource subres = {
         .aspectMask = aspect,
     };
@@ -640,8 +645,9 @@ vk_dump_image(struct vk *vk,
     vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
     vk_check(vk, "failed to map image memory");
 
-    vk_write_ppm(filename, ptr + layout.offset, img->info.format, img->info.extent.width,
-                 img->info.extent.height, layout.rowPitch);
+    vk_write_ppm(filename, ptr + layout.offset, img->info.format,
+                 img->info.extent.width * img->info.samples, img->info.extent.height,
+                 layout.rowPitch);
 
     vk->UnmapMemory(vk->dev, img->mem);
 }
@@ -901,9 +907,11 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
         .lineWidth = 1.0f,
     };
 
+    pipeline->sample_mask = (1u << fb->samples) - 1;
     pipeline->msaa_info = (VkPipelineMultisampleStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .rasterizationSamples = fb->samples,
+        .pSampleMask = &pipeline->sample_mask,
     };
 
     pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
