@@ -188,9 +188,7 @@ tri_test_draw_triangle(struct tri_test *test, VkCommandBuffer cmd)
     vk->CmdBindVertexBuffers(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 });
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
 
-    /* force gmem rendering */
-    for (uint32_t i = 0; i < 3; i++)
-        vk->CmdDraw(cmd, 3, 1, 0, 0);
+    vk->CmdDraw(cmd, 3, 1, 0, 0);
 
     vk->CmdEndRenderPass(cmd);
 
