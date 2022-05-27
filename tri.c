@@ -6,11 +6,11 @@
 #include "vkutil.h"
 
 static const uint32_t tri_test_vs[] = {
-#include "msaa.vert.inc"
+#include "tri.vert.inc"
 };
 
 static const uint32_t tri_test_fs[] = {
-#include "msaa.frag.inc"
+#include "tri.frag.inc"
 };
 
 static const float tri_vertices[3][5] = {
