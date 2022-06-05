@@ -591,9 +591,29 @@ vk_write_ppm(const char *filename,
 {
     uint8_t swizzle[3];
     uint32_t cpp;
+    uint16_t max_val;
+    bool packed;
     switch (format) {
     case VK_FORMAT_B8G8R8A8_UNORM:
         cpp = 4;
+        max_val = 255;
+        packed = false;
+        swizzle[0] = 2;
+        swizzle[1] = 1;
+        swizzle[2] = 0;
+        break;
+    case VK_FORMAT_R5G5B5A1_UNORM_PACK16:
+        cpp = 2;
+        max_val = 31;
+        packed = true;
+        swizzle[0] = 2;
+        swizzle[1] = 1;
+        swizzle[2] = 0;
+        break;
+    case VK_FORMAT_A1R5G5B5_UNORM_PACK16:
+        cpp = 2;
+        max_val = 31;
+        packed = true;
         swizzle[0] = 2;
         swizzle[1] = 1;
         swizzle[2] = 0;
@@ -607,13 +627,25 @@ vk_write_ppm(const char *filename,
     if (!fp)
         vk_die("failed to open %s", filename);
 
-    fprintf(fp, "P6 %u %u %u\n", width, height, ((cpp / 4) << 8) - 1);
+    fprintf(fp, "P6 %u %u %u\n", width, height, max_val);
     for (uint32_t y = 0; y < height; y++) {
         for (uint32_t x = 0; x < width; x++) {
-            const uint8_t *pixel = data + pitch * y + cpp * x;
-            const char bytes[3] = { pixel[swizzle[0]], pixel[swizzle[1]], pixel[swizzle[2]] };
-            if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
-                vk_die("failed to write pixel (%u, %u)", x, y);
+            if (packed) {
+                const uint16_t *pixel = data + pitch * y + cpp * x;
+                uint16_t val = *pixel;
+                if (format == VK_FORMAT_R5G5B5A1_UNORM_PACK16)
+                    val >>= 1;
+
+                const uint8_t comps[3] = { val & 0x1f, (val >> 5) & 0x1f, (val >> 10) & 0x1f };
+                const char bytes[3] = { comps[swizzle[0]], comps[swizzle[1]], comps[swizzle[2]] };
+                if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
+                    vk_die("failed to write pixel (%u, %u)", x, y);
+            } else {
+                const uint8_t *pixel = data + pitch * y + cpp * x;
+                const char bytes[3] = { pixel[swizzle[0]], pixel[swizzle[1]], pixel[swizzle[2]] };
+                if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
+                    vk_die("failed to write pixel (%u, %u)", x, y);
+            }
         }
     }
 
