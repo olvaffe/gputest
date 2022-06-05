@@ -34,9 +34,9 @@ idep_vkutil = declare_dependency(
 )
 
 tests = [
-  'vktest',
-  'msaa',
   'tri',
+  'tex_depth',
+  'msaa',
 ]
 
 foreach t : tests

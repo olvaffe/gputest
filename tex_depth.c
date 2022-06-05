@@ -5,21 +5,21 @@
 
 #include "vkutil.h"
 
-static const uint32_t vktest_vs[] = {
-#include "vktest.vert.inc"
+static const uint32_t tex_depth_test_vs[] = {
+#include "tex_depth.vert.inc"
 };
 
-static const uint32_t vktest_fs[] = {
-#include "vktest.frag.inc"
+static const uint32_t tex_depth_test_fs[] = {
+#include "tex_depth.frag.inc"
 };
 
-static const float vktest_vertices[3][2] = {
+static const float tex_depth_test_vertices[3][2] = {
     { -1.0f, -1.0f },
     { 0.0f, 1.0f },
     { 1.0f, -1.0f },
 };
 
-struct vktest {
+struct tex_depth_test {
     VkFormat color_format;
     VkFormat depth_format;
     uint32_t width;
@@ -38,7 +38,7 @@ struct vktest {
 };
 
 static void
-vktest_init_descriptor_set(struct vktest *test)
+tex_depth_test_init_descriptor_set(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -47,17 +47,17 @@ vktest_init_descriptor_set(struct vktest *test)
 }
 
 static void
-vktest_init_pipeline(struct vktest *test)
+tex_depth_test_init_pipeline(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
     test->pipeline = vk_create_pipeline(vk);
 
-    vk_set_pipeline_shaders(vk, test->pipeline, vktest_vs, sizeof(vktest_vs), vktest_fs,
-                            sizeof(vktest_fs));
+    vk_set_pipeline_shaders(vk, test->pipeline, tex_depth_test_vs, sizeof(tex_depth_test_vs),
+                            tex_depth_test_fs, sizeof(tex_depth_test_fs));
     vk_set_pipeline_layout(vk, test->pipeline, true);
 
-    const uint32_t comp_count = ARRAY_SIZE(vktest_vertices[0]);
+    const uint32_t comp_count = ARRAY_SIZE(tex_depth_test_vertices[0]);
     vk_set_pipeline_vertices(vk, test->pipeline, &comp_count, 1);
 
     vk_setup_pipeline(vk, test->pipeline, test->fb);
@@ -65,7 +65,7 @@ vktest_init_pipeline(struct vktest *test)
 }
 
 static void
-vktest_init_framebuffer(struct vktest *test)
+tex_depth_test_init_framebuffer(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -78,7 +78,7 @@ vktest_init_framebuffer(struct vktest *test)
 }
 
 static void
-vktest_init_depth_texture(struct vktest *test)
+tex_depth_test_init_depth_texture(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -89,30 +89,31 @@ vktest_init_depth_texture(struct vktest *test)
 }
 
 static void
-vktest_init_vb(struct vktest *test)
+tex_depth_test_init_vb(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb = vk_create_buffer(vk, sizeof(vktest_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    memcpy(test->vb->mem_ptr, vktest_vertices, sizeof(vktest_vertices));
+    test->vb =
+        vk_create_buffer(vk, sizeof(tex_depth_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    memcpy(test->vb->mem_ptr, tex_depth_test_vertices, sizeof(tex_depth_test_vertices));
 }
 
 static void
-vktest_init(struct vktest *test)
+tex_depth_test_init(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
     vk_init(vk);
-    vktest_init_vb(test);
+    tex_depth_test_init_vb(test);
 
-    vktest_init_depth_texture(test);
-    vktest_init_framebuffer(test);
-    vktest_init_pipeline(test);
-    vktest_init_descriptor_set(test);
+    tex_depth_test_init_depth_texture(test);
+    tex_depth_test_init_framebuffer(test);
+    tex_depth_test_init_pipeline(test);
+    tex_depth_test_init_descriptor_set(test);
 }
 
 static void
-vktest_cleanup(struct vktest *test)
+tex_depth_test_cleanup(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -130,7 +131,7 @@ vktest_cleanup(struct vktest *test)
 }
 
 static void
-vktest_draw_triangle(struct vktest *test, VkCommandBuffer cmd)
+tex_depth_test_draw_triangle(struct tex_depth_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
@@ -196,7 +197,7 @@ vktest_draw_triangle(struct vktest *test, VkCommandBuffer cmd)
 }
 
 static void
-vktest_draw_prep_texture(struct vktest *test, VkCommandBuffer cmd)
+tex_depth_test_draw_prep_texture(struct tex_depth_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
@@ -238,14 +239,14 @@ vktest_draw_prep_texture(struct vktest *test, VkCommandBuffer cmd)
 }
 
 static void
-vktest_draw(struct vktest *test)
+tex_depth_test_draw(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
     VkCommandBuffer cmd = vk_begin_cmd(vk);
 
-    vktest_draw_prep_texture(test, cmd);
-    vktest_draw_triangle(test, cmd);
+    tex_depth_test_draw_prep_texture(test, cmd);
+    tex_depth_test_draw_triangle(test, cmd);
 
     vk_end_cmd(vk);
 
@@ -255,16 +256,16 @@ vktest_draw(struct vktest *test)
 int
 main(void)
 {
-    struct vktest test = {
+    struct tex_depth_test test = {
         .color_format = VK_FORMAT_B8G8R8A8_UNORM,
         .depth_format = VK_FORMAT_D24_UNORM_S8_UINT,
         .width = 300,
         .height = 300,
     };
 
-    vktest_init(&test);
-    vktest_draw(&test);
-    vktest_cleanup(&test);
+    tex_depth_test_init(&test);
+    tex_depth_test_draw(&test);
+    tex_depth_test_cleanup(&test);
 
     return 0;
 }
