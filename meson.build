@@ -35,6 +35,7 @@ idep_vkutil = declare_dependency(
 
 tests = [
   'tri',
+  'tex',
   'tex_depth',
   'msaa',
 ]
