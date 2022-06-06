@@ -448,17 +448,36 @@ vk_validate_image(struct vk *vk, struct vk_image *img)
           VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT },
     };
 
-    VkFormatProperties props;
-    vk->GetPhysicalDeviceFormatProperties(vk->physical_dev, img->info.format, &props);
+    VkFormatProperties fmt_props;
+    vk->GetPhysicalDeviceFormatProperties(vk->physical_dev, img->info.format, &fmt_props);
 
     const VkFormatFeatureFlags features = img->info.tiling == VK_IMAGE_TILING_OPTIMAL
-                                              ? props.optimalTilingFeatures
-                                              : props.linearTilingFeatures;
+                                              ? fmt_props.optimalTilingFeatures
+                                              : fmt_props.linearTilingFeatures;
 
     for (uint32_t i = 0; i < ARRAY_SIZE(pairs); i++) {
         if ((img->info.usage & pairs[i].usage) && !(features & pairs[i].feature))
             vk_die("image usage 0x%x is not supported", img->info.usage);
     }
+
+    VkImageFormatProperties img_props;
+    vk->result = vk->GetPhysicalDeviceImageFormatProperties(
+        vk->physical_dev, img->info.format, img->info.imageType, img->info.tiling,
+        img->info.usage, img->info.flags, &img_props);
+    vk_check(vk, "image format/type/tiling/usage/flags is not supported");
+
+    if (img->info.extent.width > img_props.maxExtent.width)
+        vk_die("image width %u is not supported", img->info.extent.width);
+    if (img->info.extent.height > img_props.maxExtent.height)
+        vk_die("image height %u is not supported", img->info.extent.height);
+    if (img->info.extent.depth > img_props.maxExtent.depth)
+        vk_die("image depth %u is not supported", img->info.extent.depth);
+    if (img->info.mipLevels > img_props.maxMipLevels)
+        vk_die("image miplevel %u is not supported", img->info.mipLevels);
+    if (img->info.arrayLayers > img_props.maxArrayLayers)
+        vk_die("image array layer %u is not supported", img->info.arrayLayers);
+    if (!(img->info.samples & img_props.sampleCounts))
+        vk_die("image sample count %u is not supported", img->info.samples);
 }
 
 static inline struct vk_image *
