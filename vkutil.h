@@ -440,7 +440,12 @@ vk_validate_image(struct vk *vk, struct vk_image *img)
         VkImageUsageFlagBits usage;
         VkFormatFeatureFlagBits feature;
     } pairs[] = {
+        { VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT },
+        { VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_FORMAT_FEATURE_TRANSFER_DST_BIT },
         { VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT },
+        { VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT },
+        { VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+          VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT },
     };
 
     VkFormatProperties props;

@@ -229,8 +229,7 @@ tex_test_draw_prep_texture(struct tex_test *test, VkCommandBuffer cmd)
 
     vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                            0, 0, NULL, 0, NULL, 1, &barrier1);
-    vk->CmdClearColorImage(cmd, test->tex->img, barrier1.newLayout, &clear_val, 1,
-                                  &subres_range);
+    vk->CmdClearColorImage(cmd, test->tex->img, barrier1.newLayout, &clear_val, 1, &subres_range);
     vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
                            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1,
                            &barrier2);
