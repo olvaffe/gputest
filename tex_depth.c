@@ -3,6 +3,18 @@
  * SPDX-License-Identifier: MIT
  */
 
+/* This test draws a textured triangle to a linear color image and dumps it to
+ * a file.  The texture image is tiled, has a depth/stencil format, and is not
+ * dumped.
+ *
+ * The texture image is cleared to a solid depth/stencil value.  A render pass
+ * is used to clear the color image and draw the triangle.
+ *
+ * The FS scales the texcoords such that the border color is used.  Because
+ * the image view is into the stencil aspect, the FS uses a usampler2D and
+ * scales down the texel values by 10.0.
+ */
+
 #include "vkutil.h"
 
 static const uint32_t tex_depth_test_vs[] = {

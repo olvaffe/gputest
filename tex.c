@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: MIT
  */
 
+/* This test draws a textured triangle to a linear color image and dumps it to
+ * a file.  The texture image is also linear and is also dumped.
+ *
+ * The texture image is cleared to a solid color.  A render pass is used to
+ * clear the color image and draw the triangle.
+ */
+
 #include "vkutil.h"
 
 static const uint32_t tex_test_vs[] = {
@@ -247,6 +254,7 @@ tex_test_draw(struct tex_test *test)
 
     vk_end_cmd(vk);
 
+    vk_dump_image(vk, test->tex, VK_IMAGE_ASPECT_COLOR_BIT, "tex.ppm");
     vk_dump_image(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
 }
 

@@ -3,6 +3,12 @@
  * SPDX-License-Identifier: MIT
  */
 
+/* This test draws an RGB triangle to a tiled MSAA color image, resolves it to
+ * a linear image, and dumps the linear image to a file.
+ *
+ * A render pass is used to clear, draw, and resolve the MSAA image.
+ */
+
 #include "vkutil.h"
 
 static const uint32_t msaa_test_vs[] = {

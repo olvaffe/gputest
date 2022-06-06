@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+/* This test clears a linear color image and dumps it to a file. */
+
 #include "vkutil.h"
 
 struct clear_test {

@@ -3,6 +3,15 @@
  * SPDX-License-Identifier: MIT
  */
 
+/* This test draws an RGB triangle to a linear color image and dumps it to a
+ * file.
+ *
+ * It memsets the raw memory with vk_fill_image, which can be ignored because
+ * it does not use VK_IMAGE_LAYOUT_PREINITIALIZED.  There is a border of
+ * tri_border pixels.  A render pass is used to clear the render area and
+ * draws the triangle.
+ */
+
 #include "vkutil.h"
 
 static const uint32_t tri_test_vs[] = {
