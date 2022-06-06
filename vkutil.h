@@ -433,6 +433,29 @@ vk_destroy_buffer(struct vk *vk, struct vk_buffer *buf)
     free(buf);
 }
 
+static inline void
+vk_validate_image(struct vk *vk, struct vk_image *img)
+{
+    const struct {
+        VkImageUsageFlagBits usage;
+        VkFormatFeatureFlagBits feature;
+    } pairs[] = {
+        { VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT },
+    };
+
+    VkFormatProperties props;
+    vk->GetPhysicalDeviceFormatProperties(vk->physical_dev, img->info.format, &props);
+
+    const VkFormatFeatureFlags features = img->info.tiling == VK_IMAGE_TILING_OPTIMAL
+                                              ? props.optimalTilingFeatures
+                                              : props.linearTilingFeatures;
+
+    for (uint32_t i = 0; i < ARRAY_SIZE(pairs); i++) {
+        if ((img->info.usage & pairs[i].usage) && !(features & pairs[i].feature))
+            vk_die("image usage 0x%x is not supported", img->info.usage);
+    }
+}
+
 static inline struct vk_image *
 vk_create_image(struct vk *vk,
                 VkFormat format,
@@ -462,6 +485,8 @@ vk_create_image(struct vk *vk,
             .usage = usage,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
+
+    vk_validate_image(vk, img);
 
     vk->result = vk->CreateImage(vk->dev, &img->info, NULL, &img->img);
     vk_check(vk, "failed to create image");
