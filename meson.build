@@ -33,6 +33,12 @@ idep_vkutil = declare_dependency(
   dependencies: [dep_dl],
 )
 
+executable(
+  'clear',
+  sources: ['clear.c'],
+  dependencies: [idep_vkutil],
+)
+
 tests = [
   'tri',
   'tex',
