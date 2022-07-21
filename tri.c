@@ -71,7 +71,7 @@ tri_test_init_pipeline(struct tri_test *test)
 
     vk_set_pipeline_shaders(vk, test->pipeline, tri_test_vs, sizeof(tri_test_vs), tri_test_fs,
                             sizeof(tri_test_fs));
-    vk_set_pipeline_layout(vk, test->pipeline, false);
+    vk_set_pipeline_layout(vk, test->pipeline, false, false);
 
     const uint32_t comp_counts[2] = { 2, 3 };
     vk_set_pipeline_vertices(vk, test->pipeline, comp_counts, ARRAY_SIZE(comp_counts));

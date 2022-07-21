@@ -25,12 +25,13 @@ if not cc.has_header('vulkan/vulkan.h')
 endif
 
 dep_dl = cc.find_library('dl')
+dep_m = cc.find_library('m', required: false)
 
 add_project_arguments(['-D_GNU_SOURCE', warning_args], language: 'c')
 
 idep_vkutil = declare_dependency(
   sources: ['vkutil.h'],
-  dependencies: [dep_dl],
+  dependencies: [dep_dl, dep_m],
 )
 
 executable(
@@ -53,7 +54,8 @@ foreach t : tests
       t + '.' + stage + '.inc',
       input: [t + '.' + stage],
       output: [t + '.' + stage + '.inc'],
-      command: [prog_glslang, '--quiet', '-V', '-x', '-o', '@OUTPUT@', '@INPUT@']
+      command: [prog_glslang, '--quiet', '--target-env', 'vulkan1.1', '-x',
+                '-o', '@OUTPUT@', '@INPUT@']
     )
   endforeach
 

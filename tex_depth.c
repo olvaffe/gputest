@@ -55,7 +55,7 @@ tex_depth_test_init_descriptor_set(struct tex_depth_test *test)
     struct vk *vk = &test->vk;
 
     test->set = vk_create_descriptor_set(vk, test->pipeline);
-    vk_write_descriptor_set(vk, test->set, test->depth_tex);
+    vk_write_descriptor_set_image(vk, test->set, test->depth_tex);
 }
 
 static void
@@ -67,7 +67,7 @@ tex_depth_test_init_pipeline(struct tex_depth_test *test)
 
     vk_set_pipeline_shaders(vk, test->pipeline, tex_depth_test_vs, sizeof(tex_depth_test_vs),
                             tex_depth_test_fs, sizeof(tex_depth_test_fs));
-    vk_set_pipeline_layout(vk, test->pipeline, true);
+    vk_set_pipeline_layout(vk, test->pipeline, false, true);
 
     const uint32_t comp_count = ARRAY_SIZE(tex_depth_test_vertices[0]);
     vk_set_pipeline_vertices(vk, test->pipeline, &comp_count, 1);

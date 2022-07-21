@@ -6,7 +6,9 @@
 #ifndef VKUTIL_H
 #define VKUTIL_H
 
+#include <assert.h>
 #include <dlfcn.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -888,19 +890,24 @@ vk_set_pipeline_shaders(struct vk *vk,
 }
 
 static inline void
-vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline, bool has_set)
+vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline, bool vs_ubo, bool fs_tex)
 {
+    assert(vs_ubo + fs_tex < 2);
+    const bool has_set = vs_ubo || fs_tex;
+
     if (has_set) {
+        const VkDescriptorSetLayoutBinding binding = {
+            .binding = 0,
+            .descriptorType = vs_ubo ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+                                     : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .stageFlags = vs_ubo ? VK_SHADER_STAGE_FRAGMENT_BIT : VK_SHADER_STAGE_FRAGMENT_BIT,
+        };
+
         const VkDescriptorSetLayoutCreateInfo set_layout_info = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .bindingCount = 1,
-            .pBindings =
-                &(VkDescriptorSetLayoutBinding){
-                    .binding = 0,
-                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                    .descriptorCount = 1,
-                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-                },
+            .pBindings = &binding,
         };
 
         vk->result =
@@ -1102,8 +1109,38 @@ vk_create_descriptor_set(struct vk *vk, const struct vk_pipeline *pipeline)
 }
 
 static inline void
-vk_write_descriptor_set(struct vk *vk, struct vk_descriptor_set *set, const struct vk_image *img)
+vk_write_descriptor_set_buffer(struct vk *vk,
+                               struct vk_descriptor_set *set,
+                               const struct vk_buffer *buf)
 {
+    const VkDescriptorBufferInfo buf_info = {
+        .buffer = buf->buf,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE,
+    };
+    const VkWriteDescriptorSet write_info = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = set->set,
+        .dstBinding = 0,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .pBufferInfo = &buf_info,
+    };
+
+    vk->UpdateDescriptorSets(vk->dev, 1, &write_info, 0, NULL);
+}
+
+static inline void
+vk_write_descriptor_set_image(struct vk *vk,
+                              struct vk_descriptor_set *set,
+                              const struct vk_image *img)
+{
+    const VkDescriptorImageInfo img_info = {
+        .sampler = img->sampler,
+        .imageView = img->sample_view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
     const VkWriteDescriptorSet write_info = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .dstSet = set->set,
@@ -1111,12 +1148,7 @@ vk_write_descriptor_set(struct vk *vk, struct vk_descriptor_set *set, const stru
         .dstArrayElement = 0,
         .descriptorCount = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .pImageInfo =
-            &(VkDescriptorImageInfo){
-                .sampler = img->sampler,
-                .imageView = img->sample_view,
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            },
+        .pImageInfo = &img_info,
     };
 
     vk->UpdateDescriptorSets(vk->dev, 1, &write_info, 0, NULL);
