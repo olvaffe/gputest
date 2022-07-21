@@ -1,0 +1,20 @@
+/*
+ * Copyright 2022 Google LLC
+ * SPDX-License-Identifier: MIT
+ */
+
+#version 420 core
+
+layout(location = 0) in vec2 in_position;
+layout(location = 1) in vec3 in_color;
+layout(location = 0) out vec3 out_color;
+
+layout(set = 0, binding = 0) uniform UBO {
+    mat2 transform;
+} ubo;
+
+void main()
+{
+    gl_Position = vec4(ubo.transform * in_position, 0.0, 1.0);
+    out_color = in_color;
+}

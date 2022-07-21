@@ -44,6 +44,7 @@ tests = [
   'tri',
   'tex',
   'tex_depth',
+  'ubo',
   'msaa',
 ]
 
