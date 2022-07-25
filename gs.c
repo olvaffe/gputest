@@ -12,19 +12,19 @@
 
 #include "vkutil.h"
 
-static const uint32_t circle_test_vs[] = {
-#include "circle.vert.inc"
+static const uint32_t gs_test_vs[] = {
+#include "gs.vert.inc"
 };
 
-static const uint32_t circle_test_gs[] = {
-#include "circle.geom.inc"
+static const uint32_t gs_test_gs[] = {
+#include "gs.geom.inc"
 };
 
-static const uint32_t circle_test_fs[] = {
-#include "circle.frag.inc"
+static const uint32_t gs_test_fs[] = {
+#include "gs.frag.inc"
 };
 
-static const float circle_vertices[3][6] = {
+static const float gs_vertices[3][6] = {
     {
         -0.6f, /* x */
         -0.6f, /* y */
@@ -53,7 +53,7 @@ static const float circle_vertices[3][6] = {
 
 const uint32_t tri_border = 10;
 
-struct circle_test {
+struct gs_test {
     VkFormat color_format;
     uint32_t width;
     uint32_t height;
@@ -68,18 +68,18 @@ struct circle_test {
 };
 
 static void
-circle_test_init_pipeline(struct circle_test *test)
+gs_test_init_pipeline(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
     test->pipeline = vk_create_pipeline(vk);
 
-    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, circle_test_vs,
-                           sizeof(circle_test_vs));
-    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_GEOMETRY_BIT, circle_test_gs,
-                           sizeof(circle_test_gs));
-    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, circle_test_fs,
-                           sizeof(circle_test_fs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, gs_test_vs,
+                           sizeof(gs_test_vs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_GEOMETRY_BIT, gs_test_gs,
+                           sizeof(gs_test_gs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, gs_test_fs,
+                           sizeof(gs_test_fs));
     vk_set_pipeline_layout(vk, test->pipeline, false, false);
 
     const uint32_t comp_counts[3] = { 2, 3, 1 };
@@ -92,7 +92,7 @@ circle_test_init_pipeline(struct circle_test *test)
 }
 
 static void
-circle_test_init_framebuffer(struct circle_test *test)
+gs_test_init_framebuffer(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -105,28 +105,28 @@ circle_test_init_framebuffer(struct circle_test *test)
 }
 
 static void
-circle_test_init_vb(struct circle_test *test)
+gs_test_init_vb(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb = vk_create_buffer(vk, sizeof(circle_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    memcpy(test->vb->mem_ptr, circle_vertices, sizeof(circle_vertices));
+    test->vb = vk_create_buffer(vk, sizeof(gs_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    memcpy(test->vb->mem_ptr, gs_vertices, sizeof(gs_vertices));
 }
 
 static void
-circle_test_init(struct circle_test *test)
+gs_test_init(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
     vk_init(vk);
-    circle_test_init_vb(test);
+    gs_test_init_vb(test);
 
-    circle_test_init_framebuffer(test);
-    circle_test_init_pipeline(test);
+    gs_test_init_framebuffer(test);
+    gs_test_init_pipeline(test);
 }
 
 static void
-circle_test_cleanup(struct circle_test *test)
+gs_test_cleanup(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -141,7 +141,7 @@ circle_test_cleanup(struct circle_test *test)
 }
 
 static void
-circle_test_draw_points(struct circle_test *test, VkCommandBuffer cmd)
+gs_test_draw_points(struct gs_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
@@ -195,7 +195,7 @@ circle_test_draw_points(struct circle_test *test, VkCommandBuffer cmd)
     vk->CmdBindVertexBuffers(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 });
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
 
-    vk->CmdDraw(cmd, ARRAY_SIZE(circle_vertices), 1, 0, 0);
+    vk->CmdDraw(cmd, ARRAY_SIZE(gs_vertices), 1, 0, 0);
 
     vk->CmdEndRenderPass(cmd);
 
@@ -204,13 +204,13 @@ circle_test_draw_points(struct circle_test *test, VkCommandBuffer cmd)
 }
 
 static void
-circle_test_draw(struct circle_test *test)
+gs_test_draw(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
     VkCommandBuffer cmd = vk_begin_cmd(vk);
 
-    circle_test_draw_points(test, cmd);
+    gs_test_draw_points(test, cmd);
 
     vk_end_cmd(vk);
 
@@ -220,15 +220,15 @@ circle_test_draw(struct circle_test *test)
 int
 main(void)
 {
-    struct circle_test test = {
+    struct gs_test test = {
         .color_format = VK_FORMAT_B8G8R8A8_UNORM,
         .width = 300,
         .height = 300,
     };
 
-    circle_test_init(&test);
-    circle_test_draw(&test);
-    circle_test_cleanup(&test);
+    gs_test_init(&test);
+    gs_test_draw(&test);
+    gs_test_cleanup(&test);
 
     return 0;
 }

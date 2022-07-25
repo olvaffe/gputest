@@ -47,7 +47,7 @@ tests = [
   'tex_depth',
   'ubo',
   'msaa',
-  'circle',
+  'gs',
 ]
 
 foreach t : tests
