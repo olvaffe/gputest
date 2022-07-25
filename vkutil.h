@@ -94,8 +94,7 @@ struct vk_pipeline {
     VkPipelineShaderStageCreateInfo stages[5];
     uint32_t stage_count;
 
-    VkDescriptorSetLayout set_layout;
-    VkPipelineLayout pipeline_layout;
+    VkPipelineTessellationStateCreateInfo tess_info;
 
     VkVertexInputBindingDescription vi_binding;
     VkVertexInputAttributeDescription vi_attrs[16];
@@ -113,6 +112,9 @@ struct vk_pipeline {
 
     VkPipelineDepthStencilStateCreateInfo depth_info;
     VkPipelineColorBlendAttachmentState color_att;
+
+    VkDescriptorSetLayout set_layout;
+    VkPipelineLayout pipeline_layout;
 
     const struct vk_framebuffer *fb;
 
@@ -243,8 +245,12 @@ vk_init_physical_device(struct vk *vk)
     vk->features.pNext = &vk->custom_border_color_features;
     vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
 
+    if (!vk->features.features.tessellationShader)
+        vk_die("no tessellation shader support");
     if (!vk->features.features.geometryShader)
         vk_die("no geometry shader support");
+    if (!vk->features.features.fillModeNonSolid)
+        vk_die("no non-solid fill mode support");
 
     vk->GetPhysicalDeviceMemoryProperties(vk->physical_dev, &vk->mem_props);
 
@@ -291,7 +297,9 @@ vk_init_device(struct vk *vk)
     features = &(VkPhysicalDeviceFeatures2){
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
         .features = {
+            .tessellationShader = true,
             .geometryShader = true,
+            .fillModeNonSolid = true,
         },
     };
 #endif
@@ -904,42 +912,6 @@ vk_add_pipeline_shader(struct vk *vk,
 }
 
 static inline void
-vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline, bool vs_ubo, bool fs_tex)
-{
-    assert(vs_ubo + fs_tex < 2);
-    const bool has_set = vs_ubo || fs_tex;
-
-    if (has_set) {
-        const VkDescriptorSetLayoutBinding binding = {
-            .binding = 0,
-            .descriptorType = vs_ubo ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-                                     : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
-            .stageFlags = vs_ubo ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT,
-        };
-
-        const VkDescriptorSetLayoutCreateInfo set_layout_info = {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = 1,
-            .pBindings = &binding,
-        };
-
-        vk->result =
-            vk->CreateDescriptorSetLayout(vk->dev, &set_layout_info, NULL, &pipeline->set_layout);
-        vk_check(vk, "failed to create descriptor set layout");
-    }
-
-    const VkPipelineLayoutCreateInfo pipeline_layout_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = has_set,
-        .pSetLayouts = &pipeline->set_layout,
-    };
-    vk->result = vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL,
-                                          &pipeline->pipeline_layout);
-    vk_check(vk, "failed to create pipeline layout");
-}
-
-static inline void
 vk_set_pipeline_vertices(struct vk *vk,
                          struct vk_pipeline *pipeline,
                          const uint32_t *comp_counts,
@@ -997,6 +969,63 @@ vk_set_pipeline_topology(struct vk *vk,
 }
 
 static inline void
+vk_set_pipeline_tessellation(struct vk *vk, struct vk_pipeline *pipeline, uint32_t cp_count)
+{
+    pipeline->tess_info = (VkPipelineTessellationStateCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
+        .patchControlPoints = cp_count,
+    };
+}
+
+static inline void
+vk_set_pipeline_rasterization(struct vk *vk,
+                              struct vk_pipeline *pipeline,
+                              VkPolygonMode poly_mode)
+{
+    pipeline->rast_info = (VkPipelineRasterizationStateCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .polygonMode = poly_mode,
+        .lineWidth = 1.0f,
+    };
+}
+
+static inline void
+vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline, bool vs_ubo, bool fs_tex)
+{
+    assert(vs_ubo + fs_tex < 2);
+    const bool has_set = vs_ubo || fs_tex;
+
+    if (has_set) {
+        const VkDescriptorSetLayoutBinding binding = {
+            .binding = 0,
+            .descriptorType = vs_ubo ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+                                     : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .stageFlags = vs_ubo ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT,
+        };
+
+        const VkDescriptorSetLayoutCreateInfo set_layout_info = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindings = &binding,
+        };
+
+        vk->result =
+            vk->CreateDescriptorSetLayout(vk->dev, &set_layout_info, NULL, &pipeline->set_layout);
+        vk_check(vk, "failed to create descriptor set layout");
+    }
+
+    const VkPipelineLayoutCreateInfo pipeline_layout_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = has_set,
+        .pSetLayouts = &pipeline->set_layout,
+    };
+    vk->result = vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL,
+                                          &pipeline->pipeline_layout);
+    vk_check(vk, "failed to create pipeline layout");
+}
+
+static inline void
 vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_framebuffer *fb)
 {
     pipeline->viewport = (VkViewport){
@@ -1010,11 +1039,6 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
             .width = fb->width,
             .height = fb->height,
         },
-    };
-
-    pipeline->rast_info = (VkPipelineRasterizationStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .lineWidth = 1.0f,
     };
 
     pipeline->sample_mask = (1u << fb->samples) - 1;
@@ -1067,6 +1091,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,
         .pInputAssemblyState = &pipeline->ia_info,
+        .pTessellationState = &pipeline->tess_info,
         .pViewportState = &vp_info,
         .pRasterizationState = &pipeline->rast_info,
         .pMultisampleState = &pipeline->msaa_info,

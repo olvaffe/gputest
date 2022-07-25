@@ -83,6 +83,7 @@ ubo_test_init_pipeline(struct ubo_test *test)
     vk_set_pipeline_vertices(vk, test->pipeline, comp_counts, ARRAY_SIZE(comp_counts));
 
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL);
 
     vk_setup_pipeline(vk, test->pipeline, test->fb);
     vk_compile_pipeline(vk, test->pipeline);
