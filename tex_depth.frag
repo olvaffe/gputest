@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#version 420 core
+#version 460 core
 
 layout(binding = 0) uniform usampler2D tex;
 
