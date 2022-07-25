@@ -901,7 +901,7 @@ vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline, bool vs_ubo,
             .descriptorType = vs_ubo ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
                                      : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
-            .stageFlags = vs_ubo ? VK_SHADER_STAGE_FRAGMENT_BIT : VK_SHADER_STAGE_FRAGMENT_BIT,
+            .stageFlags = vs_ubo ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT,
         };
 
         const VkDescriptorSetLayoutCreateInfo set_layout_info = {
