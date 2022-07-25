@@ -48,11 +48,12 @@ tests = [
   'ubo',
   'msaa',
   'gs',
+  'tess',
 ]
 
 foreach t : tests
   spirv_incs = []
-  foreach stage : ['vert', 'geom', 'frag']
+  foreach stage : ['vert', 'tesc', 'tese', 'geom', 'frag']
     glsl = t + '.' + stage
     if fs.exists(glsl)
       spirv_incs += custom_target(
