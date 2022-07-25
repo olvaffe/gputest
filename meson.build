@@ -10,6 +10,7 @@ project(
   default_options: ['c_std=c11', 'warning_level=3'],
 )
 
+fs = import('fs')
 prog_glslang = find_program('glslangValidator')
 
 cc = meson.get_compiler('c')
@@ -46,18 +47,22 @@ tests = [
   'tex_depth',
   'ubo',
   'msaa',
+  'circle',
 ]
 
 foreach t : tests
   spirv_incs = []
-  foreach stage : ['vert', 'frag']
-    spirv_incs += custom_target(
-      t + '.' + stage + '.inc',
-      input: [t + '.' + stage],
-      output: [t + '.' + stage + '.inc'],
-      command: [prog_glslang, '--quiet', '--target-env', 'vulkan1.1', '-x',
-                '-o', '@OUTPUT@', '@INPUT@']
-    )
+  foreach stage : ['vert', 'geom', 'frag']
+    glsl = t + '.' + stage
+    if fs.exists(glsl)
+      spirv_incs += custom_target(
+        t + '.' + stage + '.inc',
+        input: [t + '.' + stage],
+        output: [t + '.' + stage + '.inc'],
+        command: [prog_glslang, '--quiet', '--target-env', 'vulkan1.1', '-x',
+                  '-o', '@OUTPUT@', '@INPUT@']
+      )
+    endif
   endforeach
 
   executable(
