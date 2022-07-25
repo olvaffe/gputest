@@ -46,7 +46,7 @@ static const float tri_vertices[3][5] = {
     },
 };
 
-const uint32_t tri_border = 10;
+static const uint32_t tri_border = 10;
 
 struct tri_test {
     VkFormat color_format;

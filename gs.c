@@ -51,8 +51,6 @@ static const float gs_vertices[3][6] = {
     },
 };
 
-const uint32_t tri_border = 10;
-
 struct gs_test {
     VkFormat color_format;
     uint32_t width;
