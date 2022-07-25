@@ -986,13 +986,19 @@ vk_set_pipeline_vertices(struct vk *vk,
 }
 
 static inline void
-vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_framebuffer *fb)
+vk_set_pipeline_topology(struct vk *vk,
+                         struct vk_pipeline *pipeline,
+                         VkPrimitiveTopology topology)
 {
     pipeline->ia_info = (VkPipelineInputAssemblyStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+        .topology = topology,
     };
+}
 
+static inline void
+vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_framebuffer *fb)
+{
     pipeline->viewport = (VkViewport){
         .width = (float)fb->width,
         .height = (float)fb->height,
