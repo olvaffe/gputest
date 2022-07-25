@@ -69,8 +69,10 @@ tri_test_init_pipeline(struct tri_test *test)
 
     test->pipeline = vk_create_pipeline(vk);
 
-    vk_set_pipeline_shaders(vk, test->pipeline, tri_test_vs, sizeof(tri_test_vs), tri_test_fs,
-                            sizeof(tri_test_fs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, tri_test_vs,
+                           sizeof(tri_test_vs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, tri_test_fs,
+                           sizeof(tri_test_fs));
     vk_set_pipeline_layout(vk, test->pipeline, false, false);
 
     const uint32_t comp_counts[2] = { 2, 3 };

@@ -73,8 +73,10 @@ ubo_test_init_pipeline(struct ubo_test *test)
 
     test->pipeline = vk_create_pipeline(vk);
 
-    vk_set_pipeline_shaders(vk, test->pipeline, ubo_test_vs, sizeof(ubo_test_vs), ubo_test_fs,
-                            sizeof(ubo_test_fs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, ubo_test_vs,
+                           sizeof(ubo_test_vs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, ubo_test_fs,
+                           sizeof(ubo_test_fs));
     vk_set_pipeline_layout(vk, test->pipeline, true, false);
 
     const uint32_t comp_counts[2] = { 2, 3 };

@@ -65,8 +65,10 @@ msaa_test_init_pipeline(struct msaa_test *test)
 
     test->pipeline = vk_create_pipeline(vk);
 
-    vk_set_pipeline_shaders(vk, test->pipeline, msaa_test_vs, sizeof(msaa_test_vs), msaa_test_fs,
-                            sizeof(msaa_test_fs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, msaa_test_vs,
+                           sizeof(msaa_test_vs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, msaa_test_fs,
+                           sizeof(msaa_test_fs));
     vk_set_pipeline_layout(vk, test->pipeline, false, false);
 
     const uint32_t comp_counts[2] = { 2, 3 };

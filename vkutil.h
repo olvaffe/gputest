@@ -91,8 +91,8 @@ struct vk_framebuffer {
 };
 
 struct vk_pipeline {
-    VkShaderModule vs;
-    VkShaderModule fs;
+    VkPipelineShaderStageCreateInfo stages[5];
+    uint32_t stage_count;
 
     VkDescriptorSetLayout set_layout;
     VkPipelineLayout pipeline_layout;
@@ -243,6 +243,9 @@ vk_init_physical_device(struct vk *vk)
     vk->features.pNext = &vk->custom_border_color_features;
     vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
 
+    if (!vk->features.features.geometryShader)
+        vk_die("no geometry shader support");
+
     vk->GetPhysicalDeviceMemoryProperties(vk->physical_dev, &vk->mem_props);
 
     const VkMemoryPropertyFlags mt_flags =
@@ -283,6 +286,14 @@ vk_init_device(struct vk *vk)
     exts[ext_count++] = "VK_EXT_custom_border_color";
     vk->EXT_custom_border_color = true;
     features = &vk->features;
+#else
+    /* minimal features */
+    features = &(VkPhysicalDeviceFeatures2){
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .features = {
+            .geometryShader = true,
+        },
+    };
 #endif
 
     vk->queue_family_index = 0;
@@ -878,15 +889,18 @@ vk_create_shader_module(struct vk *vk, const uint32_t *code, size_t size)
 }
 
 static inline void
-vk_set_pipeline_shaders(struct vk *vk,
-                        struct vk_pipeline *pipeline,
-                        const uint32_t *vs_code,
-                        size_t vs_size,
-                        const uint32_t *fs_code,
-                        size_t fs_size)
+vk_add_pipeline_shader(struct vk *vk,
+                       struct vk_pipeline *pipeline,
+                       VkShaderStageFlagBits stage,
+                       const uint32_t *code,
+                       size_t size)
 {
-    pipeline->vs = vk_create_shader_module(vk, vs_code, vs_size);
-    pipeline->fs = vk_create_shader_module(vk, fs_code, fs_size);
+    pipeline->stages[pipeline->stage_count++] = (VkPipelineShaderStageCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = stage,
+        .module = vk_create_shader_module(vk, code, size),
+        .pName = "main",
+    };
 }
 
 static inline void
@@ -931,6 +945,8 @@ vk_set_pipeline_vertices(struct vk *vk,
                          const uint32_t *comp_counts,
                          uint32_t attr_count)
 {
+    assert(attr_count < ARRAY_SIZE(pipeline->vi_attrs));
+
     uint32_t offset = 0;
     for (uint32_t i = 0; i < attr_count; i++) {
         VkFormat format;
@@ -1017,21 +1033,6 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
 static inline void
 vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 {
-    const VkPipelineShaderStageCreateInfo stage_info[2] = {
-        [0] = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_VERTEX_BIT,
-            .module = pipeline->vs,
-            .pName = "main",
-        },
-        [1] = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .module = pipeline->fs,
-            .pName = "main",
-        },
-    };
-
     const VkPipelineVertexInputStateCreateInfo vi_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .vertexBindingDescriptionCount = 1,
@@ -1056,8 +1057,8 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 
     const VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .stageCount = 2,
-        .pStages = stage_info,
+        .stageCount = pipeline->stage_count,
+        .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,
         .pInputAssemblyState = &pipeline->ia_info,
         .pViewportState = &vp_info,
@@ -1077,8 +1078,8 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 static inline void
 vk_destroy_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 {
-    vk->DestroyShaderModule(vk->dev, pipeline->vs, NULL);
-    vk->DestroyShaderModule(vk->dev, pipeline->fs, NULL);
+    for (uint32_t i = 0; i < pipeline->stage_count; i++)
+        vk->DestroyShaderModule(vk->dev, pipeline->stages[i].module, NULL);
 
     vk->DestroyDescriptorSetLayout(vk->dev, pipeline->set_layout, NULL);
     vk->DestroyPipelineLayout(vk->dev, pipeline->pipeline_layout, NULL);
