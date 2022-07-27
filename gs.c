@@ -78,7 +78,6 @@ gs_test_init_pipeline(struct gs_test *test)
                            sizeof(gs_test_gs));
     vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, gs_test_fs,
                            sizeof(gs_test_fs));
-    vk_set_pipeline_layout(vk, test->pipeline, false, false);
 
     const uint32_t comp_counts[3] = { 2, 3, 1 };
     vk_set_pipeline_vertices(vk, test->pipeline, comp_counts, ARRAY_SIZE(comp_counts));

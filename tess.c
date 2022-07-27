@@ -78,7 +78,6 @@ tess_test_init_pipeline(struct tess_test *test)
                            tess_test_tes, sizeof(tess_test_tes));
     vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, tess_test_fs,
                            sizeof(tess_test_fs));
-    vk_set_pipeline_layout(vk, test->pipeline, false, false);
 
     const uint32_t comp_counts[2] = { 2, 3 };
     vk_set_pipeline_vertices(vk, test->pipeline, comp_counts, ARRAY_SIZE(comp_counts));

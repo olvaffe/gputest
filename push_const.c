@@ -53,7 +53,6 @@ push_const_init_pipeline(struct push_const_test *test)
 
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
                                sizeof(push_const_test_color));
-    vk_set_pipeline_layout(vk, test->pipeline, true, false);
 
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL);

@@ -113,8 +113,10 @@ struct vk_pipeline {
     VkPipelineDepthStencilStateCreateInfo depth_info;
     VkPipelineColorBlendAttachmentState color_att;
 
+    VkDescriptorSetLayout set_layouts[4];
+    uint32_t set_layout_count;
+
     VkPushConstantRange push_const;
-    VkDescriptorSetLayout set_layout;
     VkPipelineLayout pipeline_layout;
 
     const struct vk_framebuffer *fb;
@@ -991,6 +993,31 @@ vk_set_pipeline_rasterization(struct vk *vk,
 }
 
 static inline void
+vk_add_pipeline_set_layout(struct vk *vk,
+                           struct vk_pipeline *pipeline,
+                           VkDescriptorType type,
+                           VkShaderStageFlags stages)
+{
+    assert(pipeline->set_layout_count < ARRAY_SIZE(pipeline->set_layouts));
+
+    const VkDescriptorSetLayoutBinding binding = {
+        .binding = 0,
+        .descriptorType = type,
+        .descriptorCount = 1,
+        .stageFlags = stages,
+    };
+    const VkDescriptorSetLayoutCreateInfo set_layout_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 1,
+        .pBindings = &binding,
+    };
+
+    vk->result = vk->CreateDescriptorSetLayout(
+        vk->dev, &set_layout_info, NULL, &pipeline->set_layouts[pipeline->set_layout_count++]);
+    vk_check(vk, "failed to create descriptor set layout");
+}
+
+static inline void
 vk_set_pipeline_push_const(struct vk *vk,
                            struct vk_pipeline *pipeline,
                            VkShaderStageFlags stages,
@@ -1003,46 +1030,19 @@ vk_set_pipeline_push_const(struct vk *vk,
 }
 
 static inline void
-vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline, bool vs_ubo, bool fs_tex)
+vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_framebuffer *fb)
 {
-    assert(vs_ubo + fs_tex < 2);
-    const bool has_set = vs_ubo || fs_tex;
-
-    if (has_set) {
-        const VkDescriptorSetLayoutBinding binding = {
-            .binding = 0,
-            .descriptorType = vs_ubo ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-                                     : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
-            .stageFlags = vs_ubo ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT,
-        };
-
-        const VkDescriptorSetLayoutCreateInfo set_layout_info = {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = 1,
-            .pBindings = &binding,
-        };
-
-        vk->result =
-            vk->CreateDescriptorSetLayout(vk->dev, &set_layout_info, NULL, &pipeline->set_layout);
-        vk_check(vk, "failed to create descriptor set layout");
-    }
-
     const VkPipelineLayoutCreateInfo pipeline_layout_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = has_set,
-        .pSetLayouts = &pipeline->set_layout,
+        .setLayoutCount = pipeline->set_layout_count,
+        .pSetLayouts = pipeline->set_layouts,
         .pushConstantRangeCount = pipeline->push_const.size ? 1 : 0,
         .pPushConstantRanges = &pipeline->push_const,
     };
     vk->result = vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL,
                                           &pipeline->pipeline_layout);
     vk_check(vk, "failed to create pipeline layout");
-}
 
-static inline void
-vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_framebuffer *fb)
-{
     pipeline->viewport = (VkViewport){
         .width = (float)fb->width,
         .height = (float)fb->height,
@@ -1127,7 +1127,9 @@ vk_destroy_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     for (uint32_t i = 0; i < pipeline->stage_count; i++)
         vk->DestroyShaderModule(vk->dev, pipeline->stages[i].module, NULL);
 
-    vk->DestroyDescriptorSetLayout(vk->dev, pipeline->set_layout, NULL);
+    for (uint32_t i = 0; i < pipeline->set_layout_count; i++)
+        vk->DestroyDescriptorSetLayout(vk->dev, pipeline->set_layouts[i], NULL);
+
     vk->DestroyPipelineLayout(vk->dev, pipeline->pipeline_layout, NULL);
 
     vk->DestroyPipeline(vk->dev, pipeline->pipeline, NULL);
@@ -1136,7 +1138,7 @@ vk_destroy_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 }
 
 static inline struct vk_descriptor_set *
-vk_create_descriptor_set(struct vk *vk, const struct vk_pipeline *pipeline)
+vk_create_descriptor_set(struct vk *vk, VkDescriptorSetLayout layout)
 {
     struct vk_descriptor_set *set = calloc(1, sizeof(*set));
     if (!set)
@@ -1146,7 +1148,7 @@ vk_create_descriptor_set(struct vk *vk, const struct vk_pipeline *pipeline)
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .descriptorPool = vk->desc_pool,
         .descriptorSetCount = 1,
-        .pSetLayouts = &pipeline->set_layout,
+        .pSetLayouts = &layout,
     };
 
     vk->result = vk->AllocateDescriptorSets(vk->dev, &set_info, &set->set);

@@ -62,7 +62,7 @@ ubo_test_init_descriptor_set(struct ubo_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->set = vk_create_descriptor_set(vk, test->pipeline);
+    test->set = vk_create_descriptor_set(vk, test->pipeline->set_layouts[0]);
     vk_write_descriptor_set_buffer(vk, test->set, test->ubo);
 }
 
@@ -77,7 +77,9 @@ ubo_test_init_pipeline(struct ubo_test *test)
                            sizeof(ubo_test_vs));
     vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, ubo_test_fs,
                            sizeof(ubo_test_fs));
-    vk_set_pipeline_layout(vk, test->pipeline, true, false);
+
+    vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                               VK_SHADER_STAGE_VERTEX_BIT);
 
     const uint32_t comp_counts[2] = { 2, 3 };
     vk_set_pipeline_vertices(vk, test->pipeline, comp_counts, ARRAY_SIZE(comp_counts));

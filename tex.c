@@ -49,7 +49,7 @@ tex_test_init_descriptor_set(struct tex_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->set = vk_create_descriptor_set(vk, test->pipeline);
+    test->set = vk_create_descriptor_set(vk, test->pipeline->set_layouts[0]);
     vk_write_descriptor_set_image(vk, test->set, test->tex);
 }
 
@@ -64,7 +64,9 @@ tex_test_init_pipeline(struct tex_test *test)
                            sizeof(tex_test_vs));
     vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, tex_test_fs,
                            sizeof(tex_test_fs));
-    vk_set_pipeline_layout(vk, test->pipeline, false, true);
+
+    vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                               VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const uint32_t comp_count = ARRAY_SIZE(tex_test_vertices[0]);
     vk_set_pipeline_vertices(vk, test->pipeline, &comp_count, 1);
