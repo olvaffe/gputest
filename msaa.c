@@ -12,14 +12,14 @@
 #include "vkutil.h"
 
 static const uint32_t msaa_test_vs[] = {
-#include "msaa.vert.inc"
+#include "msaa_test.vert.inc"
 };
 
 static const uint32_t msaa_test_fs[] = {
-#include "msaa.frag.inc"
+#include "msaa_test.frag.inc"
 };
 
-static const float msaa_vertices[3][5] = {
+static const float msaa_test_vertices[3][5] = {
     {
         -1.0f, /* x */
         -1.0f, /* y */
@@ -104,8 +104,9 @@ msaa_test_init_vb(struct msaa_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb = vk_create_buffer(vk, sizeof(msaa_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    memcpy(test->vb->mem_ptr, msaa_vertices, sizeof(msaa_vertices));
+    test->vb =
+        vk_create_buffer(vk, sizeof(msaa_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    memcpy(test->vb->mem_ptr, msaa_test_vertices, sizeof(msaa_test_vertices));
 }
 
 static void

@@ -10,22 +10,22 @@
 #include "vkutil.h"
 
 static const uint32_t tess_test_vs[] = {
-#include "tess.vert.inc"
+#include "tess_test.vert.inc"
 };
 
 static const uint32_t tess_test_tcs[] = {
-#include "tess.tesc.inc"
+#include "tess_test.tesc.inc"
 };
 
 static const uint32_t tess_test_tes[] = {
-#include "tess.tese.inc"
+#include "tess_test.tese.inc"
 };
 
 static const uint32_t tess_test_fs[] = {
-#include "tess.frag.inc"
+#include "tess_test.frag.inc"
 };
 
-static const float tess_vertices[3][5] = {
+static const float tess_test_vertices[3][5] = {
     {
         -0.9f, /* x */
         -0.9f, /* y */
@@ -109,8 +109,9 @@ tess_test_init_vb(struct tess_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb = vk_create_buffer(vk, sizeof(tess_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    memcpy(test->vb->mem_ptr, tess_vertices, sizeof(tess_vertices));
+    test->vb =
+        vk_create_buffer(vk, sizeof(tess_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    memcpy(test->vb->mem_ptr, tess_test_vertices, sizeof(tess_test_vertices));
 }
 
 static void

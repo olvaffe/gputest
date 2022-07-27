@@ -10,14 +10,14 @@
 #include "vkutil.h"
 
 static const uint32_t ubo_test_vs[] = {
-#include "ubo.vert.inc"
+#include "ubo_test.vert.inc"
 };
 
 static const uint32_t ubo_test_fs[] = {
-#include "ubo.frag.inc"
+#include "ubo_test.frag.inc"
 };
 
-static const float ubo_vertices[3][5] = {
+static const float ubo_test_vertices[3][5] = {
     {
         -1.0f, /* x */
         -1.0f, /* y */
@@ -125,8 +125,8 @@ ubo_test_init_vb(struct ubo_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb = vk_create_buffer(vk, sizeof(ubo_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    memcpy(test->vb->mem_ptr, ubo_vertices, sizeof(ubo_vertices));
+    test->vb = vk_create_buffer(vk, sizeof(ubo_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    memcpy(test->vb->mem_ptr, ubo_test_vertices, sizeof(ubo_test_vertices));
 }
 
 static void

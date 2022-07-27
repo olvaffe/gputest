@@ -13,11 +13,11 @@
 #include "vkutil.h"
 
 static const uint32_t tex_test_vs[] = {
-#include "tex.vert.inc"
+#include "tex_test.vert.inc"
 };
 
 static const uint32_t tex_test_fs[] = {
-#include "tex.frag.inc"
+#include "tex_test.frag.inc"
 };
 
 static const float tex_test_vertices[3][2] = {

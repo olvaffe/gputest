@@ -15,14 +15,14 @@
 #include "vkutil.h"
 
 static const uint32_t tri_test_vs[] = {
-#include "tri.vert.inc"
+#include "tri_test.vert.inc"
 };
 
 static const uint32_t tri_test_fs[] = {
-#include "tri.frag.inc"
+#include "tri_test.frag.inc"
 };
 
-static const float tri_vertices[3][5] = {
+static const float tri_test_vertices[3][5] = {
     {
         -1.0f, /* x */
         -1.0f, /* y */
@@ -112,8 +112,8 @@ tri_test_init_vb(struct tri_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb = vk_create_buffer(vk, sizeof(tri_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    memcpy(test->vb->mem_ptr, tri_vertices, sizeof(tri_vertices));
+    test->vb = vk_create_buffer(vk, sizeof(tri_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    memcpy(test->vb->mem_ptr, tri_test_vertices, sizeof(tri_test_vertices));
 }
 
 static void

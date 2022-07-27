@@ -13,18 +13,18 @@
 #include "vkutil.h"
 
 static const uint32_t gs_test_vs[] = {
-#include "gs.vert.inc"
+#include "gs_test.vert.inc"
 };
 
 static const uint32_t gs_test_gs[] = {
-#include "gs.geom.inc"
+#include "gs_test.geom.inc"
 };
 
 static const uint32_t gs_test_fs[] = {
-#include "gs.frag.inc"
+#include "gs_test.frag.inc"
 };
 
-static const float gs_vertices[3][6] = {
+static const float gs_test_vertices[3][6] = {
     {
         -0.6f, /* x */
         -0.6f, /* y */
@@ -108,8 +108,8 @@ gs_test_init_vb(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb = vk_create_buffer(vk, sizeof(gs_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    memcpy(test->vb->mem_ptr, gs_vertices, sizeof(gs_vertices));
+    test->vb = vk_create_buffer(vk, sizeof(gs_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    memcpy(test->vb->mem_ptr, gs_test_vertices, sizeof(gs_test_vertices));
 }
 
 static void
@@ -194,7 +194,7 @@ gs_test_draw_points(struct gs_test *test, VkCommandBuffer cmd)
     vk->CmdBindVertexBuffers(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 });
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
 
-    vk->CmdDraw(cmd, ARRAY_SIZE(gs_vertices), 1, 0, 0);
+    vk->CmdDraw(cmd, ARRAY_SIZE(gs_test_vertices), 1, 0, 0);
 
     vk->CmdEndRenderPass(cmd);
 

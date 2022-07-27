@@ -55,11 +55,12 @@ foreach t : tests
   spirv_incs = []
   foreach stage : ['vert', 'tesc', 'tese', 'geom', 'frag']
     glsl = t + '.' + stage
+    spirv = t + '_test.' + stage + '.inc'
     if fs.exists(glsl)
       spirv_incs += custom_target(
-        t + '.' + stage + '.inc',
-        input: [t + '.' + stage],
-        output: [t + '.' + stage + '.inc'],
+        spirv,
+        input: [glsl],
+        output: [spirv],
         command: [prog_glslang, '--quiet', '--target-env', 'vulkan1.1', '-x',
                   '-o', '@OUTPUT@', '@INPUT@']
       )

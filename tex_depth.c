@@ -18,11 +18,11 @@
 #include "vkutil.h"
 
 static const uint32_t tex_depth_test_vs[] = {
-#include "tex_depth.vert.inc"
+#include "tex_depth_test.vert.inc"
 };
 
 static const uint32_t tex_depth_test_fs[] = {
-#include "tex_depth.frag.inc"
+#include "tex_depth_test.frag.inc"
 };
 
 static const float tex_depth_test_vertices[3][2] = {
