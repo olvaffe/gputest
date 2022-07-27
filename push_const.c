@@ -11,12 +11,12 @@
 
 #include "vkutil.h"
 
-static const uint32_t push_const_vs[] = {
-#include "push_const.vert.inc"
+static const uint32_t push_const_test_vs[] = {
+#include "push_const_test.vert.inc"
 };
 
-static const uint32_t push_const_fs[] = {
-#include "push_const.frag.inc"
+static const uint32_t push_const_test_fs[] = {
+#include "push_const_test.frag.inc"
 };
 
 static const float push_const_test_color[] = {
@@ -26,7 +26,7 @@ static const float push_const_test_color[] = {
     1.0f,
 };
 
-struct push_const {
+struct push_const_test {
     VkFormat color_format;
     uint32_t width;
     uint32_t height;
@@ -40,16 +40,16 @@ struct push_const {
 };
 
 static void
-push_const_init_pipeline(struct push_const *test)
+push_const_init_pipeline(struct push_const_test *test)
 {
     struct vk *vk = &test->vk;
 
     test->pipeline = vk_create_pipeline(vk);
 
-    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, push_const_vs,
-                           sizeof(push_const_vs));
-    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, push_const_fs,
-                           sizeof(push_const_fs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, push_const_test_vs,
+                           sizeof(push_const_test_vs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, push_const_test_fs,
+                           sizeof(push_const_test_fs));
 
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
                                sizeof(push_const_test_color));
@@ -63,7 +63,7 @@ push_const_init_pipeline(struct push_const *test)
 }
 
 static void
-push_const_init_framebuffer(struct push_const *test)
+push_const_init_framebuffer(struct push_const_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -76,7 +76,7 @@ push_const_init_framebuffer(struct push_const *test)
 }
 
 static void
-push_const_init(struct push_const *test)
+push_const_init(struct push_const_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -87,7 +87,7 @@ push_const_init(struct push_const *test)
 }
 
 static void
-push_const_cleanup(struct push_const *test)
+push_const_cleanup(struct push_const_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -100,7 +100,7 @@ push_const_cleanup(struct push_const *test)
 }
 
 static void
-push_const_draw_triangle(struct push_const *test, VkCommandBuffer cmd)
+push_const_draw_triangle(struct push_const_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
@@ -164,7 +164,7 @@ push_const_draw_triangle(struct push_const *test, VkCommandBuffer cmd)
 }
 
 static void
-push_const_draw(struct push_const *test)
+push_const_draw(struct push_const_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -180,7 +180,7 @@ push_const_draw(struct push_const *test)
 int
 main(void)
 {
-    struct push_const test = {
+    struct push_const_test test = {
         .color_format = VK_FORMAT_B8G8R8A8_UNORM,
         .width = 300,
         .height = 300,
