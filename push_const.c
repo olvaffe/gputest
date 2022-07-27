@@ -32,12 +32,23 @@ struct push_const_test {
     uint32_t height;
 
     struct vk vk;
+    struct vk_buffer *ubo;
 
     struct vk_image *rt;
     struct vk_framebuffer *fb;
 
     struct vk_pipeline *pipeline;
+    struct vk_descriptor_set *set;
 };
+
+static void
+push_const_test_init_descriptor_set(struct push_const_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    test->set = vk_create_descriptor_set(vk, test->pipeline->set_layouts[0]);
+    vk_write_descriptor_set_buffer(vk, test->set, test->ubo);
+}
 
 static void
 push_const_init_pipeline(struct push_const_test *test)
@@ -51,6 +62,8 @@ push_const_init_pipeline(struct push_const_test *test)
     vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, push_const_test_fs,
                            sizeof(push_const_test_fs));
 
+    vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                               VK_SHADER_STAGE_FRAGMENT_BIT);
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
                                sizeof(push_const_test_color));
 
@@ -75,14 +88,32 @@ push_const_init_framebuffer(struct push_const_test *test)
 }
 
 static void
+push_const_test_init_ubo(struct push_const_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    const float color[4] = {
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f,
+    };
+
+    test->ubo = vk_create_buffer(vk, sizeof(color), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    memcpy(test->ubo->mem_ptr, color, sizeof(color));
+}
+
+static void
 push_const_init(struct push_const_test *test)
 {
     struct vk *vk = &test->vk;
 
     vk_init(vk);
+    push_const_test_init_ubo(test);
 
     push_const_init_framebuffer(test);
     push_const_init_pipeline(test);
+    push_const_test_init_descriptor_set(test);
 }
 
 static void
@@ -90,10 +121,13 @@ push_const_cleanup(struct push_const_test *test)
 {
     struct vk *vk = &test->vk;
 
+    vk_destroy_descriptor_set(vk, test->set);
     vk_destroy_pipeline(vk, test->pipeline);
 
     vk_destroy_image(vk, test->rt);
     vk_destroy_framebuffer(vk, test->fb);
+
+    vk_destroy_buffer(vk, test->ubo);
 
     vk_cleanup(vk);
 }
@@ -153,6 +187,9 @@ push_const_draw_triangle(struct push_const_test *test, VkCommandBuffer cmd)
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
     vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(push_const_test_color), push_const_test_color);
+
+    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
 
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
