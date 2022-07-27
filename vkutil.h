@@ -113,6 +113,7 @@ struct vk_pipeline {
     VkPipelineDepthStencilStateCreateInfo depth_info;
     VkPipelineColorBlendAttachmentState color_att;
 
+    VkPushConstantRange push_const;
     VkDescriptorSetLayout set_layout;
     VkPipelineLayout pipeline_layout;
 
@@ -990,6 +991,18 @@ vk_set_pipeline_rasterization(struct vk *vk,
 }
 
 static inline void
+vk_set_pipeline_push_const(struct vk *vk,
+                           struct vk_pipeline *pipeline,
+                           VkShaderStageFlags stages,
+                           uint32_t size)
+{
+    pipeline->push_const = (VkPushConstantRange){
+        .stageFlags = stages,
+        .size = size,
+    };
+}
+
+static inline void
 vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline, bool vs_ubo, bool fs_tex)
 {
     assert(vs_ubo + fs_tex < 2);
@@ -1019,6 +1032,8 @@ vk_set_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline, bool vs_ubo,
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = has_set,
         .pSetLayouts = &pipeline->set_layout,
+        .pushConstantRangeCount = pipeline->push_const.size ? 1 : 0,
+        .pPushConstantRanges = &pipeline->push_const,
     };
     vk->result = vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL,
                                           &pipeline->pipeline_layout);
@@ -1065,7 +1080,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 {
     const VkPipelineVertexInputStateCreateInfo vi_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = 1,
+        .vertexBindingDescriptionCount = pipeline->vi_attr_count ? 1 : 0,
         .pVertexBindingDescriptions = &pipeline->vi_binding,
         .vertexAttributeDescriptionCount = pipeline->vi_attr_count,
         .pVertexAttributeDescriptions = pipeline->vi_attrs,

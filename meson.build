@@ -49,6 +49,7 @@ tests = [
   'msaa',
   'gs',
   'tess',
+  'push_const',
 ]
 
 foreach t : tests
