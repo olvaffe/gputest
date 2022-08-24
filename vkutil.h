@@ -55,11 +55,12 @@ struct vk {
     VkDescriptorPool desc_pool;
 
     VkCommandPool cmd_pool;
-    VkCommandBuffer cmd;
-
-    VkFence fences[4];
-    uint32_t fence_count;
-    uint32_t fence_next;
+    struct {
+        VkCommandBuffer cmds[4];
+        VkFence fences[4];
+        uint32_t count;
+        uint32_t next;
+    } submit;
 };
 
 struct vk_buffer {
@@ -366,6 +367,7 @@ vk_init_cmd_pool(struct vk *vk)
 {
     const VkCommandPoolCreateInfo pool_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         .queueFamilyIndex = vk->queue_family_index,
     };
 
@@ -388,7 +390,8 @@ vk_init(struct vk *vk)
     vk_init_desc_pool(vk);
     vk_init_cmd_pool(vk);
 
-    vk->fence_count = ARRAY_SIZE(vk->fences);
+    static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.fences), "");
+    vk->submit.count = ARRAY_SIZE(vk->submit.cmds);
 }
 
 static inline void
@@ -396,10 +399,10 @@ vk_cleanup(struct vk *vk)
 {
     vk->DeviceWaitIdle(vk->dev);
 
-    for (uint32_t i = 0; i < vk->fence_count; i++) {
-        if (vk->fences[i] == VK_NULL_HANDLE)
+    for (uint32_t i = 0; i < vk->submit.count; i++) {
+        if (vk->submit.fences[i] == VK_NULL_HANDLE)
             break;
-        vk->DestroyFence(vk->dev, vk->fences[i], NULL);
+        vk->DestroyFence(vk->dev, vk->submit.fences[i], NULL);
     }
 
     vk->DestroyDescriptorPool(vk->dev, vk->desc_pool, NULL);
@@ -1224,39 +1227,27 @@ vk_destroy_descriptor_set(struct vk *vk, struct vk_descriptor_set *set)
 static inline VkCommandBuffer
 vk_begin_cmd(struct vk *vk)
 {
-    const VkCommandBufferAllocateInfo alloc_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = vk->cmd_pool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
+    VkCommandBuffer *cmd = &vk->submit.cmds[vk->submit.next];
+    VkFence *fence = &vk->submit.fences[vk->submit.next];
 
-    vk->result = vk->AllocateCommandBuffers(vk->dev, &alloc_info, &vk->cmd);
-    vk_check(vk, "failed to allocate command buffer");
-
-    const VkCommandBufferBeginInfo begin_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-    };
-    vk->result = vk->BeginCommandBuffer(vk->cmd, &begin_info);
-    vk_check(vk, "failed to begin command buffer");
-
-    return vk->cmd;
-}
-
-static inline void
-vk_end_cmd(struct vk *vk)
-{
-    vk->result = vk->EndCommandBuffer(vk->cmd);
-    vk_check(vk, "failed to end command buffer");
-
-    VkFence *fence = &vk->fences[vk->fence_next];
-    vk->fence_next = (vk->fence_next + 1) % vk->fence_count;
-
-    if (*fence != VK_NULL_HANDLE) {
-        /* throttle */
+    /* reuse or allocate */
+    if (*cmd) {
         vk->result = vk->WaitForFences(vk->dev, 1, fence, true, UINT64_MAX);
         vk_check(vk, "failed to wait fence");
+
+        vk->result = vk->ResetCommandBuffer(*cmd, 0);
+        vk_check(vk, "failed to reset command buffer");
     } else {
+        const VkCommandBufferAllocateInfo alloc_info = {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .commandPool = vk->cmd_pool,
+            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            .commandBufferCount = 1,
+        };
+
+        vk->result = vk->AllocateCommandBuffers(vk->dev, &alloc_info, cmd);
+        vk_check(vk, "failed to allocate command buffer");
+
         const VkFenceCreateInfo fence_info = {
             .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
         };
@@ -1264,12 +1255,33 @@ vk_end_cmd(struct vk *vk)
         vk_check(vk, "failed to create fence");
     }
 
+    const VkCommandBufferBeginInfo begin_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+    };
+    vk->result = vk->BeginCommandBuffer(*cmd, &begin_info);
+    vk_check(vk, "failed to begin command buffer");
+
+    return *cmd;
+}
+
+static inline void
+vk_end_cmd(struct vk *vk)
+{
+    VkCommandBuffer cmd = vk->submit.cmds[vk->submit.next];
+    VkFence fence = vk->submit.fences[vk->submit.next];
+
+    /* increment */
+    vk->submit.next = (vk->submit.next + 1) % vk->submit.count;
+
+    vk->result = vk->EndCommandBuffer(cmd);
+    vk_check(vk, "failed to end command buffer");
+
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .commandBufferCount = 1,
-        .pCommandBuffers = &vk->cmd,
+        .pCommandBuffers = &cmd,
     };
-    vk->result = vk->QueueSubmit(vk->queue, 1, &submit_info, *fence);
+    vk->result = vk->QueueSubmit(vk->queue, 1, &submit_info, fence);
     vk_check(vk, "failed to submit command buffer");
 }
 
