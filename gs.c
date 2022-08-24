@@ -211,6 +211,7 @@ gs_test_draw(struct gs_test *test)
     gs_test_draw_points(test, cmd);
 
     vk_end_cmd(vk);
+    vk_wait(vk);
 
     vk_dump_image(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
 }

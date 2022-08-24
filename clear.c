@@ -101,6 +101,7 @@ clear_test_draw(struct clear_test *test)
     clear_test_clear(test, cmd);
 
     vk_end_cmd(vk);
+    vk_wait(vk);
 
     vk_dump_image(vk, test->img, test->aspect, "rt.ppm");
 }

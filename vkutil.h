@@ -56,6 +56,10 @@ struct vk {
 
     VkCommandPool cmd_pool;
     VkCommandBuffer cmd;
+
+    VkFence fences[4];
+    uint32_t fence_count;
+    uint32_t fence_next;
 };
 
 struct vk_buffer {
@@ -383,12 +387,20 @@ vk_init(struct vk *vk)
 
     vk_init_desc_pool(vk);
     vk_init_cmd_pool(vk);
+
+    vk->fence_count = ARRAY_SIZE(vk->fences);
 }
 
 static inline void
 vk_cleanup(struct vk *vk)
 {
     vk->DeviceWaitIdle(vk->dev);
+
+    for (uint32_t i = 0; i < vk->fence_count; i++) {
+        if (vk->fences[i] == VK_NULL_HANDLE)
+            break;
+        vk->DestroyFence(vk->dev, vk->fences[i], NULL);
+    }
 
     vk->DestroyDescriptorPool(vk->dev, vk->desc_pool, NULL);
     vk->DestroyCommandPool(vk->dev, vk->cmd_pool, NULL);
@@ -1237,16 +1249,35 @@ vk_end_cmd(struct vk *vk)
     vk->result = vk->EndCommandBuffer(vk->cmd);
     vk_check(vk, "failed to end command buffer");
 
+    VkFence *fence = &vk->fences[vk->fence_next];
+    vk->fence_next = (vk->fence_next + 1) % vk->fence_count;
+
+    if (*fence != VK_NULL_HANDLE) {
+        /* throttle */
+        vk->result = vk->WaitForFences(vk->dev, 1, fence, true, UINT64_MAX);
+        vk_check(vk, "failed to wait fence");
+    } else {
+        const VkFenceCreateInfo fence_info = {
+            .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        };
+        vk->result = vk->CreateFence(vk->dev, &fence_info, NULL, fence);
+        vk_check(vk, "failed to create fence");
+    }
+
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .commandBufferCount = 1,
         .pCommandBuffers = &vk->cmd,
     };
-    vk->result = vk->QueueSubmit(vk->queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk->result = vk->QueueSubmit(vk->queue, 1, &submit_info, *fence);
     vk_check(vk, "failed to submit command buffer");
+}
 
+static inline void
+vk_wait(struct vk *vk)
+{
     vk->result = vk->QueueWaitIdle(vk->queue);
-    vk_check(vk, "failed to wait submit");
+    vk_check(vk, "failed to wait queue");
 }
 
 #endif /* VKUTIL_H */

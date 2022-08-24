@@ -213,6 +213,7 @@ tess_test_draw(struct tess_test *test)
     tess_test_draw_triangle(test, cmd);
 
     vk_end_cmd(vk);
+    vk_wait(vk);
 
     vk_dump_image(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
 }

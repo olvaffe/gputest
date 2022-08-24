@@ -220,6 +220,7 @@ msaa_test_draw(struct msaa_test *test)
     msaa_test_draw_triangle(test, cmd);
 
     vk_end_cmd(vk);
+    vk_wait(vk);
 
     vk_dump_image(vk, test->resolved, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
 }
