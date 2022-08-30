@@ -1061,6 +1061,13 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
                                           &pipeline->pipeline_layout);
     vk_check(vk, "failed to create pipeline layout");
 
+    if (!fb) {
+        if (pipeline->stage_count != 1 ||
+            pipeline->stages[0].stage != VK_SHADER_STAGE_COMPUTE_BIT)
+            vk_die("expect a compute pipeline");
+        return;
+    }
+
     pipeline->viewport = (VkViewport){
         .width = (float)fb->width,
         .height = (float)fb->height,
@@ -1096,6 +1103,18 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
 static inline void
 vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 {
+    if (!pipeline->fb) {
+        const VkComputePipelineCreateInfo compute_info = {
+            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+            .stage = pipeline->stages[0],
+            .layout = pipeline->pipeline_layout,
+        };
+        vk->result = vk->CreateComputePipelines(vk->dev, VK_NULL_HANDLE, 1, &compute_info, NULL,
+                                                &pipeline->pipeline);
+        vk_check(vk, "failed to create compute pipeline");
+        return;
+    }
+
     const VkPipelineVertexInputStateCreateInfo vi_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .vertexBindingDescriptionCount = pipeline->vi_attr_count ? 1 : 0,
@@ -1136,7 +1155,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 
     vk->result = vk->CreateGraphicsPipelines(vk->dev, VK_NULL_HANDLE, 1, &pipeline_info, NULL,
                                              &pipeline->pipeline);
-    vk_check(vk, "failed to create pipeline");
+    vk_check(vk, "failed to create graphics pipeline");
 }
 
 static inline void
