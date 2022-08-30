@@ -41,6 +41,7 @@ struct vk {
     VkInstance instance;
 
     VkPhysicalDevice physical_dev;
+    VkPhysicalDeviceProperties2 props;
     VkPhysicalDeviceFeatures2 features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
     VkPhysicalDeviceMemoryProperties mem_props;
@@ -242,10 +243,12 @@ vk_init_physical_device(struct vk *vk)
     if (vk->result < VK_SUCCESS || !count)
         vk_die("failed to enumerate physical devices");
 
-    VkPhysicalDeviceProperties props;
-    vk->GetPhysicalDeviceProperties(vk->physical_dev, &props);
-    if (props.apiVersion < VKUTIL_MIN_API_VERSION)
-        vk_die("physical device api version %d < %d", props.apiVersion, VKUTIL_MIN_API_VERSION);
+    vk->props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    vk->GetPhysicalDeviceProperties2(vk->physical_dev, &vk->props);
+    if (vk->props.properties.apiVersion < VKUTIL_MIN_API_VERSION) {
+        vk_die("physical device api version %d < %d", vk->props.properties.apiVersion,
+               VKUTIL_MIN_API_VERSION);
+    }
 
     vk->custom_border_color_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
