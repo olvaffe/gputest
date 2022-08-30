@@ -1,0 +1,18 @@
+/*
+ * Copyright 2022 Google LLC
+ * SPDX-License-Identifier: MIT
+ */
+
+#version 460 core
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) buffer SSBO {
+    uint data[];
+} ssbo;
+
+void main()
+{
+    uint val = gl_GlobalInvocationID.y * gl_NumWorkGroups.x * 8 + gl_GlobalInvocationID.x;
+    ssbo.data[val] = val;
+}

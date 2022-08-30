@@ -35,13 +35,8 @@ idep_vkutil = declare_dependency(
   dependencies: [dep_dl, dep_m],
 )
 
-executable(
-  'clear',
-  sources: ['clear.c'],
-  dependencies: [idep_vkutil],
-)
-
 tests = [
+  'clear',
   'tri',
   'tex',
   'tex_depth',
@@ -50,11 +45,12 @@ tests = [
   'gs',
   'tess',
   'push_const',
+  'compute',
 ]
 
 foreach t : tests
   spirv_incs = []
-  foreach stage : ['vert', 'tesc', 'tese', 'geom', 'frag']
+  foreach stage : ['vert', 'tesc', 'tese', 'geom', 'frag', 'comp']
     glsl = t + '.' + stage
     spirv = t + '_test.' + stage + '.inc'
     if fs.exists(glsl)
