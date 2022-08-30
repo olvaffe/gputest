@@ -42,7 +42,7 @@ struct vk {
 
     VkPhysicalDevice physical_dev;
     VkPhysicalDeviceFeatures2 features;
-    VkPhysicalDeviceFeatures2 custom_border_color_features;
+    VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
     VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t buf_mt_index;
 
