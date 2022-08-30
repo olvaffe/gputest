@@ -1178,6 +1178,7 @@ vk_create_descriptor_set(struct vk *vk, VkDescriptorSetLayout layout)
 static inline void
 vk_write_descriptor_set_buffer(struct vk *vk,
                                struct vk_descriptor_set *set,
+                               VkDescriptorType type,
                                const struct vk_buffer *buf)
 {
     const VkDescriptorBufferInfo buf_info = {
@@ -1191,7 +1192,7 @@ vk_write_descriptor_set_buffer(struct vk *vk,
         .dstBinding = 0,
         .dstArrayElement = 0,
         .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorType = type,
         .pBufferInfo = &buf_info,
     };
 
