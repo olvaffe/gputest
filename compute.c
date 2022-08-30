@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-/* This test draws a rotated RGB triangle to a linear color image and dumps it
- * to a file.
+/* This allocates an SSBO that is close to maxStorageBufferRange and verifies
+ * that it can be written to.
  */
 
 #include "vkutil.h"
