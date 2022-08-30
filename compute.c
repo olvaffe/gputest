@@ -56,16 +56,9 @@ compute_test_init_ssbo(struct compute_test *test)
     struct vk *vk = &test->vk;
     const VkPhysicalDeviceLimits *limits = &vk->props.properties.limits;
 
-    /* driver limit or 1GB */
-    VkDeviceSize size;
-    test->grid_size = 1u << 14;
-    while (true) {
-        size = test->grid_size * test->grid_size * sizeof(uint32_t);
-        if (size <= limits->maxStorageBufferRange)
-            break;
-        test->grid_size >>= 1;
-    }
+    test->grid_size = (uint32_t)sqrt((double)(limits->maxStorageBufferRange / sizeof(uint32_t)));
 
+    VkDeviceSize size = test->grid_size * test->grid_size * sizeof(uint32_t);
     test->ssbo = vk_create_buffer(vk, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     memset(test->ssbo->mem_ptr, 0, size);
 }
