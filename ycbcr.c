@@ -13,17 +13,24 @@ static const uint32_t ycbcr_test_fs[] = {
 #include "ycbcr_test.frag.inc"
 };
 
-static const float ycbcr_test_vertices[3][2] = {
+/* for ycbcr_test_ppm */
+#include "ycbcr_test.ppm.inc"
+
+static const float ycbcr_test_vertices[][2] = {
+    { -1.0f, 1.0f },
+    { 1.0f, 1.0f },
     { -1.0f, -1.0f },
-    { 0.0f, 1.0f },
     { 1.0f, -1.0f },
 };
 
 struct ycbcr_test {
     VkFormat color_format;
-    VkFormat tex_format;
     uint32_t width;
     uint32_t height;
+    bool planar;
+    VkFilter minmag_filter;
+    VkChromaLocation chroma_loc;
+    VkFilter chroma_filter;
 
     struct vk vk;
     struct vk_buffer *vb;
@@ -89,11 +96,11 @@ ycbcr_test_init_texture(struct ycbcr_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->tex = vk_create_image(vk, test->tex_format, test->width, test->height,
-                                VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_LINEAR,
-                                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-    vk_create_image_ycbcr_conversion(vk, test->tex, VK_FILTER_NEAREST);
-    vk_create_image_sample_view(vk, test->tex, VK_IMAGE_ASPECT_COLOR_BIT, VK_FILTER_NEAREST);
+    test->tex =
+        vk_create_image_from_ppm(vk, ycbcr_test_ppm, ARRAY_SIZE(ycbcr_test_ppm), test->planar);
+    if (test->planar)
+        vk_create_image_ycbcr_conversion(vk, test->tex, test->chroma_loc, test->chroma_filter);
+    vk_create_image_sample_view(vk, test->tex, VK_IMAGE_ASPECT_COLOR_BIT, test->minmag_filter);
 }
 
 static void
@@ -196,7 +203,7 @@ ycbcr_test_draw_triangle(struct ycbcr_test *test, VkCommandBuffer cmd)
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                               test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
 
-    vk->CmdDraw(cmd, 3, 1, 0, 0);
+    vk->CmdDraw(cmd, ARRAY_SIZE(ycbcr_test_vertices), 1, 0, 0);
 
     vk->CmdEndRenderPass(cmd);
 
@@ -214,33 +221,18 @@ ycbcr_test_draw_prep_texture(struct ycbcr_test *test, VkCommandBuffer cmd)
         .levelCount = 1,
         .layerCount = 1,
     };
-    const VkImageMemoryBarrier barrier1 = {
+    const VkImageMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        .image = test->tex->img,
-        .subresourceRange = subres_range,
-    };
-    const VkImageMemoryBarrier barrier2 = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED,
         .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         .image = test->tex->img,
         .subresourceRange = subres_range,
     };
 
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           0, 0, NULL, 0, NULL, 1, &barrier1);
-
-    /* TODO init */
-
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1,
-                           &barrier2);
+    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                           0, 0, NULL, 0, NULL, 1, &barrier);
 }
 
 static void
@@ -260,14 +252,38 @@ ycbcr_test_draw(struct ycbcr_test *test)
 }
 
 int
-main(void)
+main(int argc, const char **argv)
 {
     struct ycbcr_test test = {
         .color_format = VK_FORMAT_B8G8R8A8_UNORM,
-        .tex_format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
         .width = 300,
         .height = 300,
+        .planar = true,
+        .minmag_filter = VK_FILTER_NEAREST,
+        .chroma_loc = VK_CHROMA_LOCATION_MIDPOINT,
+        .chroma_filter = VK_FILTER_NEAREST,
     };
+
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "planar"))
+            test.planar = true;
+        else if (!strcmp(argv[i], "rgb"))
+            test.planar = false;
+        else if (!strcmp(argv[i], "minmag_nearest"))
+            test.minmag_filter = VK_FILTER_NEAREST;
+        else if (!strcmp(argv[i], "minmag_linear"))
+            test.minmag_filter = VK_FILTER_LINEAR;
+        else if (!strcmp(argv[i], "midpoint"))
+            test.chroma_loc = VK_CHROMA_LOCATION_MIDPOINT;
+        else if (!strcmp(argv[i], "cosited"))
+            test.chroma_loc = VK_CHROMA_LOCATION_COSITED_EVEN;
+        else if (!strcmp(argv[i], "chroma_nearest"))
+            test.chroma_filter = VK_FILTER_NEAREST;
+        else if (!strcmp(argv[i], "chroma_linear"))
+            test.chroma_filter = VK_FILTER_LINEAR;
+        else
+            vk_die("unknown option %s", argv[i]);
+    }
 
     ycbcr_test_init(&test);
     ycbcr_test_draw(&test);

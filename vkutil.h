@@ -759,11 +759,21 @@ vk_create_image_render_view(struct vk *vk, struct vk_image *img, VkImageAspectFl
 }
 
 static inline void
-vk_create_image_ycbcr_conversion(struct vk *vk, struct vk_image *img, VkFilter chroma_filter)
+vk_create_image_ycbcr_conversion(struct vk *vk,
+                                 struct vk_image *img,
+                                 VkChromaLocation chroma_offset,
+                                 VkFilter chroma_filter)
 {
-    if (!(img->features & VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT))
+    if (chroma_offset == VK_CHROMA_LOCATION_MIDPOINT &&
+        !(img->features & VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT))
         vk_die("image does not support midpoint chroma offset");
-    const VkChromaLocation chroma_offset = VK_CHROMA_LOCATION_MIDPOINT;
+    else if (chroma_offset == VK_CHROMA_LOCATION_COSITED_EVEN &&
+             !(img->features & VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT))
+        vk_die("image does not support cosited chroma offset");
+
+    if (chroma_filter == VK_FILTER_LINEAR &&
+        !(img->features & VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT))
+        vk_die("image does not support linear chroma offset");
 
     const VkPhysicalDeviceImageFormatInfo2 fmt_info = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
