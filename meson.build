@@ -48,6 +48,7 @@ tests = [
   'tess',
   'push_const',
   'compute',
+  'ycbcr',
 ]
 
 foreach t : tests
