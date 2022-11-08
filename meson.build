@@ -12,6 +12,7 @@ project(
 
 fs = import('fs')
 prog_glslang = find_program('glslangValidator')
+prog_xxd = find_program('xxd')
 
 cc = meson.get_compiler('c')
 
@@ -52,24 +53,39 @@ tests = [
 ]
 
 foreach t : tests
-  spirv_incs = []
-  foreach stage : ['vert', 'tesc', 'tese', 'geom', 'frag', 'comp']
-    glsl = t + '.' + stage
-    spirv = t + '_test.' + stage + '.inc'
-    if fs.exists(glsl)
-      spirv_incs += custom_target(
-        spirv,
-        input: [glsl],
-        output: [spirv],
+  test_incs = []
+
+  foreach suffix : ['vert', 'tesc', 'tese', 'geom', 'frag', 'comp']
+    src = t + '.' + suffix
+    dst = t + '_test.' + suffix + '.inc'
+    if fs.exists(src)
+      test_incs += custom_target(
+        dst,
+        input: [src],
+        output: [dst],
         command: [prog_glslang, '--quiet', '--target-env', 'vulkan1.1', '-x',
                   '-o', '@OUTPUT@', '@INPUT@']
       )
     endif
   endforeach
 
+  foreach suffix : ['ppm']
+    src = t + '.' + suffix
+    dst = t + '_test.' + suffix + '.inc'
+    if fs.exists(src)
+      test_incs += custom_target(
+        dst,
+        input: [src],
+        output: [dst],
+        command: [prog_xxd, '-i', '-n', t + '_test_ppm', '@INPUT@'],
+        capture: true,
+      )
+    endif
+  endforeach
+
   executable(
     t,
-    sources: [t + '.c', spirv_incs],
+    sources: [t + '.c', test_incs],
     dependencies: [idep_vkutil],
   )
 endforeach
