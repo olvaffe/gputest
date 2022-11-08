@@ -7,6 +7,7 @@
 #define VKUTIL_H
 
 #include <assert.h>
+#include <ctype.h>
 #include <dlfcn.h>
 #include <drm_fourcc.h>
 #include <inttypes.h>
@@ -541,6 +542,41 @@ vk_validate_image(struct vk *vk, struct vk_image *img)
         vk_die("image sample count %u is not supported", img->info.samples);
 }
 
+static inline void
+vk_init_image(struct vk *vk, struct vk_image *img)
+{
+    VkFormatProperties2 fmt_props = {
+        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+    };
+    vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, img->info.format, &fmt_props);
+    img->features = img->info.tiling == VK_IMAGE_TILING_OPTIMAL
+                        ? fmt_props.formatProperties.optimalTilingFeatures
+                        : fmt_props.formatProperties.linearTilingFeatures;
+
+    vk_validate_image(vk, img);
+
+    vk->result = vk->CreateImage(vk->dev, &img->info, NULL, &img->img);
+    vk_check(vk, "failed to create image");
+
+    VkMemoryRequirements reqs;
+    vk->GetImageMemoryRequirements(vk->dev, img->img, &reqs);
+
+    uint32_t mt_index;
+    if (reqs.memoryTypeBits & (1u << vk->buf_mt_index)) {
+        mt_index = vk->buf_mt_index;
+        img->mem_mappable = true;
+    } else {
+        mt_index = ffs(reqs.memoryTypeBits) - 1;
+        img->mem_mappable = false;
+    }
+
+    img->mem = vk_alloc_memory(vk, reqs.size, mt_index);
+    img->mem_size = reqs.size;
+
+    vk->result = vk->BindImageMemory(vk->dev, img->img, img->mem, 0);
+    vk_check(vk, "failed to bind image memory");
+}
+
 static inline struct vk_image *
 vk_create_image(struct vk *vk,
                 VkFormat format,
@@ -571,36 +607,135 @@ vk_create_image(struct vk *vk,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
 
-    VkFormatProperties2 fmt_props = {
-        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+    vk_init_image(vk, img);
+
+    return img;
+}
+
+static inline const void *
+vk_parse_ppm(const void *ppm_data, size_t ppm_size, int *width, int *height)
+{
+    if (sscanf(ppm_data, "P6 %d %d 255\n", width, height) != 2)
+        vk_die("invalid ppm header");
+
+    const size_t img_size = *width * *height * 3;
+    if (img_size >= ppm_size)
+        vk_die("bad ppm dimension %dx%d", *width, *height);
+
+    const size_t hdr_size = ppm_size - img_size;
+    if (!isspace(((const char *)ppm_data)[hdr_size - 1]))
+        vk_die("no space at the end of ppm header");
+
+    return ppm_data + hdr_size;
+}
+
+static inline void
+vk_rgb_to_yuv(const uint8_t *rgb, uint8_t *yuv)
+{
+    const int tmp[3] = {
+        ((66 * (rgb)[0] + 129 * (rgb)[1] + 25 * (rgb)[2] + 128) >> 8) + 16,
+        ((-38 * (rgb)[0] - 74 * (rgb)[1] + 112 * (rgb)[2] + 128) >> 8) + 128,
+        ((112 * (rgb)[0] - 94 * (rgb)[1] - 18 * (rgb)[2] + 128) >> 8) + 128,
     };
-    vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, format, &fmt_props);
-    img->features = tiling == VK_IMAGE_TILING_OPTIMAL
-                        ? fmt_props.formatProperties.optimalTilingFeatures
-                        : fmt_props.formatProperties.linearTilingFeatures;
 
-    vk_validate_image(vk, img);
+    for (int i = 0; i < 3; i++) {
+        if (tmp[i] > 255)
+            yuv[i] = 255;
+        else if (tmp[i] < 0)
+            yuv[i] = 0;
+        else
+            yuv[i] = tmp[i];
+    }
+}
 
-    vk->result = vk->CreateImage(vk->dev, &img->info, NULL, &img->img);
-    vk_check(vk, "failed to create image");
+static inline struct vk_image *
+vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, bool planar)
+{
+    int width;
+    int height;
+    const uint8_t *rgb_data = vk_parse_ppm(ppm_data, ppm_size, &width, &height);
 
-    VkMemoryRequirements reqs;
-    vk->GetImageMemoryRequirements(vk->dev, img->img, &reqs);
+    const VkFormat fmt = planar ? VK_FORMAT_G8_B8R8_2PLANE_420_UNORM : VK_FORMAT_B8G8R8A8_UNORM;
 
-    uint32_t mt_index;
-    if (reqs.memoryTypeBits & (1u << vk->buf_mt_index)) {
-        mt_index = vk->buf_mt_index;
-        img->mem_mappable = true;
+    struct vk_image *img = calloc(1, sizeof(*img));
+    if (!img)
+        vk_die("failed to alloc img");
+
+    img->info = (VkImageCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            .imageType = VK_IMAGE_TYPE_2D,
+            .format = fmt,
+            .extent = {
+                .width = width,
+                .height = height,
+                .depth = 1,
+            },
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .tiling = VK_IMAGE_TILING_LINEAR,
+            .usage = VK_IMAGE_USAGE_SAMPLED_BIT,
+            .initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED,
+    };
+
+    vk_init_image(vk, img);
+
+    void *ptr;
+    vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
+    vk_check(vk, "failed to map image");
+
+    if (planar) {
+        const VkImageSubresource y_subres = {
+            .aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT,
+        };
+        const VkImageSubresource uv_subres = {
+            .aspectMask = VK_IMAGE_ASPECT_PLANE_1_BIT,
+        };
+        VkSubresourceLayout y_layout;
+        VkSubresourceLayout uv_layout;
+        vk->GetImageSubresourceLayout(vk->dev, img->img, &y_subres, &y_layout);
+        vk->GetImageSubresourceLayout(vk->dev, img->img, &uv_subres, &uv_layout);
+
+        for (int y = 0; y < height; y++) {
+            uint8_t *y_dst = ptr + y_layout.offset + y_layout.rowPitch * y;
+            uint8_t *uv_dst = ptr + uv_layout.offset + uv_layout.rowPitch * y / 2;
+
+            for (int x = 0; x < width; x++) {
+                uint8_t yuv[3];
+                vk_rgb_to_yuv(rgb_data, yuv);
+                rgb_data += 3;
+
+                y_dst[0] = yuv[0];
+                y_dst++;
+                if (!((x | y) & 1)) {
+                    uv_dst[0] = yuv[1];
+                    uv_dst[1] = yuv[2];
+                    uv_dst += 2;
+                }
+            }
+        }
     } else {
-        mt_index = ffs(reqs.memoryTypeBits) - 1;
-        img->mem_mappable = false;
+        const VkImageSubresource subres = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        };
+        VkSubresourceLayout layout;
+        vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
+
+        for (int y = 0; y < height; y++) {
+            uint8_t *dst = ptr + layout.offset + layout.rowPitch * y;
+            for (int x = 0; x < width; x++) {
+                dst[0] = rgb_data[2];
+                dst[1] = rgb_data[1];
+                dst[2] = rgb_data[0];
+                dst[3] = 0xff;
+
+                rgb_data += 3;
+                dst += 4;
+            }
+        }
     }
 
-    img->mem = vk_alloc_memory(vk, reqs.size, mt_index);
-    img->mem_size = reqs.size;
-
-    vk->result = vk->BindImageMemory(vk->dev, img->img, img->mem, 0);
-    vk_check(vk, "failed to bind image memory");
+    vk->UnmapMemory(vk->dev, img->mem);
 
     return img;
 }
@@ -753,6 +888,7 @@ vk_fill_image(struct vk *vk, struct vk_image *img, VkImageAspectFlagBits aspect,
 
     void *ptr;
     vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
+    vk_check(vk, "failed to map image");
     memset(ptr, val, img->mem_size);
     vk->UnmapMemory(vk->dev, img->mem);
 }
