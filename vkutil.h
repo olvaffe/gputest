@@ -46,7 +46,9 @@ struct vk {
     VkPhysicalDevice physical_dev;
     VkPhysicalDeviceProperties2 props;
     VkPhysicalDeviceFeatures2 features;
+    VkPhysicalDeviceSamplerYcbcrConversionFeatures sampler_ycbcr_conversion_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
+
     VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t buf_mt_index;
 
@@ -85,6 +87,9 @@ struct vk_image {
     bool mem_mappable;
 
     VkImageView render_view;
+
+    VkSamplerYcbcrConversion ycbcr_conv;
+    uint32_t ycbcr_conv_desc_count;
 
     VkImageView sample_view;
     VkSampler sampler;
@@ -255,8 +260,11 @@ vk_init_physical_device(struct vk *vk)
 
     vk->custom_border_color_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
+    vk->sampler_ycbcr_conversion_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+    vk->sampler_ycbcr_conversion_features.pNext = &vk->custom_border_color_features;
     vk->features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    vk->features.pNext = &vk->custom_border_color_features;
+    vk->features.pNext = &vk->sampler_ycbcr_conversion_features;
     vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
 
     if (!vk->features.features.tessellationShader)
@@ -265,6 +273,8 @@ vk_init_physical_device(struct vk *vk)
         vk_die("no geometry shader support");
     if (!vk->features.features.fillModeNonSolid)
         vk_die("no non-solid fill mode support");
+    if (!vk->sampler_ycbcr_conversion_features.samplerYcbcrConversion)
+        vk_die("no ycbcr conversion support");
 
     vk->GetPhysicalDeviceMemoryProperties(vk->physical_dev, &vk->mem_props);
 
@@ -310,6 +320,10 @@ vk_init_device(struct vk *vk)
     /* minimal features */
     features = &(VkPhysicalDeviceFeatures2){
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &(VkPhysicalDeviceSamplerYcbcrConversionFeatures){
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES,
+            .samplerYcbcrConversion = true,
+        },
         .features = {
             .tessellationShader = true,
             .geometryShader = true,
@@ -608,10 +622,56 @@ vk_create_image_render_view(struct vk *vk, struct vk_image *img, VkImageAspectFl
 }
 
 static inline void
+vk_create_image_ycbcr_conversion(struct vk *vk, struct vk_image *img)
+{
+    const VkPhysicalDeviceImageFormatInfo2 fmt_info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
+        .format = img->info.format,
+        .type = img->info.imageType,
+        .tiling = img->info.tiling,
+        .usage = img->info.usage,
+    };
+    VkSamplerYcbcrConversionImageFormatProperties ycbcr_props = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_IMAGE_FORMAT_PROPERTIES,
+    };
+    VkImageFormatProperties2 fmt_props = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2,
+        .pNext = &ycbcr_props,
+    };
+    vk->result =
+        vk->GetPhysicalDeviceImageFormatProperties2(vk->physical_dev, &fmt_info, &fmt_props);
+    vk_check(vk, "unsupported VkSamplerYcbcrConversion format");
+
+    const VkSamplerYcbcrConversionCreateInfo conv_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_CREATE_INFO,
+        .format = img->info.format,
+        .ycbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_601,
+        .ycbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_FULL,
+        .xChromaOffset = VK_CHROMA_LOCATION_MIDPOINT,
+        .yChromaOffset = VK_CHROMA_LOCATION_MIDPOINT,
+        .chromaFilter = VK_FILTER_LINEAR,
+        .forceExplicitReconstruction = false,
+    };
+
+    VkSamplerYcbcrConversion conv;
+    vk->result = vk->CreateSamplerYcbcrConversion(vk->dev, &conv_info, NULL, &conv);
+    vk_check(vk, "failed to create VkSamplerYcbcrConversion");
+
+    img->ycbcr_conv = conv;
+    img->ycbcr_conv_desc_count = ycbcr_props.combinedImageSamplerDescriptorCount;
+}
+
+static inline void
 vk_create_image_sample_view(struct vk *vk, struct vk_image *img, VkImageAspectFlagBits aspect)
 {
+    const VkSamplerYcbcrConversionInfo conv_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO,
+        .conversion = img->ycbcr_conv,
+    };
+
     const VkImageViewCreateInfo view_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .pNext = img->ycbcr_conv != VK_NULL_HANDLE ? &conv_info : NULL,
         .image = img->img,
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = img->info.format,
@@ -634,21 +694,24 @@ vk_create_image_sample_view(struct vk *vk, struct vk_image *img, VkImageAspectFl
     } else {
         border_color = VK_BORDER_COLOR_INT_OPAQUE_WHITE;
     }
+    const VkSamplerCustomBorderColorCreateInfoEXT border_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT,
+        .customBorderColor = custom_border_color,
+        .format = img->info.format,
+    };
 
+    const VkSamplerAddressMode addr_mode = img->ycbcr_conv != VK_NULL_HANDLE
+                                               ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+                                               : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
     const VkSamplerCreateInfo sampler_info = {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .pNext =
-            &(VkSamplerCustomBorderColorCreateInfoEXT){
-                .sType = VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT,
-                .customBorderColor = custom_border_color,
-                .format = img->info.format,
-            },
+        .pNext = img->ycbcr_conv != VK_NULL_HANDLE ? (void *)&conv_info : (void *)&border_info,
         .magFilter = VK_FILTER_NEAREST,
         .minFilter = VK_FILTER_NEAREST,
         .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+        .addressModeU = addr_mode,
+        .addressModeV = addr_mode,
+        .addressModeW = addr_mode,
         .borderColor = border_color,
     };
     vk->result = vk->CreateSampler(vk->dev, &sampler_info, NULL, &img->sampler);
@@ -660,6 +723,8 @@ vk_destroy_image(struct vk *vk, struct vk_image *img)
 {
     vk->DestroySampler(vk->dev, img->sampler, NULL);
     vk->DestroyImageView(vk->dev, img->sample_view, NULL);
+
+    vk->DestroySamplerYcbcrConversion(vk->dev, img->ycbcr_conv, NULL);
 
     vk->DestroyImageView(vk->dev, img->render_view, NULL);
 
