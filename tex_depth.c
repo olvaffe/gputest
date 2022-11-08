@@ -70,8 +70,8 @@ tex_depth_test_init_pipeline(struct tex_depth_test *test)
     vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, tex_depth_test_fs,
                            sizeof(tex_depth_test_fs));
 
-    vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                               VK_SHADER_STAGE_FRAGMENT_BIT);
+    vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+                               VK_SHADER_STAGE_FRAGMENT_BIT, NULL);
 
     const uint32_t comp_count = ARRAY_SIZE(tex_depth_test_vertices[0]);
     vk_set_pipeline_vertices(vk, test->pipeline, &comp_count, 1);

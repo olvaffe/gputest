@@ -43,8 +43,8 @@ compute_test_init_pipeline(struct compute_test *test)
     vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_COMPUTE_BIT, compute_test_cs,
                            sizeof(compute_test_cs));
 
-    vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                               VK_SHADER_STAGE_COMPUTE_BIT);
+    vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                               VK_SHADER_STAGE_COMPUTE_BIT, NULL);
 
     vk_setup_pipeline(vk, test->pipeline, NULL);
     vk_compile_pipeline(vk, test->pipeline);

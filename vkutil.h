@@ -356,6 +356,14 @@ vk_init_desc_pool(struct vk *vk)
             .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 256,
         },
+        [1] = {
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 256,
+        },
+        [2] = {
+            .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 256,
+        },
     };
     const VkDescriptorPoolCreateInfo pool_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -1017,15 +1025,18 @@ static inline void
 vk_add_pipeline_set_layout(struct vk *vk,
                            struct vk_pipeline *pipeline,
                            VkDescriptorType type,
-                           VkShaderStageFlags stages)
+                           uint32_t desc_count,
+                           VkShaderStageFlags stages,
+                           const VkSampler *immutable_samplers)
 {
     assert(pipeline->set_layout_count < ARRAY_SIZE(pipeline->set_layouts));
 
     const VkDescriptorSetLayoutBinding binding = {
         .binding = 0,
         .descriptorType = type,
-        .descriptorCount = 1,
+        .descriptorCount = desc_count,
         .stageFlags = stages,
+        .pImmutableSamplers = immutable_samplers,
     };
     const VkDescriptorSetLayoutCreateInfo set_layout_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
