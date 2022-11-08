@@ -33,10 +33,12 @@ add_project_arguments(['-D_GNU_SOURCE', warning_args], language: 'c')
 idep_vkutil = declare_dependency(
   sources: ['vkutil.h'],
   dependencies: [dep_dl, dep_m],
+  include_directories: ['include'],
 )
 
 tests = [
   'clear',
+  'formats',
   'tri',
   'tex',
   'tex_depth',

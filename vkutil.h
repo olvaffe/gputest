@@ -8,6 +8,8 @@
 
 #include <assert.h>
 #include <dlfcn.h>
+#include <drm_fourcc.h>
+#include <inttypes.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -17,6 +19,7 @@
 #include <string.h>
 #include <strings.h>
 #include <vulkan/vulkan.h>
+#include <vulkan/vulkan_android.h>
 
 #ifdef __ANDROID__
 #define LIBVULKAN_NAME "libvulkan.so"
