@@ -80,6 +80,7 @@ struct vk_buffer {
 
 struct vk_image {
     VkImageCreateInfo info;
+    VkFormatFeatureFlags features;
     VkImage img;
 
     VkDeviceMemory mem;
@@ -515,15 +516,8 @@ vk_validate_image(struct vk *vk, struct vk_image *img)
           VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT },
     };
 
-    VkFormatProperties fmt_props;
-    vk->GetPhysicalDeviceFormatProperties(vk->physical_dev, img->info.format, &fmt_props);
-
-    const VkFormatFeatureFlags features = img->info.tiling == VK_IMAGE_TILING_OPTIMAL
-                                              ? fmt_props.optimalTilingFeatures
-                                              : fmt_props.linearTilingFeatures;
-
     for (uint32_t i = 0; i < ARRAY_SIZE(pairs); i++) {
-        if ((img->info.usage & pairs[i].usage) && !(features & pairs[i].feature))
+        if ((img->info.usage & pairs[i].usage) && !(img->features & pairs[i].feature))
             vk_die("image usage 0x%x is not supported", img->info.usage);
     }
 
@@ -577,6 +571,14 @@ vk_create_image(struct vk *vk,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
 
+    VkFormatProperties2 fmt_props = {
+        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+    };
+    vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, format, &fmt_props);
+    img->features = tiling == VK_IMAGE_TILING_OPTIMAL
+                        ? fmt_props.formatProperties.optimalTilingFeatures
+                        : fmt_props.formatProperties.linearTilingFeatures;
+
     vk_validate_image(vk, img);
 
     vk->result = vk->CreateImage(vk->dev, &img->info, NULL, &img->img);
@@ -622,8 +624,12 @@ vk_create_image_render_view(struct vk *vk, struct vk_image *img, VkImageAspectFl
 }
 
 static inline void
-vk_create_image_ycbcr_conversion(struct vk *vk, struct vk_image *img)
+vk_create_image_ycbcr_conversion(struct vk *vk, struct vk_image *img, VkFilter chroma_filter)
 {
+    if (!(img->features & VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT))
+        vk_die("image does not support midpoint chroma offset");
+    const VkChromaLocation chroma_offset = VK_CHROMA_LOCATION_MIDPOINT;
+
     const VkPhysicalDeviceImageFormatInfo2 fmt_info = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
         .format = img->info.format,
@@ -647,9 +653,9 @@ vk_create_image_ycbcr_conversion(struct vk *vk, struct vk_image *img)
         .format = img->info.format,
         .ycbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_601,
         .ycbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_FULL,
-        .xChromaOffset = VK_CHROMA_LOCATION_MIDPOINT,
-        .yChromaOffset = VK_CHROMA_LOCATION_MIDPOINT,
-        .chromaFilter = VK_FILTER_LINEAR,
+        .xChromaOffset = chroma_offset,
+        .yChromaOffset = chroma_offset,
+        .chromaFilter = chroma_filter,
         .forceExplicitReconstruction = false,
     };
 
@@ -662,7 +668,10 @@ vk_create_image_ycbcr_conversion(struct vk *vk, struct vk_image *img)
 }
 
 static inline void
-vk_create_image_sample_view(struct vk *vk, struct vk_image *img, VkImageAspectFlagBits aspect)
+vk_create_image_sample_view(struct vk *vk,
+                            struct vk_image *img,
+                            VkImageAspectFlagBits aspect,
+                            VkFilter filter)
 {
     const VkSamplerYcbcrConversionInfo conv_info = {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO,
@@ -706,8 +715,8 @@ vk_create_image_sample_view(struct vk *vk, struct vk_image *img, VkImageAspectFl
     const VkSamplerCreateInfo sampler_info = {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .pNext = img->ycbcr_conv != VK_NULL_HANDLE ? (void *)&conv_info : (void *)&border_info,
-        .magFilter = VK_FILTER_NEAREST,
-        .minFilter = VK_FILTER_NEAREST,
+        .magFilter = filter,
+        .minFilter = filter,
         .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
         .addressModeU = addr_mode,
         .addressModeV = addr_mode,
