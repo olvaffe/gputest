@@ -98,8 +98,14 @@ ycbcr_test_init_texture(struct ycbcr_test *test)
 
     test->tex =
         vk_create_image_from_ppm(vk, ycbcr_test_ppm, ARRAY_SIZE(ycbcr_test_ppm), test->planar);
-    if (test->planar)
+    if (test->planar) {
+        if (test->chroma_filter != test->minmag_filter &&
+            !(test->tex->features &
+              VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT))
+            vk_die("chroma filter and min/mag filter must be the same");
+
         vk_create_image_ycbcr_conversion(vk, test->tex, test->chroma_loc, test->chroma_filter);
+    }
     vk_create_image_sample_view(vk, test->tex, VK_IMAGE_ASPECT_COLOR_BIT, test->minmag_filter);
 }
 
