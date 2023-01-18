@@ -1432,12 +1432,13 @@ static inline void
 vk_write_descriptor_set_buffer(struct vk *vk,
                                struct vk_descriptor_set *set,
                                VkDescriptorType type,
-                               const struct vk_buffer *buf)
+                               const struct vk_buffer *buf,
+                               VkDeviceSize size)
 {
     const VkDescriptorBufferInfo buf_info = {
         .buffer = buf->buf,
         .offset = 0,
-        .range = VK_WHOLE_SIZE,
+        .range = size,
     };
     const VkWriteDescriptorSet write_info = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,

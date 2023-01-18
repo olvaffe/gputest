@@ -63,7 +63,8 @@ ubo_test_init_descriptor_set(struct ubo_test *test)
     struct vk *vk = &test->vk;
 
     test->set = vk_create_descriptor_set(vk, test->pipeline->set_layouts[0]);
-    vk_write_descriptor_set_buffer(vk, test->set, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, test->ubo);
+    vk_write_descriptor_set_buffer(vk, test->set, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, test->ubo,
+                                   VK_WHOLE_SIZE);
 }
 
 static void

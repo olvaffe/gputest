@@ -30,7 +30,8 @@ compute_test_init_descriptor_set(struct compute_test *test)
     struct vk *vk = &test->vk;
 
     test->set = vk_create_descriptor_set(vk, test->pipeline->set_layouts[0]);
-    vk_write_descriptor_set_buffer(vk, test->set, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, test->ssbo);
+    vk_write_descriptor_set_buffer(vk, test->set, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, test->ssbo,
+                                   VK_WHOLE_SIZE);
 }
 
 static void
