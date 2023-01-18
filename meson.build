@@ -38,6 +38,7 @@ idep_vkutil = declare_dependency(
 )
 
 tests = [
+  'info',
   'clear',
   'formats',
   'tri',
