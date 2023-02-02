@@ -40,6 +40,7 @@ idep_vkutil = declare_dependency(
 tests = [
   'info',
   'clear',
+  'clear_rp',
   'formats',
   'tri',
   'tex',

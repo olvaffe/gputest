@@ -1006,6 +1006,26 @@ vk_dump_image(struct vk *vk,
     vk->UnmapMemory(vk->dev, img->mem);
 }
 
+static inline void
+vk_dump_image_raw(struct vk *vk, struct vk_image *img, const char *filename)
+{
+    if (!img->mem_mappable)
+        vk_die("cannot dump non-mappable image");
+
+    void *ptr;
+    vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
+    vk_check(vk, "failed to map image memory");
+
+    FILE *fp = fopen(filename, "w");
+    if (!fp)
+        vk_die("failed to open %s", filename);
+    if (fwrite(ptr, 1, img->mem_size, fp) != img->mem_size)
+        vk_die("failed to write raw memory");
+    fclose(fp);
+
+    vk->UnmapMemory(vk->dev, img->mem);
+}
+
 static inline struct vk_framebuffer *
 vk_create_framebuffer(struct vk *vk,
                       struct vk_image *color,
@@ -1099,9 +1119,9 @@ vk_create_framebuffer(struct vk *vk,
         .renderPass = fb->pass,
         .attachmentCount = att_count,
         .pAttachments = views,
-        .width = color->info.extent.width,
-        .height = color->info.extent.height,
-        .layers = color->info.arrayLayers,
+        .width = color ? color->info.extent.width : depth->info.extent.width,
+        .height = color ? color->info.extent.height : depth->info.extent.height,
+        .layers = color ? color->info.arrayLayers : depth->info.arrayLayers,
     };
 
     vk->result = vk->CreateFramebuffer(vk->dev, &fb_info, NULL, &fb->fb);
