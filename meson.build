@@ -52,6 +52,7 @@ tests = [
   'tex_ubo',
   'tri',
   'ubo',
+  'xfer',
   'ycbcr',
 ]
 

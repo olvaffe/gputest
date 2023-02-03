@@ -63,6 +63,10 @@
 #define FMT_COMPRESSED(fmt) FMT(fmt)
 #endif
 
+#ifndef FMT_YCBCR
+#define FMT_YCBCR(fmt) FMT(fmt)
+#endif
+
 #ifndef FMT_2PLANE
 #define FMT_2PLANE(fmt) FMT(fmt)
 #endif
@@ -340,5 +344,6 @@ FMT_COMPRESSED(ASTC_12x12_SFLOAT_BLOCK)
 #undef FMT_S
 #undef FMT_DS
 #undef FMT_COMPRESSED
+#undef FMT_YCBCR
 #undef FMT_2PLANE
 #undef FMT_3PLANE
