@@ -39,13 +39,13 @@ idep_vkutil = declare_dependency(
 
 tests = [
   'clear',
-  'clear_rp',
   'compute',
   'formats',
   'gs',
   'info',
   'msaa',
   'push_const',
+  'renderpass_ops',
   'tess',
   'tex',
   'tex_depth',
