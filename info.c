@@ -32,13 +32,13 @@ info_physical_device(struct vk *vk)
     vk_log("  %d memory heaps", vk->mem_props.memoryHeapCount);
     for (uint32_t i = 0; i < vk->mem_props.memoryHeapCount; i++) {
         const VkMemoryHeap *heap = &vk->mem_props.memoryHeaps[i];
-        vk_log("    heap[i]: size %zu flags 0x%x", heap->size, heap->flags);
+        vk_log("    heap[%d]: size %zu flags 0x%x", i, heap->size, heap->flags);
     }
 
     vk_log("  %d memory types", vk->mem_props.memoryTypeCount);
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
         const VkMemoryType *mt = &vk->mem_props.memoryTypes[i];
-        vk_log("    mt[i]: heap %d flags %s%s%s%s%s%s", mt->heapIndex,
+        vk_log("    mt[%d]: heap %d flags %s%s%s%s%s%s", i, mt->heapIndex,
                (mt->propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? "Lo" : "-",
                (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) ? "Vi" : "-",
                (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) ? "Co" : "-",
