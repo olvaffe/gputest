@@ -3,48 +3,116 @@
  * SPDX-License-Identifier: MIT
  */
 
-/* This test clears a tiled depth image and dumps it to a file. */
-
 #include "vkutil.h"
 
+static const uint32_t renderpass_ops_test_vs[] = {
+#include "renderpass_ops_test.vert.inc"
+};
+
+static const uint32_t renderpass_ops_test_fs[] = {
+#include "renderpass_ops_test.frag.inc"
+};
+
 struct renderpass_ops_test {
+    bool verbose;
+    VkFormat dump_color_format;
     uint32_t width;
     uint32_t height;
 
-    VkFormat color_format;
-    VkImageTiling color_tiling;
-
-    VkFormat depth_format;
-    VkImageAspectFlags depth_aspect_mask;
-
     struct vk vk;
 
-    struct vk_image *color_img;
-    struct vk_image *depth_img;
+    VkCommandBuffer cmd;
+    struct vk_image *img;
     struct vk_framebuffer *fb;
+    struct vk_pipeline *pipeline;
+};
+
+struct renderpass_ops_test_format {
+    VkFormat format;
+    const char *name;
+
+    bool color;
+    bool depth;
+    bool stencil;
+    bool compressed;
+    bool ycbcr;
+    uint32_t plane_count;
+
+    VkFormatProperties2 props;
+};
+
+static struct renderpass_ops_test_format renderpass_ops_test_formats[] = {
+#define FMT_COMMON(fmt) .format = VK_FORMAT_##fmt, .name = #fmt
+
+#define FMT(fmt)                                                                                 \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+        .color = true,                                                                           \
+        .plane_count = 1,                                                                        \
+    },
+#define FMT_D(fmt)                                                                               \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+        .depth = true,                                                                           \
+        .plane_count = 1,                                                                        \
+    },
+#define FMT_S(fmt)                                                                               \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+        .stencil = true,                                                                         \
+        .plane_count = 1,                                                                        \
+    },
+#define FMT_DS(fmt)                                                                              \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+        .depth = true,                                                                           \
+        .stencil = true,                                                                         \
+        .plane_count = 1,                                                                        \
+    },
+#define FMT_COMPRESSED(fmt)                                                                      \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+        .color = true,                                                                           \
+        .compressed = true,                                                                      \
+        .plane_count = 1,                                                                        \
+    },
+#define FMT_YCBCR(fmt)                                                                           \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+        .color = true,                                                                           \
+        .ycbcr = true,                                                                           \
+        .plane_count = 1,                                                                        \
+    },
+#define FMT_2PLANE(fmt)                                                                          \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+        .color = true,                                                                           \
+        .ycbcr = true,                                                                           \
+        .plane_count = 2,                                                                        \
+    },
+#define FMT_3PLANE(fmt)                                                                          \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+        .color = true,                                                                           \
+        .ycbcr = true,                                                                           \
+        .plane_count = 3,                                                                        \
+    },
+#include "vkutil_formats.inc"
+
+#undef FMT_COMMON
 };
 
 static void
-renderpass_ops_test_init_framebuffer(struct renderpass_ops_test *test)
+renderpass_ops_test_init_formats(struct renderpass_ops_test *test)
 {
     struct vk *vk = &test->vk;
 
-    if (test->color_format != VK_FORMAT_UNDEFINED) {
-        test->color_img = vk_create_image(vk, test->color_format, test->width, test->height,
-                                          VK_SAMPLE_COUNT_1_BIT, test->color_tiling,
-                                          VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-        vk_create_image_render_view(vk, test->color_img, VK_IMAGE_ASPECT_COLOR_BIT);
-    }
+    for (uint32_t i = 0; i < ARRAY_SIZE(renderpass_ops_test_formats); i++) {
+        struct renderpass_ops_test_format *fmt = &renderpass_ops_test_formats[i];
 
-    if (test->depth_format != VK_FORMAT_UNDEFINED) {
-        test->depth_img = vk_create_image(vk, test->depth_format, test->width, test->height,
-                                          VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-                                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-        vk_create_image_render_view(vk, test->depth_img, test->depth_aspect_mask);
+        fmt->props.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+        vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, fmt->format, &fmt->props);
     }
-
-    test->fb = vk_create_framebuffer(vk, test->color_img, NULL, test->depth_img,
-                                     VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void
@@ -53,8 +121,7 @@ renderpass_ops_test_init(struct renderpass_ops_test *test)
     struct vk *vk = &test->vk;
 
     vk_init(vk);
-
-    renderpass_ops_test_init_framebuffer(test);
+    renderpass_ops_test_init_formats(test);
 }
 
 static void
@@ -62,133 +129,37 @@ renderpass_ops_test_cleanup(struct renderpass_ops_test *test)
 {
     struct vk *vk = &test->vk;
 
-    if (test->color_img)
-        vk_destroy_image(vk, test->color_img);
-    if (test->depth_img)
-        vk_destroy_image(vk, test->depth_img);
-    vk_destroy_framebuffer(vk, test->fb);
-
     vk_cleanup(vk);
 }
 
-static void
-renderpass_ops_test_draw_ops(struct renderpass_ops_test *test, VkCommandBuffer cmd)
+static VkCommandBuffer
+renderpass_ops_test_begin_cmd(struct renderpass_ops_test *test)
 {
     struct vk *vk = &test->vk;
-
-    VkImageMemoryBarrier barriers[2];
-    VkClearValue clear_vals[2];
-    uint32_t att_count = 0;
-
-    if (test->color_format != VK_FORMAT_UNDEFINED) {
-        barriers[att_count] = (VkImageMemoryBarrier){
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .image = test->color_img->img,
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .levelCount = 1,
-                .layerCount = 1,
-            },
-        };
-
-        clear_vals[att_count++] = (VkClearValue) {
-            .color = {
-                .float32 = { 0.7f, 0.6f, 0.5f, 1.0f },
-            },
-        };
-    }
-    if (test->depth_format != VK_FORMAT_UNDEFINED) {
-        barriers[att_count] = (VkImageMemoryBarrier){
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            .image = test->depth_img->img,
-            .subresourceRange = {
-                .aspectMask = test->depth_aspect_mask,
-                .levelCount = 1,
-                .layerCount = 1,
-
-            },
-        };
-
-        clear_vals[att_count++] = (VkClearValue){
-            .depthStencil = {
-                .depth = 0.5f,
-                .stencil = 10,
-            },
-        };
-    }
-
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, att_count,
-                           barriers);
-
-    const VkRenderPassBeginInfo pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = test->fb->pass,
-        .framebuffer = test->fb->fb,
-        .renderArea = {
-            .extent = {
-                .width = test->width,
-                .height = test->height,
-            },
-        },
-        .clearValueCount = att_count,
-        .pClearValues = clear_vals,
-    };
-
-    /* trigger renderpass ops */
-    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
-    vk->CmdEndRenderPass(cmd);
-
-    if (test->color_format != VK_FORMAT_UNDEFINED &&
-        test->color_tiling == VK_IMAGE_TILING_LINEAR) {
-        const VkImageMemoryBarrier barrier = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-            .image = test->color_img->img,
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .levelCount = 1,
-                .layerCount = 1,
-            },
-        };
-        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                               VK_PIPELINE_STAGE_HOST_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
-    }
+    test->cmd = vk_begin_cmd(vk);
+    return test->cmd;
 }
 
 static void
-renderpass_ops_test_draw(struct renderpass_ops_test *test)
+renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
+                                      const struct renderpass_ops_test_format *fmt,
+                                      VkSampleCountFlagBits samples,
+                                      VkImageTiling tiling,
+                                      VkAttachmentLoadOp load_op,
+                                      VkAttachmentStoreOp store_op)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    if (!test->cmd)
+        vk_die("no cmd");
+    if (test->img)
+        vk_die("already has img");
 
-    renderpass_ops_test_draw_ops(test, cmd);
+    VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkImageUsageFlags usage = 0;
+    VkImageAspectFlags aspect_mask = 0;
+    VkAccessFlags access_mask = 0;
 
-    vk_end_cmd(vk);
-    vk_wait(vk);
-
-    if (test->color_format != VK_FORMAT_UNDEFINED && test->color_tiling == VK_IMAGE_TILING_LINEAR)
-        vk_dump_image(vk, test->color_img, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
-
-    if (test->depth_format != VK_FORMAT_UNDEFINED)
-        vk_dump_image_raw(vk, test->depth_img, "zs.raw");
-}
-
-int
-main(void)
-{
     /* VkImageSubresourceRange has some rules
      *
      *  - aspectMask must be only VK_IMAGE_ASPECT_COLOR_BIT,
@@ -210,15 +181,235 @@ main(void)
      *    depth/stencil framebuffer attachment, the aspectMask is ignored and
      *    both depth and stencil image subresources are used.
      */
+
+    if (fmt->color) {
+        layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        aspect_mask |= VK_IMAGE_ASPECT_COLOR_BIT;
+        access_mask |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    }
+    if (fmt->depth || fmt->stencil) {
+        layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+        if (fmt->depth)
+            aspect_mask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+        if (fmt->stencil)
+            aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+        access_mask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                       VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    }
+
+    test->img =
+        vk_create_image(vk, fmt->format, test->width, test->height, samples, tiling, usage);
+    vk_create_image_render_view(vk, test->img, aspect_mask);
+
+    struct vk_image *color_img = fmt->color ? test->img : NULL;
+    struct vk_image *depth_img = (fmt->depth || fmt->stencil) ? test->img : NULL;
+    test->fb = vk_create_framebuffer(vk, color_img, NULL, depth_img, load_op, store_op);
+
+    const VkImageMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .srcAccessMask = 0,
+        .dstAccessMask = access_mask,
+        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout = layout,
+        .image = test->img->img,
+        .subresourceRange = {
+            .aspectMask = aspect_mask,
+            .levelCount = 1,
+            .layerCount = 1,
+        },
+    };
+    vk->CmdPipelineBarrier(test->cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+}
+
+static void
+renderpass_ops_test_begin_pipeline(struct renderpass_ops_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    if (!test->fb)
+        vk_die("no fb");
+    if (test->pipeline)
+        vk_die("already has pipeline");
+
+    test->pipeline = vk_create_pipeline(vk);
+
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, renderpass_ops_test_vs,
+                           sizeof(renderpass_ops_test_vs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
+                           renderpass_ops_test_fs, sizeof(renderpass_ops_test_fs));
+
+    vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL);
+
+    vk_setup_pipeline(vk, test->pipeline, test->fb);
+    vk_compile_pipeline(vk, test->pipeline);
+
+    vk->CmdBindPipeline(test->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+}
+
+static void
+renderpass_ops_test_begin_renderpass(struct renderpass_ops_test *test,
+                                     const struct renderpass_ops_test_format *fmt)
+{
+    struct vk *vk = &test->vk;
+
+    if (!test->fb)
+        vk_die("no fb");
+
+    VkClearValue clear_val;
+    if (fmt->color)
+        clear_val.color = (VkClearColorValue){ 0 };
+    if (fmt->depth || fmt->stencil) {
+        clear_val.depthStencil = (VkClearDepthStencilValue){
+            .depth = 1.0f,
+            .stencil = 0,
+        };
+    }
+
+    const VkRenderPassBeginInfo pass_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .renderPass = test->fb->pass,
+        .framebuffer = test->fb->fb,
+        .renderArea = {
+            .extent = {
+                .width = test->width,
+                .height = test->height,
+            },
+        },
+        .clearValueCount = 1,
+        .pClearValues = &clear_val,
+    };
+
+    vk->CmdBeginRenderPass(test->cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+static void
+renderpass_ops_test_end_all(struct renderpass_ops_test *test, bool dump_color)
+{
+    struct vk *vk = &test->vk;
+
+    if (dump_color) {
+        const VkImageMemoryBarrier barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .image = test->img->img,
+            .subresourceRange = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .levelCount = 1,
+                .layerCount = 1,
+            },
+        };
+        vk->CmdPipelineBarrier(test->cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                               VK_PIPELINE_STAGE_HOST_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+    }
+
+    vk_end_cmd(vk);
+    vk_wait(vk);
+
+    if (dump_color)
+        vk_dump_image(vk, test->img, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
+
+    test->cmd = NULL;
+
+    vk_destroy_image(vk, test->img);
+    test->img = NULL;
+
+    vk_destroy_framebuffer(vk, test->fb);
+    test->fb = NULL;
+
+    vk_destroy_pipeline(vk, test->pipeline);
+    test->pipeline = NULL;
+}
+
+static void
+renderpass_ops_test_draw_format(struct renderpass_ops_test *test,
+                                const struct renderpass_ops_test_format *fmt,
+                                VkImageTiling tiling)
+{
+    struct vk *vk = &test->vk;
+
+    const struct {
+        VkAttachmentLoadOp load_op;
+        VkAttachmentStoreOp store_op;
+    } combos[] = {
+        [0] = {
+            .load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .store_op = VK_ATTACHMENT_STORE_OP_STORE,
+        },
+        [1] = {
+            .load_op = VK_ATTACHMENT_LOAD_OP_LOAD,
+            .store_op = VK_ATTACHMENT_STORE_OP_STORE,
+        },
+    };
+
+    for (uint32_t i = 0; i < ARRAY_SIZE(combos); i++) {
+        const VkAttachmentLoadOp load_op = combos[i].load_op;
+        const VkAttachmentStoreOp store_op = combos[i].store_op;
+
+        if (test->verbose) {
+            vk_log("format %s, %s, load %d, store %d", fmt->name, tiling ? "linear" : "optimal",
+                   load_op, store_op);
+        }
+
+        VkCommandBuffer cmd = renderpass_ops_test_begin_cmd(test);
+        renderpass_ops_test_begin_framebuffer(test, fmt, VK_SAMPLE_COUNT_1_BIT, tiling, load_op,
+                                              store_op);
+        renderpass_ops_test_begin_pipeline(test);
+        renderpass_ops_test_begin_renderpass(test, fmt);
+
+        for (uint32_t i = 0; i < 16; i++)
+            vk->CmdDraw(cmd, 3, 1, 0, 0);
+
+        vk->CmdEndRenderPass(cmd);
+
+        const bool dump_color = fmt->color && fmt->format == test->dump_color_format &&
+                                test->img->info.tiling == VK_IMAGE_TILING_LINEAR && i == 0;
+        renderpass_ops_test_end_all(test, dump_color);
+    }
+}
+
+static void
+renderpass_ops_test_draw(struct renderpass_ops_test *test)
+{
+    for (uint32_t i = 0; i < ARRAY_SIZE(renderpass_ops_test_formats); i++) {
+        const struct renderpass_ops_test_format *fmt = &renderpass_ops_test_formats[i];
+        const VkFormatFeatureFlags linear = fmt->props.formatProperties.linearTilingFeatures;
+        const VkFormatFeatureFlags optimal = fmt->props.formatProperties.optimalTilingFeatures;
+
+        if (fmt->color) {
+            if (linear & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)
+                renderpass_ops_test_draw_format(test, fmt, VK_IMAGE_TILING_LINEAR);
+            if (optimal & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)
+                renderpass_ops_test_draw_format(test, fmt, VK_IMAGE_TILING_OPTIMAL);
+        }
+
+        if (fmt->depth || fmt->stencil) {
+            if (linear & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                renderpass_ops_test_draw_format(test, fmt, VK_IMAGE_TILING_LINEAR);
+            if (optimal & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                renderpass_ops_test_draw_format(test, fmt, VK_IMAGE_TILING_OPTIMAL);
+        }
+    }
+}
+
+int
+main(void)
+{
     struct renderpass_ops_test test = {
-        .width = 300,
-        .height = 300,
-
-        .color_format = VK_FORMAT_B8G8R8A8_UNORM,
-        .color_tiling = VK_IMAGE_TILING_LINEAR,
-
-        .depth_format = VK_FORMAT_D24_UNORM_S8_UINT,
-        .depth_aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+        .verbose = true,
+        .dump_color_format = VK_FORMAT_B8G8R8A8_UNORM,
+        .width = 900,
+        .height = 900,
     };
 
     renderpass_ops_test_init(&test);
