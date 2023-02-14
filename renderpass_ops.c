@@ -43,7 +43,8 @@ renderpass_ops_test_init_framebuffer(struct renderpass_ops_test *test)
         vk_create_image_render_view(vk, test->depth_img, test->depth_aspect_mask);
     }
 
-    test->fb = vk_create_framebuffer(vk, test->color_img, NULL, test->depth_img);
+    test->fb = vk_create_framebuffer(vk, test->color_img, NULL, test->depth_img,
+                                     VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void

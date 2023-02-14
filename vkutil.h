@@ -1030,7 +1030,9 @@ static inline struct vk_framebuffer *
 vk_create_framebuffer(struct vk *vk,
                       struct vk_image *color,
                       struct vk_image *resolve,
-                      struct vk_image *depth)
+                      struct vk_image *depth,
+                      VkAttachmentLoadOp load_op,
+                      VkAttachmentStoreOp store_op)
 {
     struct vk_framebuffer *fb = calloc(1, sizeof(*fb));
     if (!fb)
@@ -1047,8 +1049,8 @@ vk_create_framebuffer(struct vk *vk,
         att_descs[att_count] = (VkAttachmentDescription){
             .format = color->info.format,
             .samples = color->info.samples,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .loadOp = load_op,
+            .storeOp = store_op,
             .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         };
@@ -1065,7 +1067,7 @@ vk_create_framebuffer(struct vk *vk,
             .format = resolve->info.format,
             .samples = resolve->info.samples,
             .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .storeOp = store_op,
             .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         };
@@ -1081,10 +1083,10 @@ vk_create_framebuffer(struct vk *vk,
         att_descs[att_count] = (VkAttachmentDescription){
             .format = depth->info.format,
             .samples = depth->info.samples,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .loadOp = load_op,
+            .storeOp = store_op,
+            .stencilLoadOp = load_op,
+            .stencilStoreOp = store_op,
             .initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         };

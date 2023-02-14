@@ -95,7 +95,8 @@ msaa_test_init_framebuffer(struct msaa_test *test)
                         VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vk_create_image_render_view(vk, test->resolved, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    test->fb = vk_create_framebuffer(vk, test->rt, test->resolved, NULL);
+    test->fb = vk_create_framebuffer(vk, test->rt, test->resolved, NULL,
+                                     VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void

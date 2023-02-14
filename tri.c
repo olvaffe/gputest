@@ -103,7 +103,8 @@ tri_test_init_framebuffer(struct tri_test *test)
     vk_fill_image(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT, 0x11);
     vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    test->fb = vk_create_framebuffer(vk, test->rt, NULL, NULL);
+    test->fb = vk_create_framebuffer(vk, test->rt, NULL, NULL, VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                     VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void
