@@ -1102,9 +1102,9 @@ vk_create_framebuffer(struct vk *vk,
             &(VkSubpassDescription){
                 .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
                 .colorAttachmentCount = color ? 1 : 0,
-                .pColorAttachments = &color_ref,
-                .pResolveAttachments = &resolve_ref,
-                .pDepthStencilAttachment = &depth_ref,
+                .pColorAttachments = color ? &color_ref : NULL,
+                .pResolveAttachments = resolve ? &resolve_ref : NULL,
+                .pDepthStencilAttachment = depth ? &depth_ref : NULL,
             },
     };
 
