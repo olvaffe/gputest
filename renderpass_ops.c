@@ -16,13 +16,15 @@ static const uint32_t renderpass_ops_test_fs[] = {
 struct renderpass_ops_test {
     bool verbose;
     VkFormat dump_color_format;
+    VkFormat force_color_format;
     uint32_t width;
     uint32_t height;
 
     struct vk vk;
 
     VkCommandBuffer cmd;
-    struct vk_image *img;
+    struct vk_image *color_img;
+    struct vk_image *depth_img;
     struct vk_framebuffer *fb;
     struct vk_pipeline *pipeline;
 };
@@ -152,13 +154,8 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
 
     if (!test->cmd)
         vk_die("no cmd");
-    if (test->img)
+    if (test->color_img || test->depth_img)
         vk_die("already has img");
-
-    VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    VkImageUsageFlags usage = 0;
-    VkImageAspectFlags aspect_mask = 0;
-    VkAccessFlags access_mask = 0;
 
     /* VkImageSubresourceRange has some rules
      *
@@ -181,51 +178,69 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
      *    depth/stencil framebuffer attachment, the aspectMask is ignored and
      *    both depth and stencil image subresources are used.
      */
+    if (fmt->color || test->force_color_format != VK_FORMAT_UNDEFINED) {
+        const VkImageLayout color_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        const VkImageUsageFlags color_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        const VkImageAspectFlags color_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+        const VkAccessFlags color_access_mask =
+            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    if (fmt->color) {
-        layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        test->color_img =
+            vk_create_image(vk, fmt->color ? fmt->format : test->force_color_format, test->width,
+                            test->height, samples, tiling, color_usage);
+        vk_create_image_render_view(vk, test->color_img, color_aspect_mask);
 
-        usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        aspect_mask |= VK_IMAGE_ASPECT_COLOR_BIT;
-        access_mask |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        const VkImageMemoryBarrier color_barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = 0,
+            .dstAccessMask = color_access_mask,
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = color_layout,
+            .image = test->color_img->img,
+            .subresourceRange = {
+                .aspectMask = color_aspect_mask,
+                .levelCount = 1,
+                .layerCount = 1,
+            },
+        };
+        vk->CmdPipelineBarrier(test->cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1,
+                               &color_barrier);
     }
+
     if (fmt->depth || fmt->stencil) {
-        layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        const VkImageLayout depth_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        const VkImageUsageFlags depth_usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        const VkImageAspectFlags depth_aspect_mask =
+            (fmt->depth ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
+            (fmt->stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0);
+        const VkAccessFlags depth_access_mask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-        usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        test->depth_img = vk_create_image(vk, fmt->format, test->width, test->height, samples,
+                                          tiling, depth_usage);
+        vk_create_image_render_view(vk, test->depth_img, depth_aspect_mask);
 
-        if (fmt->depth)
-            aspect_mask |= VK_IMAGE_ASPECT_DEPTH_BIT;
-        if (fmt->stencil)
-            aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-
-        access_mask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                       VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        const VkImageMemoryBarrier depth_barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = 0,
+            .dstAccessMask = depth_access_mask,
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = depth_layout,
+            .image = test->depth_img->img,
+            .subresourceRange = {
+                .aspectMask = depth_aspect_mask,
+                .levelCount = 1,
+                .layerCount = 1,
+            },
+        };
+        vk->CmdPipelineBarrier(test->cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1,
+                               &depth_barrier);
     }
 
-    test->img =
-        vk_create_image(vk, fmt->format, test->width, test->height, samples, tiling, usage);
-    vk_create_image_render_view(vk, test->img, aspect_mask);
-
-    struct vk_image *color_img = fmt->color ? test->img : NULL;
-    struct vk_image *depth_img = (fmt->depth || fmt->stencil) ? test->img : NULL;
-    test->fb = vk_create_framebuffer(vk, color_img, NULL, depth_img, load_op, store_op);
-
-    const VkImageMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = 0,
-        .dstAccessMask = access_mask,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = layout,
-        .image = test->img->img,
-        .subresourceRange = {
-            .aspectMask = aspect_mask,
-            .levelCount = 1,
-            .layerCount = 1,
-        },
-    };
-    vk->CmdPipelineBarrier(test->cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+    test->fb =
+        vk_create_framebuffer(vk, test->color_img, NULL, test->depth_img, load_op, store_op);
 }
 
 static void
@@ -264,11 +279,13 @@ renderpass_ops_test_begin_renderpass(struct renderpass_ops_test *test,
     if (!test->fb)
         vk_die("no fb");
 
-    VkClearValue clear_val;
-    if (fmt->color)
-        clear_val.color = (VkClearColorValue){ 0 };
+    VkClearValue clear_vals[2];
+    uint32_t clear_val_count = 0;
+
+    if (fmt->color || test->force_color_format != VK_FORMAT_UNDEFINED)
+        clear_vals[clear_val_count++].color = (VkClearColorValue){ 0 };
     if (fmt->depth || fmt->stencil) {
-        clear_val.depthStencil = (VkClearDepthStencilValue){
+        clear_vals[clear_val_count++].depthStencil = (VkClearDepthStencilValue){
             .depth = 1.0f,
             .stencil = 0,
         };
@@ -284,25 +301,31 @@ renderpass_ops_test_begin_renderpass(struct renderpass_ops_test *test,
                 .height = test->height,
             },
         },
-        .clearValueCount = 1,
-        .pClearValues = &clear_val,
+        .clearValueCount = clear_val_count,
+        .pClearValues = clear_vals,
     };
 
     vk->CmdBeginRenderPass(test->cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
 
     if (clear_att) {
-        VkImageAspectFlags aspect_mask = 0;
-        if (fmt->color)
-            aspect_mask |= VK_IMAGE_ASPECT_COLOR_BIT;
-        if (fmt->depth)
-            aspect_mask |= VK_IMAGE_ASPECT_DEPTH_BIT;
-        if (fmt->stencil)
-            aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        VkClearAttachment atts[2];
+        uint32_t att_count = 0;
 
-        const VkClearAttachment att = {
-            .aspectMask = aspect_mask,
-            .clearValue = clear_val,
-        };
+        if (fmt->color || test->force_color_format != VK_FORMAT_UNDEFINED) {
+            atts[att_count++] = (VkClearAttachment){
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .clearValue = clear_vals[0],
+            };
+        }
+
+        if (fmt->depth || fmt->stencil) {
+            atts[att_count++] = (VkClearAttachment){
+                .aspectMask = (fmt->depth ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
+                              (fmt->stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0),
+                .clearValue = clear_vals[1],
+            };
+        }
+
         const VkClearRect rect = {
             .rect = {
                 .extent = {
@@ -313,7 +336,7 @@ renderpass_ops_test_begin_renderpass(struct renderpass_ops_test *test,
             .layerCount = 1,
         };
 
-        vk->CmdClearAttachments(test->cmd, 1, &att, 1, &rect);
+        vk->CmdClearAttachments(test->cmd, att_count, atts, 1, &rect);
     }
 }
 
@@ -329,7 +352,7 @@ renderpass_ops_test_end_all(struct renderpass_ops_test *test, bool dump_color)
             .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-            .image = test->img->img,
+            .image = test->color_img->img,
             .subresourceRange = {
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                 .levelCount = 1,
@@ -344,12 +367,19 @@ renderpass_ops_test_end_all(struct renderpass_ops_test *test, bool dump_color)
     vk_wait(vk);
 
     if (dump_color)
-        vk_dump_image(vk, test->img, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
+        vk_dump_image(vk, test->color_img, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
 
     test->cmd = NULL;
 
-    vk_destroy_image(vk, test->img);
-    test->img = NULL;
+    if (test->color_img) {
+        vk_destroy_image(vk, test->color_img);
+        test->color_img = NULL;
+    }
+
+    if (test->depth_img) {
+        vk_destroy_image(vk, test->depth_img);
+        test->depth_img = NULL;
+    }
 
     vk_destroy_framebuffer(vk, test->fb);
     test->fb = NULL;
@@ -407,7 +437,7 @@ renderpass_ops_test_draw_format(struct renderpass_ops_test *test,
         vk->CmdEndRenderPass(cmd);
 
         const bool dump_color = fmt->color && fmt->format == test->dump_color_format &&
-                                test->img->info.tiling == VK_IMAGE_TILING_LINEAR && i == 0;
+                                test->color_img->info.tiling == VK_IMAGE_TILING_LINEAR && i == 0;
         renderpass_ops_test_end_all(test, dump_color);
     }
 }
@@ -442,6 +472,7 @@ main(void)
     struct renderpass_ops_test test = {
         .verbose = true,
         .dump_color_format = VK_FORMAT_B8G8R8A8_UNORM,
+        .force_color_format = VK_FORMAT_B8G8R8A8_UNORM, /* to force binning */
         .width = 900,
         .height = 900,
     };
