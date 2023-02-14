@@ -256,7 +256,8 @@ renderpass_ops_test_begin_pipeline(struct renderpass_ops_test *test)
 
 static void
 renderpass_ops_test_begin_renderpass(struct renderpass_ops_test *test,
-                                     const struct renderpass_ops_test_format *fmt)
+                                     const struct renderpass_ops_test_format *fmt,
+                                     bool clear_att)
 {
     struct vk *vk = &test->vk;
 
@@ -288,6 +289,32 @@ renderpass_ops_test_begin_renderpass(struct renderpass_ops_test *test,
     };
 
     vk->CmdBeginRenderPass(test->cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+
+    if (clear_att) {
+        VkImageAspectFlags aspect_mask = 0;
+        if (fmt->color)
+            aspect_mask |= VK_IMAGE_ASPECT_COLOR_BIT;
+        if (fmt->depth)
+            aspect_mask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+        if (fmt->stencil)
+            aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+        const VkClearAttachment att = {
+            .aspectMask = aspect_mask,
+            .clearValue = clear_val,
+        };
+        const VkClearRect rect = {
+            .rect = {
+                .extent = {
+                    .width = test->width,
+                    .height = test->height,
+                },
+            },
+            .layerCount = 1,
+        };
+
+        vk->CmdClearAttachments(test->cmd, 1, &att, 1, &rect);
+    }
 }
 
 static void
@@ -350,6 +377,10 @@ renderpass_ops_test_draw_format(struct renderpass_ops_test *test,
             .load_op = VK_ATTACHMENT_LOAD_OP_LOAD,
             .store_op = VK_ATTACHMENT_STORE_OP_STORE,
         },
+        [2] = {
+            .load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .store_op = VK_ATTACHMENT_STORE_OP_STORE,
+        },
     };
 
     for (uint32_t i = 0; i < ARRAY_SIZE(combos); i++) {
@@ -365,7 +396,9 @@ renderpass_ops_test_draw_format(struct renderpass_ops_test *test,
         renderpass_ops_test_begin_framebuffer(test, fmt, VK_SAMPLE_COUNT_1_BIT, tiling, load_op,
                                               store_op);
         renderpass_ops_test_begin_pipeline(test);
-        renderpass_ops_test_begin_renderpass(test, fmt);
+
+        const bool clear_att = load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        renderpass_ops_test_begin_renderpass(test, fmt, clear_att);
 
         for (uint32_t i = 0; i < 16; i++)
             vk->CmdDraw(cmd, 3, 1, 0, 0);
