@@ -192,9 +192,7 @@ static inline void PRINTFLIKE(2, 3) vk_check(const struct vk *vk, const char *fo
 static inline void
 vk_init_global_dispatch(struct vk *vk)
 {
-#define PFN_GLOBAL(name)                                                                         \
-    if (!(vk->name = (PFN_vk##name)vk->GetInstanceProcAddr(NULL, "vk" #name)))                   \
-        vk_die("no global command vk" #name);
+#define PFN_GLOBAL(name) vk->name = (PFN_vk##name)vk->GetInstanceProcAddr(NULL, "vk" #name);
 #include "vkutil_entrypoints.inc"
 }
 
@@ -217,8 +215,7 @@ static inline void
 vk_init_instance_dispatch(struct vk *vk)
 {
 #define PFN_INSTANCE(name)                                                                       \
-    if (!(vk->name = (PFN_vk##name)vk->GetInstanceProcAddr(vk->instance, "vk" #name)))           \
-        vk_die("no instance command vk" #name);
+    vk->name = (PFN_vk##name)vk->GetInstanceProcAddr(vk->instance, "vk" #name);
 #include "vkutil_entrypoints.inc"
 }
 
@@ -301,9 +298,7 @@ vk_init_device_dispatch(struct vk *vk)
     vk->GetDeviceProcAddr =
         (PFN_vkGetDeviceProcAddr)vk->GetInstanceProcAddr(vk->instance, "vkGetDeviceProcAddr");
 
-#define PFN_DEVICE(name)                                                                         \
-    if (!(vk->name = (PFN_vk##name)vk->GetDeviceProcAddr(vk->dev, "vk" #name)))                  \
-        vk_die("no device command vk" #name);
+#define PFN_DEVICE(name) vk->name = (PFN_vk##name)vk->GetDeviceProcAddr(vk->dev, "vk" #name);
 #include "vkutil_entrypoints.inc"
 }
 
