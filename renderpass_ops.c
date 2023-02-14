@@ -369,15 +369,15 @@ renderpass_ops_test_draw_format(struct renderpass_ops_test *test,
         VkAttachmentLoadOp load_op;
         VkAttachmentStoreOp store_op;
     } combos[] = {
-        [0] = {
+        {
             .load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .store_op = VK_ATTACHMENT_STORE_OP_STORE,
         },
-        [1] = {
+        {
             .load_op = VK_ATTACHMENT_LOAD_OP_LOAD,
             .store_op = VK_ATTACHMENT_STORE_OP_STORE,
         },
-        [2] = {
+        {
             .load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .store_op = VK_ATTACHMENT_STORE_OP_STORE,
         },
@@ -400,8 +400,9 @@ renderpass_ops_test_draw_format(struct renderpass_ops_test *test,
         const bool clear_att = load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         renderpass_ops_test_begin_renderpass(test, fmt, clear_att);
 
-        for (uint32_t i = 0; i < 16; i++)
-            vk->CmdDraw(cmd, 3, 1, 0, 0);
+        /* draw some triangles to force binning */
+        for (uint32_t i = 0; i < 4; i++)
+            vk->CmdDraw(cmd, 93, 1, 0, 0);
 
         vk->CmdEndRenderPass(cmd);
 
