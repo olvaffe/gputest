@@ -164,7 +164,6 @@ struct vk_swapchain {
     VkImage *img_handles;
     struct vk_image *imgs;
 
-    VkResult img_result;
     uint32_t img_cur;
 };
 
@@ -1794,9 +1793,9 @@ vk_acquire_swapchain_image(struct vk *vk, struct vk_swapchain *swapchain)
         .fence = swapchain->fence,
         .deviceMask = 0x1,
     };
-    swapchain->img_result = vk->AcquireNextImage2KHR(vk->dev, &info, &swapchain->img_cur);
+    vk->result = vk->AcquireNextImage2KHR(vk->dev, &info, &swapchain->img_cur);
 
-    switch (swapchain->img_result) {
+    switch (vk->result) {
     case VK_SUCCESS:
     case VK_SUBOPTIMAL_KHR:
         vk->result = vk->WaitForFences(vk->dev, 1, &swapchain->fence, true, UINT64_MAX);
@@ -1811,7 +1810,7 @@ vk_acquire_swapchain_image(struct vk *vk, struct vk_swapchain *swapchain)
     }
 }
 
-static inline bool
+static inline VkResult
 vk_present_swapchain_image(struct vk *vk, struct vk_swapchain *swapchain)
 {
     const VkPresentInfoKHR present_info = {
@@ -1820,14 +1819,13 @@ vk_present_swapchain_image(struct vk *vk, struct vk_swapchain *swapchain)
         .pSwapchains = &swapchain->swapchain,
         .pImageIndices = &swapchain->img_cur,
     };
-    swapchain->img_result = vk->QueuePresentKHR(vk->queue, &present_info);
+    vk->result = vk->QueuePresentKHR(vk->queue, &present_info);
 
     switch (vk->result) {
     case VK_SUCCESS:
     case VK_SUBOPTIMAL_KHR:
-        return true;
     case VK_ERROR_OUT_OF_DATE_KHR:
-        return false;
+        return vk->result;
     default:
         vk_die("failed to present swapchain img");
     }

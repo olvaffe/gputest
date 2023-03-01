@@ -8,15 +8,26 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
+enum win_state {
+    WIN_NORMAL,
+    WIN_MINIMIZED,
+    WIN_MAXIMIZED,
+    WIN_FULLSCREEN,
+};
+
 struct sdl_test {
-    uint32_t width;
-    uint32_t height;
+    uint32_t win_width;
+    uint32_t win_height;
     uint32_t win_flags;
 
     SDL_Window *win;
-
     struct vk vk;
     VkSurfaceKHR surf;
+
+    bool quit;
+    bool redraw;
+    enum win_state win_req;
+
     struct vk_swapchain *swapchain;
 };
 
@@ -49,6 +60,15 @@ sdl_log_event_windowevent(const SDL_Event *ev)
 #undef CASE
     default:
         vk_log("unknown windowe vent 0x%x", ev->window.event);
+        break;
+    }
+
+    switch (ev->window.event) {
+    case SDL_WINDOWEVENT_RESIZED:
+    case SDL_WINDOWEVENT_SIZE_CHANGED:
+        vk_log("  data1 %d data2 %d", ev->window.data1, ev->window.data2);
+        break;
+    default:
         break;
     }
 }
@@ -145,7 +165,7 @@ sdl_test_init(struct sdl_test *test)
         vk_die("failed to load vulkan into sdl");
 
     test->win = SDL_CreateWindow("test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                 test->width, test->height, test->win_flags);
+                                 test->win_width, test->win_height, test->win_flags);
     if (!test->win)
         vk_die("failed to create win");
 
@@ -168,10 +188,6 @@ sdl_test_init(struct sdl_test *test)
 
     if (!SDL_Vulkan_CreateSurface(test->win, vk->instance, &test->surf))
         vk_die("failed to create surface");
-
-    test->swapchain =
-        vk_create_swapchain(vk, test->surf, VK_FORMAT_B8G8R8A8_UNORM, test->width, test->height,
-                            VK_PRESENT_MODE_FIFO_KHR, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 }
 
 static void
@@ -179,7 +195,9 @@ sdl_test_cleanup(struct sdl_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_destroy_swapchain(vk, test->swapchain);
+    if (test->swapchain)
+        vk_destroy_swapchain(vk, test->swapchain);
+
     vk->DestroySurfaceKHR(vk->instance, test->surf, NULL);
     vk_cleanup(vk);
 
@@ -237,42 +255,42 @@ sdl_test_draw(struct sdl_test *test, struct vk_image *img)
 }
 
 static void
-sdl_test_loop(struct sdl_test *test)
+sdl_test_wait_events(struct sdl_test *test)
 {
-    struct vk *vk = &test->vk;
+    if (!SDL_WaitEvent(NULL))
+        vk_die("failed to wait events");
 
-    while (true) {
-        SDL_Event ev;
-        if (!SDL_WaitEvent(&ev))
-            vk_die("failed to wait event");
-        sdl_log_event(&ev);
-
-        bool quit = false;
-        bool redraw = false;
-        bool toggle_fullscreen = false;
-        bool toggle_minimize = false;
-        bool toggle_maximize = false;
-
+    SDL_Event ev;
+    while (SDL_PollEvent(&ev)) {
         switch (ev.type) {
         case SDL_QUIT:
-            quit = true;
+            test->quit = true;
             break;
         case SDL_WINDOWEVENT:
-            redraw = ev.window.event == SDL_WINDOWEVENT_EXPOSED;
+            sdl_log_event(&ev);
+            switch (ev.window.event) {
+            case SDL_WINDOWEVENT_SHOWN:
+            case SDL_WINDOWEVENT_EXPOSED:
+                test->redraw = true;
+                break;
+            default:
+                break;
+            }
             break;
         case SDL_KEYUP:
             switch (ev.key.keysym.sym) {
             case SDLK_f:
-                toggle_fullscreen = true;
+                test->win_req = test->win_req == WIN_FULLSCREEN ? WIN_NORMAL : WIN_FULLSCREEN;
                 break;
             case SDLK_m:
                 if (ev.key.keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT))
-                    toggle_maximize = true;
+                    test->win_req = test->win_req == WIN_MAXIMIZED ? WIN_NORMAL : WIN_MAXIMIZED;
                 else
-                    toggle_minimize = true;
+                    test->win_req = test->win_req == WIN_MINIMIZED ? WIN_NORMAL : WIN_MINIMIZED;
                 break;
             case SDLK_q:
-                quit = true;
+            case SDLK_ESCAPE:
+                test->quit = true;
                 break;
             default:
                 break;
@@ -281,46 +299,103 @@ sdl_test_loop(struct sdl_test *test)
         default:
             break;
         }
+    }
 
-        if (quit)
+    /* update win size */
+    int win_width;
+    int win_height;
+    SDL_GetWindowSize(test->win, &win_width, &win_height);
+    if (test->win_width != (unsigned)win_width || test->win_height != (unsigned)win_height) {
+        vk_log("win resized: %dx%d -> %dx%d", test->win_width, test->win_height, win_width,
+               win_height);
+        test->win_width = win_width;
+        test->win_height = win_height;
+        test->redraw = true;
+    }
+
+    /* update win flags */
+    test->win_flags = SDL_GetWindowFlags(test->win);
+
+    if ((test->win_flags & SDL_WINDOW_HIDDEN) || !test->win_width || !test->win_height)
+        test->redraw = false;
+}
+
+static void
+sdl_test_update_window(struct sdl_test *test)
+{
+    switch (test->win_req) {
+    case WIN_NORMAL:
+    case WIN_FULLSCREEN:
+        SDL_RestoreWindow(test->win);
+        break;
+    case WIN_MINIMIZED:
+        if (test->win_flags & SDL_WINDOW_MAXIMIZED)
+            SDL_RestoreWindow(test->win);
+        SDL_MinimizeWindow(test->win);
+        break;
+    case WIN_MAXIMIZED:
+        if (test->win_flags & SDL_WINDOW_MINIMIZED)
+            SDL_RestoreWindow(test->win);
+        SDL_MaximizeWindow(test->win);
+        break;
+    default:
+        break;
+    }
+
+    SDL_SetWindowFullscreen(test->win,
+                            test->win_req == WIN_FULLSCREEN ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+}
+
+static void
+sdl_test_loop(struct sdl_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    while (true) {
+        sdl_test_wait_events(test);
+        if (test->quit)
             break;
 
-        if (toggle_fullscreen) {
-            const uint32_t win_flags = SDL_GetWindowFlags(test->win);
-            const uint32_t fs_flags =
-                win_flags & SDL_WINDOW_FULLSCREEN ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP;
-            SDL_SetWindowFullscreen(test->win, fs_flags);
-        }
+        if (test->redraw) {
+            vk_log("redraw");
 
-        if (toggle_minimize) {
-            const uint32_t win_flags = SDL_GetWindowFlags(test->win);
-            if (win_flags & SDL_WINDOW_MINIMIZED)
-                SDL_RestoreWindow(test->win);
-            else
-                SDL_MinimizeWindow(test->win);
-        }
-
-        if (toggle_maximize) {
-            const uint32_t win_flags = SDL_GetWindowFlags(test->win);
-            if (win_flags & SDL_WINDOW_MAXIMIZED)
-                SDL_RestoreWindow(test->win);
-            else
-                SDL_MaximizeWindow(test->win);
-        }
-
-        if (redraw) {
 #if 0
             SDL_Surface *surf = SDL_GetWindowSurface(test->win);
-            assert(surf);
+            if (!surf)
+                vk_die("no window surface");
+
             const uint32_t color = SDL_MapRGB(surf->format, 0xff, 0x80, 0x80);
             SDL_FillRect(surf, NULL, color);
             SDL_UpdateWindowSurface(test->win);
 #else
-            struct vk_image *img = vk_acquire_swapchain_image(vk, test->swapchain);
-            sdl_test_draw(test, img);
-            vk_present_swapchain_image(vk, test->swapchain);
+            struct vk_image *img;
+
+            if (!test->swapchain) {
+                vk_log("create swapchain %dx%d", test->win_width, test->win_height);
+                test->swapchain = vk_create_swapchain(
+                    vk, test->surf, VK_FORMAT_B8G8R8A8_UNORM, test->win_width, test->win_height,
+                    VK_PRESENT_MODE_FIFO_KHR, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+            }
+
+            if (test->swapchain->info.imageExtent.width != test->win_width ||
+                test->swapchain->info.imageExtent.height != test->win_height) {
+                vk_log(
+                    "re-create swapchain %dx%d -> %dx%d", test->swapchain->info.imageExtent.width,
+                    test->swapchain->info.imageExtent.height, test->win_width, test->win_height);
+                vk_recreate_swapchain(vk, test->swapchain, test->win_width, test->win_height);
+            }
+
+            img = vk_acquire_swapchain_image(vk, test->swapchain);
+            if (img) {
+                sdl_test_draw(test, img);
+                vk_present_swapchain_image(vk, test->swapchain);
+            }
 #endif
+
+            test->redraw = false;
         }
+
+        sdl_test_update_window(test);
     }
 }
 
@@ -328,9 +403,9 @@ int
 main(void)
 {
     struct sdl_test test = {
-        .width = 320,
-        .height = 240,
-        .win_flags = SDL_WINDOW_VULKAN,
+        .win_width = 320,
+        .win_height = 240,
+        .win_flags = SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN,
     };
 
     sdl_test_init(&test);
