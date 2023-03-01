@@ -83,7 +83,7 @@ int
 main(void)
 {
     struct vk vk;
-    vk_init(&vk);
+    vk_init(&vk, NULL);
     info_instance(&vk);
     info_physical_device(&vk);
     vk_cleanup(&vk);

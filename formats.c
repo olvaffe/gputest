@@ -269,7 +269,7 @@ int
 main(void)
 {
     struct vk vk;
-    vk_init(&vk);
+    vk_init(&vk, NULL);
     formats_test_dump(&vk);
     vk_cleanup(&vk);
 

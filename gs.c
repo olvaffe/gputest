@@ -117,7 +117,7 @@ gs_test_init(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     gs_test_init_vb(test);
 
     gs_test_init_framebuffer(test);

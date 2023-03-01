@@ -69,7 +69,7 @@ compute_test_init(struct compute_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     compute_test_init_ssbo(test);
 
     compute_test_init_pipeline(test);

@@ -119,7 +119,7 @@ tess_test_init(struct tess_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     tess_test_init_vb(test);
 
     tess_test_init_framebuffer(test);

@@ -138,7 +138,7 @@ ubo_test_init(struct ubo_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     ubo_test_init_vb(test);
     ubo_test_init_ubo(test);
 

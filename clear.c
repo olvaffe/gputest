@@ -23,7 +23,7 @@ clear_test_init(struct clear_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
 
     test->img =
         vk_create_image(vk, test->color_format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,

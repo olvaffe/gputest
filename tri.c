@@ -121,7 +121,7 @@ tri_test_init(struct tri_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     tri_test_init_vb(test);
 
     tri_test_init_framebuffer(test);

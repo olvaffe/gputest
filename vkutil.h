@@ -33,7 +33,17 @@
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_1
 
+struct vk_init_params {
+    const char *const *instance_exts;
+    uint32_t instance_ext_count;
+
+    const char *const *dev_exts;
+    uint32_t dev_ext_count;
+};
+
 struct vk {
+    struct vk_init_params params;
+
     struct {
         void *handle;
 #define PFN_ALL(name) PFN_vk##name name;
@@ -53,6 +63,7 @@ struct vk {
     VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t buf_mt_index;
 
+    bool KHR_swapchain;
     bool EXT_custom_border_color;
 
     VkDevice dev;
@@ -142,6 +153,19 @@ struct vk_pipeline {
 
 struct vk_descriptor_set {
     VkDescriptorSet set;
+};
+
+struct vk_swapchain {
+    VkSwapchainCreateInfoKHR info;
+    VkSwapchainKHR swapchain;
+    VkFence fence;
+
+    uint32_t img_count;
+    VkImage *img_handles;
+    struct vk_image *imgs;
+
+    VkResult img_result;
+    uint32_t img_cur;
 };
 
 static inline void
@@ -234,6 +258,8 @@ vk_init_instance(struct vk *vk)
                 .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
                 .apiVersion = VKUTIL_MIN_API_VERSION,
             },
+        .enabledExtensionCount = vk->params.instance_ext_count,
+        .ppEnabledExtensionNames = vk->params.instance_exts,
     };
 
     vk->result = vk->CreateInstance(&instance_info, NULL, &vk->instance);
@@ -305,17 +331,8 @@ vk_init_device_dispatch(struct vk *vk)
 static inline void
 vk_init_device(struct vk *vk)
 {
-    const char *exts[32];
-    uint32_t ext_count = 0;
-    const VkPhysicalDeviceFeatures2 *features = NULL;
-
-#if 0
-    exts[ext_count++] = "VK_EXT_custom_border_color";
-    vk->EXT_custom_border_color = true;
-    features = &vk->features;
-#else
-    /* minimal features */
-    features = &(VkPhysicalDeviceFeatures2){
+    /* required features */
+    VkPhysicalDeviceFeatures2 req_features = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
         .pNext = &(VkPhysicalDeviceSamplerYcbcrConversionFeatures){
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES,
@@ -327,7 +344,17 @@ vk_init_device(struct vk *vk)
             .fillModeNonSolid = true,
         },
     };
-#endif
+    void *features = &req_features;
+
+    for (uint32_t i = 0; i < vk->params.dev_ext_count; i++) {
+        if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
+            vk->KHR_swapchain = true;
+        } else if (!strcmp(vk->params.dev_exts[i], VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME)) {
+            vk->EXT_custom_border_color = true;
+            vk->custom_border_color_features.pNext = features;
+            features = &vk->custom_border_color_features;
+        }
+    }
 
     vk->queue_family_index = 0;
 
@@ -348,8 +375,8 @@ vk_init_device(struct vk *vk)
                 .queueCount = 1,
                 .pQueuePriorities = &(float){ 1.0f },
             },
-        .enabledExtensionCount = ext_count,
-        .ppEnabledExtensionNames = exts,
+        .enabledExtensionCount = vk->params.dev_ext_count,
+        .ppEnabledExtensionNames = vk->params.dev_exts,
     };
     vk->result = vk->CreateDevice(vk->physical_dev, &dev_info, NULL, &vk->dev);
     vk_check(vk, "failed to create device");
@@ -401,9 +428,11 @@ vk_init_cmd_pool(struct vk *vk)
 }
 
 static inline void
-vk_init(struct vk *vk)
+vk_init(struct vk *vk, const struct vk_init_params *params)
 {
     memset(vk, 0, sizeof(*vk));
+    if (params)
+        vk->params = *params;
 
     vk_init_library(vk);
 
@@ -417,6 +446,10 @@ vk_init(struct vk *vk)
 
     static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.fences), "");
     vk->submit.count = ARRAY_SIZE(vk->submit.cmds);
+
+    /* avoid accessing dangling pointers */
+    vk->params.instance_ext_count = 0;
+    vk->params.dev_ext_count = 0;
 }
 
 static inline void
@@ -1568,6 +1601,247 @@ vk_wait(struct vk *vk)
 {
     vk->result = vk->QueueWaitIdle(vk->queue);
     vk_check(vk, "failed to wait queue");
+}
+
+static inline void
+vk_validate_swapchain(struct vk *vk, const struct vk_swapchain *swapchain)
+{
+    if (!vk->KHR_swapchain)
+        vk_die("VK_KHR_swapchain is disabled");
+
+    /* check support */
+    VkBool32 supported;
+    vk->result = vk->GetPhysicalDeviceSurfaceSupportKHR(vk->physical_dev, vk->queue_family_index,
+                                                        swapchain->info.surface, &supported);
+    vk_check(vk, "failed to get surface support");
+    if (!supported)
+        vk_die("surface is unsupported");
+
+    /* check caps */
+    VkSurfaceCapabilitiesKHR caps;
+    vk->result = vk->GetPhysicalDeviceSurfaceCapabilitiesKHR(vk->physical_dev,
+                                                             swapchain->info.surface, &caps);
+    vk_check(vk, "failed to get surface caps");
+    if (swapchain->info.imageExtent.width < caps.minImageExtent.width ||
+        swapchain->info.imageExtent.width > caps.maxImageExtent.width ||
+        swapchain->info.imageExtent.height < caps.minImageExtent.height ||
+        swapchain->info.imageExtent.height > caps.maxImageExtent.height)
+        vk_die("%dx%d swapchain is invalid", swapchain->info.imageExtent.width,
+               swapchain->info.imageExtent.height);
+
+    if (swapchain->info.minImageCount < caps.minImageCount ||
+        swapchain->info.minImageCount < caps.maxImageCount)
+        vk_die("swapchain min image count %d is invalid", swapchain->info.minImageCount);
+
+    /* check format */
+    VkSurfaceFormatKHR fmts[8];
+    uint32_t count = ARRAY_SIZE(fmts);
+    vk->result = vk->GetPhysicalDeviceSurfaceFormatsKHR(vk->physical_dev, swapchain->info.surface,
+                                                        &count, fmts);
+    vk_check(vk, "failed to get surface formats");
+
+    bool found = false;
+    for (uint32_t i = 0; i < count; i++) {
+        if (fmts[i].format == swapchain->info.imageFormat &&
+            fmts[i].colorSpace == swapchain->info.imageColorSpace) {
+            found = true;
+            break;
+        }
+    }
+    if (!found)
+        vk_die("%d is an invalid format", swapchain->info.imageFormat);
+
+    /* check present mode */
+    VkPresentModeKHR modes[8];
+    count = ARRAY_SIZE(modes);
+    vk->result = vk->GetPhysicalDeviceSurfacePresentModesKHR(
+        vk->physical_dev, swapchain->info.surface, &count, modes);
+    vk_check(vk, "failed to get surface present modes");
+
+    found = false;
+    for (uint32_t i = 0; i < count; i++) {
+        if (modes[i] == swapchain->info.presentMode) {
+            found = true;
+            break;
+        }
+    }
+    if (!found)
+        vk_die("%d is invalid present mode", swapchain->info.presentMode);
+}
+
+static inline void
+vk_recreate_swapchain(struct vk *vk,
+                      struct vk_swapchain *swapchain,
+                      uint32_t width,
+                      uint32_t height)
+{
+    swapchain->info.imageExtent = (VkExtent2D){
+        .width = width,
+        .height = height,
+    };
+    swapchain->info.oldSwapchain = swapchain->swapchain;
+
+    vk_validate_swapchain(vk, swapchain);
+
+    vk->result = vk->CreateSwapchainKHR(vk->dev, &swapchain->info, NULL, &swapchain->swapchain);
+    vk_check(vk, "failed to create swapchain");
+
+    if (swapchain->info.oldSwapchain != VK_NULL_HANDLE) {
+        vk->DestroySwapchainKHR(vk->dev, swapchain->info.oldSwapchain, NULL);
+        free(swapchain->img_handles);
+        free(swapchain->imgs);
+    }
+
+    vk->result =
+        vk->GetSwapchainImagesKHR(vk->dev, swapchain->swapchain, &swapchain->img_count, NULL);
+    vk_check(vk, "failed to get swapchain image count");
+
+    swapchain->img_handles = calloc(swapchain->img_count, sizeof(*swapchain->img_handles));
+    swapchain->imgs = calloc(swapchain->img_count, sizeof(*swapchain->imgs));
+    if (!swapchain->img_handles || !swapchain->imgs)
+        vk_die("failed to alloc swapchain imgs");
+
+    vk->result = vk->GetSwapchainImagesKHR(vk->dev, swapchain->swapchain, &swapchain->img_count,
+                                           swapchain->img_handles);
+    vk_check(vk, "failed to get swapchain images");
+
+    for (uint32_t i = 0; i < swapchain->img_count; i++) {
+        struct vk_image *img = &swapchain->imgs[i];
+
+        img->info = (VkImageCreateInfo){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            .imageType = VK_IMAGE_TYPE_2D,
+            .format = swapchain->info.imageFormat,
+            .extent = {
+                .width = swapchain->info.imageExtent.width,
+                .height = swapchain->info.imageExtent.height,
+                .depth = 1,
+            },
+            .mipLevels = 1,
+            .arrayLayers = swapchain->info.imageArrayLayers,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .tiling = VK_IMAGE_TILING_OPTIMAL,
+            .usage = swapchain->info.imageUsage,
+            .sharingMode = swapchain->info.imageSharingMode,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        };
+
+        VkFormatProperties2 fmt_props = {
+            .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+        };
+        vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, img->info.format, &fmt_props);
+        img->features = img->info.tiling == VK_IMAGE_TILING_OPTIMAL
+                            ? fmt_props.formatProperties.optimalTilingFeatures
+                            : fmt_props.formatProperties.linearTilingFeatures;
+        vk_validate_image(vk, img);
+
+        img->img = swapchain->img_handles[i];
+    }
+}
+
+static inline struct vk_swapchain *
+vk_create_swapchain(struct vk *vk,
+                    VkSurfaceKHR surf,
+                    VkFormat format,
+                    uint32_t width,
+                    uint32_t height,
+                    VkPresentModeKHR mode,
+                    VkImageUsageFlags usage)
+{
+    VkSurfaceCapabilitiesKHR surf_caps;
+    vk->result = vk->GetPhysicalDeviceSurfaceCapabilitiesKHR(vk->physical_dev, surf, &surf_caps);
+    vk_check(vk, "failed to get surface caps");
+
+    struct vk_swapchain *swapchain = calloc(1, sizeof(*swapchain));
+    if (!swapchain)
+        vk_die("failed to alloc swapchain");
+
+    swapchain->info = (VkSwapchainCreateInfoKHR){
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .surface = surf,
+        .minImageCount = surf_caps.minImageCount,
+        .imageFormat = format,
+        .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+        .imageExtent.width = width,
+        .imageExtent.height = height,
+        .imageArrayLayers = 1,
+        .imageUsage = usage,
+        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = mode,
+        .clipped = true,
+        .oldSwapchain = VK_NULL_HANDLE,
+    };
+    vk_recreate_swapchain(vk, swapchain, width, height);
+
+    const VkFenceCreateInfo fence_create_info = {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    };
+    vk->result = vk->CreateFence(vk->dev, &fence_create_info, NULL, &swapchain->fence);
+    vk_check(vk, "failed to create swapchain fence");
+
+    return swapchain;
+}
+
+static inline struct vk_image *
+vk_acquire_swapchain_image(struct vk *vk, struct vk_swapchain *swapchain)
+{
+    const VkAcquireNextImageInfoKHR info = {
+        .sType = VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR,
+        .swapchain = swapchain->swapchain,
+        .timeout = UINT64_MAX,
+        .fence = swapchain->fence,
+        .deviceMask = 0x1,
+    };
+    swapchain->img_result = vk->AcquireNextImage2KHR(vk->dev, &info, &swapchain->img_cur);
+
+    switch (swapchain->img_result) {
+    case VK_SUCCESS:
+    case VK_SUBOPTIMAL_KHR:
+        vk->result = vk->WaitForFences(vk->dev, 1, &swapchain->fence, true, UINT64_MAX);
+        vk_check(vk, "failed to wait for swapchain img");
+        vk->result = vk->ResetFences(vk->dev, 1, &swapchain->fence);
+        vk_check(vk, "failed to reset for swapchain img");
+        return &swapchain->imgs[swapchain->img_cur];
+    case VK_ERROR_OUT_OF_DATE_KHR:
+        return NULL;
+    default:
+        vk_die("failed to acquire swapchain img");
+    }
+}
+
+static inline bool
+vk_present_swapchain_image(struct vk *vk, struct vk_swapchain *swapchain)
+{
+    const VkPresentInfoKHR present_info = {
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .swapchainCount = 1,
+        .pSwapchains = &swapchain->swapchain,
+        .pImageIndices = &swapchain->img_cur,
+    };
+    swapchain->img_result = vk->QueuePresentKHR(vk->queue, &present_info);
+
+    switch (vk->result) {
+    case VK_SUCCESS:
+    case VK_SUBOPTIMAL_KHR:
+        return true;
+    case VK_ERROR_OUT_OF_DATE_KHR:
+        return false;
+    default:
+        vk_die("failed to present swapchain img");
+    }
+}
+
+static inline void
+vk_destroy_swapchain(struct vk *vk, struct vk_swapchain *swapchain)
+{
+    vk->DestroyFence(vk->dev, swapchain->fence, NULL);
+    vk->DestroySwapchainKHR(vk->dev, swapchain->swapchain, NULL);
+
+    free(swapchain->img_handles);
+    free(swapchain->imgs);
+    free(swapchain);
 }
 
 #endif /* VKUTIL_H */

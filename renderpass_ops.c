@@ -122,7 +122,7 @@ renderpass_ops_test_init(struct renderpass_ops_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     renderpass_ops_test_init_formats(test);
 }
 

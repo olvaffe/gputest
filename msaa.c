@@ -114,7 +114,7 @@ msaa_test_init(struct msaa_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     msaa_test_init_vb(test);
 
     msaa_test_init_framebuffer(test);

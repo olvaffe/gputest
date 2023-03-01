@@ -246,6 +246,24 @@ PFN_DEVICE(GetDeviceBufferMemoryRequirements)
 PFN_DEVICE(GetDeviceImageMemoryRequirements)
 PFN_DEVICE(GetDeviceImageSparseMemoryRequirements)
 
+/* VK_KHR_surface */
+PFN_INSTANCE(DestroySurfaceKHR)
+PFN_INSTANCE(GetPhysicalDeviceSurfaceSupportKHR)
+PFN_INSTANCE(GetPhysicalDeviceSurfaceCapabilitiesKHR)
+PFN_INSTANCE(GetPhysicalDeviceSurfaceFormatsKHR)
+PFN_INSTANCE(GetPhysicalDeviceSurfacePresentModesKHR)
+
+/* VK_KHR_swapchain */
+PFN_DEVICE(CreateSwapchainKHR)
+PFN_DEVICE(DestroySwapchainKHR)
+PFN_DEVICE(GetSwapchainImagesKHR)
+PFN_DEVICE(AcquireNextImageKHR)
+PFN_DEVICE(QueuePresentKHR)
+PFN_DEVICE(GetDeviceGroupPresentCapabilitiesKHR)
+PFN_DEVICE(GetDeviceGroupSurfacePresentModesKHR)
+PFN_DEVICE(GetPhysicalDevicePresentRectanglesKHR)
+PFN_DEVICE(AcquireNextImage2KHR)
+
 #undef PFN_ALL
 #undef PFN_GPIA
 #undef PFN_GLOBAL

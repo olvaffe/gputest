@@ -117,7 +117,7 @@ tex_test_init(struct tex_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     tex_test_init_vb(test);
 
     tex_test_init_texture(test);

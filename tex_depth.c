@@ -124,7 +124,7 @@ tex_depth_test_init(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     tex_depth_test_init_vb(test);
 
     tex_depth_test_init_depth_texture(test);

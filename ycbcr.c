@@ -125,7 +125,7 @@ ycbcr_test_init(struct ycbcr_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     ycbcr_test_init_vb(test);
 
     ycbcr_test_init_texture(test);

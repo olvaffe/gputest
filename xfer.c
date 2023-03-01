@@ -113,7 +113,7 @@ xfer_test_init(struct xfer_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     xfer_test_init_formats(test);
 }
 

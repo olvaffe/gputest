@@ -149,7 +149,7 @@ tex_ubo_test_init(struct tex_ubo_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk);
+    vk_init(vk, NULL);
     tex_ubo_test_init_vb(test);
 
     tex_ubo_test_init_texture(test);
