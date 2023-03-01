@@ -28,6 +28,7 @@ endif
 
 dep_dl = cc.find_library('dl')
 dep_m = cc.find_library('m', required: false)
+dep_sdl2 = dependency('sdl2', required: false)
 
 add_project_arguments(['-D_GNU_SOURCE', warning_args], language: 'c')
 
@@ -55,6 +56,10 @@ tests = [
   'xfer',
   'ycbcr',
 ]
+
+if dep_sdl2.found()
+  tests += ['sdl']
+endif
 
 foreach t : tests
   test_incs = []
@@ -87,9 +92,14 @@ foreach t : tests
     endif
   endforeach
 
+  test_deps = [idep_vkutil]
+  if t == 'sdl'
+    test_deps += [dep_sdl2]
+  endif
+
   executable(
     t,
     sources: [t + '.c', test_incs],
-    dependencies: [idep_vkutil],
+    dependencies: test_deps,
   )
 endforeach
