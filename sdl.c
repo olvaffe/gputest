@@ -158,6 +158,8 @@ sdl_test_init(struct sdl_test *test)
 {
     struct vk *vk = &test->vk;
 
+    SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "1");
+
     if (SDL_Init(SDL_INIT_VIDEO))
         vk_die("failed to init sdl");
 

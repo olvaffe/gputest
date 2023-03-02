@@ -1624,9 +1624,12 @@ vk_validate_swapchain(struct vk *vk, const struct vk_swapchain *swapchain)
     if (swapchain->info.imageExtent.width < caps.minImageExtent.width ||
         swapchain->info.imageExtent.width > caps.maxImageExtent.width ||
         swapchain->info.imageExtent.height < caps.minImageExtent.height ||
-        swapchain->info.imageExtent.height > caps.maxImageExtent.height)
-        vk_die("%dx%d swapchain is invalid", swapchain->info.imageExtent.width,
-               swapchain->info.imageExtent.height);
+        swapchain->info.imageExtent.height > caps.maxImageExtent.height) {
+        vk_die("bad swapchain extent: req %dx%d min %dx%d max %dx%d",
+               swapchain->info.imageExtent.width, swapchain->info.imageExtent.height,
+               caps.minImageExtent.width, caps.minImageExtent.height, caps.maxImageExtent.width,
+               caps.maxImageExtent.height);
+    }
 
     if (swapchain->info.minImageCount < caps.minImageCount ||
         swapchain->info.minImageCount < caps.maxImageCount)
