@@ -259,11 +259,11 @@ sdl_test_draw(struct sdl_test *test, struct vk_image *img)
 static void
 sdl_test_wait_events(struct sdl_test *test)
 {
-    if (!SDL_WaitEvent(NULL))
-        vk_die("failed to wait events");
-
     SDL_Event ev;
-    while (SDL_PollEvent(&ev)) {
+    int timeout = -1;
+    while (SDL_WaitEventTimeout(&ev, timeout)) {
+        timeout = 0;
+
         switch (ev.type) {
         case SDL_QUIT:
             test->quit = true;
@@ -302,6 +302,8 @@ sdl_test_wait_events(struct sdl_test *test)
             break;
         }
     }
+    if (timeout == -1)
+        vk_die("failed to wait for events");
 
     /* update win size */
     int win_width;
