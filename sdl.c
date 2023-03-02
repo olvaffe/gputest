@@ -8,11 +8,11 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
-enum win_state {
-    WIN_NORMAL,
-    WIN_MINIMIZED,
-    WIN_MAXIMIZED,
-    WIN_FULLSCREEN,
+enum win_op {
+    WIN_OP_NONE,
+    WIN_OP_TOGGLE_MINIMIZED,
+    WIN_OP_TOGGLE_MAXIMIZED,
+    WIN_OP_TOGGLE_FULLSCREEN,
 };
 
 struct sdl_test {
@@ -26,7 +26,7 @@ struct sdl_test {
 
     bool quit;
     bool redraw;
-    enum win_state win_req;
+    enum win_op win_op;
 
     struct vk_swapchain *swapchain;
 };
@@ -280,13 +280,13 @@ sdl_test_wait_events(struct sdl_test *test)
         case SDL_KEYUP:
             switch (ev.key.keysym.sym) {
             case SDLK_f:
-                test->win_req = test->win_req == WIN_FULLSCREEN ? WIN_NORMAL : WIN_FULLSCREEN;
+                test->win_op = WIN_OP_TOGGLE_FULLSCREEN;
                 break;
             case SDLK_m:
                 if (ev.key.keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT))
-                    test->win_req = test->win_req == WIN_MAXIMIZED ? WIN_NORMAL : WIN_MAXIMIZED;
+                    test->win_op = WIN_OP_TOGGLE_MAXIMIZED;
                 else
-                    test->win_req = test->win_req == WIN_MINIMIZED ? WIN_NORMAL : WIN_MINIMIZED;
+                    test->win_op = WIN_OP_TOGGLE_MINIMIZED;
                 break;
             case SDLK_q:
             case SDLK_ESCAPE:
@@ -321,81 +321,88 @@ sdl_test_wait_events(struct sdl_test *test)
 }
 
 static void
-sdl_test_update_window(struct sdl_test *test)
+sdl_test_redraw_window(struct sdl_test *test)
 {
-    switch (test->win_req) {
-    case WIN_NORMAL:
-    case WIN_FULLSCREEN:
-        SDL_RestoreWindow(test->win);
-        break;
-    case WIN_MINIMIZED:
-        if (test->win_flags & SDL_WINDOW_MAXIMIZED)
-            SDL_RestoreWindow(test->win);
-        SDL_MinimizeWindow(test->win);
-        break;
-    case WIN_MAXIMIZED:
+    struct vk *vk = &test->vk;
+
+    if (!test->redraw)
+        return;
+
+    vk_log("redraw");
+    test->redraw = false;
+
+#if 0
+    SDL_Surface *surf = SDL_GetWindowSurface(test->win);
+    if (!surf)
+        vk_die("no window surface");
+
+    const uint32_t color = SDL_MapRGB(surf->format, 0xff, 0x80, 0x80);
+    SDL_FillRect(surf, NULL, color);
+    SDL_UpdateWindowSurface(test->win);
+#else
+    struct vk_image *img;
+
+    if (!test->swapchain) {
+        vk_log("create swapchain %dx%d", test->win_width, test->win_height);
+        test->swapchain = vk_create_swapchain(
+            vk, test->surf, VK_FORMAT_B8G8R8A8_UNORM, test->win_width, test->win_height,
+            VK_PRESENT_MODE_FIFO_KHR, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    }
+
+    if (test->swapchain->info.imageExtent.width != test->win_width ||
+        test->swapchain->info.imageExtent.height != test->win_height) {
+        vk_log("re-create swapchain %dx%d -> %dx%d", test->swapchain->info.imageExtent.width,
+               test->swapchain->info.imageExtent.height, test->win_width, test->win_height);
+        vk_recreate_swapchain(vk, test->swapchain, test->win_width, test->win_height);
+    }
+
+    img = vk_acquire_swapchain_image(vk, test->swapchain);
+    if (img) {
+        sdl_test_draw(test, img);
+        vk_present_swapchain_image(vk, test->swapchain);
+    }
+#endif
+}
+
+static void
+sdl_test_configure_window(struct sdl_test *test)
+{
+    switch (test->win_op) {
+    case WIN_OP_TOGGLE_MINIMIZED:
         if (test->win_flags & SDL_WINDOW_MINIMIZED)
             SDL_RestoreWindow(test->win);
-        SDL_MaximizeWindow(test->win);
+        else
+            SDL_MinimizeWindow(test->win);
+        break;
+    case WIN_OP_TOGGLE_MAXIMIZED:
+        if (test->win_flags & SDL_WINDOW_MAXIMIZED)
+            SDL_RestoreWindow(test->win);
+        else
+            SDL_MaximizeWindow(test->win);
+        break;
+    case WIN_OP_TOGGLE_FULLSCREEN:
+        SDL_SetWindowFullscreen(test->win, test->win_flags & SDL_WINDOW_FULLSCREEN
+                                               ? 0
+                                               : SDL_WINDOW_FULLSCREEN_DESKTOP);
         break;
     default:
         break;
     }
 
-    SDL_SetWindowFullscreen(test->win,
-                            test->win_req == WIN_FULLSCREEN ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+    test->win_op = WIN_OP_NONE;
 }
 
 static void
 sdl_test_loop(struct sdl_test *test)
 {
-    struct vk *vk = &test->vk;
-
     while (true) {
         sdl_test_wait_events(test);
+
         if (test->quit)
             break;
 
-        if (test->redraw) {
-            vk_log("redraw");
-
-#if 0
-            SDL_Surface *surf = SDL_GetWindowSurface(test->win);
-            if (!surf)
-                vk_die("no window surface");
-
-            const uint32_t color = SDL_MapRGB(surf->format, 0xff, 0x80, 0x80);
-            SDL_FillRect(surf, NULL, color);
-            SDL_UpdateWindowSurface(test->win);
-#else
-            struct vk_image *img;
-
-            if (!test->swapchain) {
-                vk_log("create swapchain %dx%d", test->win_width, test->win_height);
-                test->swapchain = vk_create_swapchain(
-                    vk, test->surf, VK_FORMAT_B8G8R8A8_UNORM, test->win_width, test->win_height,
-                    VK_PRESENT_MODE_FIFO_KHR, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-            }
-
-            if (test->swapchain->info.imageExtent.width != test->win_width ||
-                test->swapchain->info.imageExtent.height != test->win_height) {
-                vk_log(
-                    "re-create swapchain %dx%d -> %dx%d", test->swapchain->info.imageExtent.width,
-                    test->swapchain->info.imageExtent.height, test->win_width, test->win_height);
-                vk_recreate_swapchain(vk, test->swapchain, test->win_width, test->win_height);
-            }
-
-            img = vk_acquire_swapchain_image(vk, test->swapchain);
-            if (img) {
-                sdl_test_draw(test, img);
-                vk_present_swapchain_image(vk, test->swapchain);
-            }
-#endif
-
-            test->redraw = false;
-        }
-
-        sdl_test_update_window(test);
+        sdl_test_redraw_window(test);
+        sdl_test_configure_window(test);
     }
 }
 
