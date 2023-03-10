@@ -9,6 +9,7 @@ struct clear_depth_test {
     VkFormat depth_format;
     uint32_t width;
     uint32_t height;
+    uint32_t stride;
     VkImageAspectFlags aspect_mask;
 
     struct vk vk;
@@ -31,7 +32,7 @@ clear_depth_test_init(struct clear_depth_test *test)
                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     test->buf =
-        vk_create_buffer(vk, test->width * test->height, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+        vk_create_buffer(vk, test->stride * test->height, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 }
 
 static void
@@ -86,6 +87,7 @@ clear_depth_test_clear(struct clear_depth_test *test, VkCommandBuffer cmd)
                            0, NULL, 0, NULL, 1, &barrier2);
 
     const VkBufferImageCopy region = {
+        .bufferRowLength = test->stride,
         .imageSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
             .layerCount = 1,
@@ -122,6 +124,14 @@ clear_depth_test_draw(struct clear_depth_test *test)
     vk_wait(vk);
 
     vk_dump_buffer_raw(vk, test->buf, "rt.raw");
+
+    for (uint32_t y = 0; y < test->height; y++) {
+        for (uint32_t x = 0; x < test->width; x++) {
+            const uint8_t *px = test->buf->mem_ptr + test->stride * y + x;
+            if (*px != 8)
+                vk_die("(%d, %d) is not 8", x, y);
+        }
+    }
 }
 
 int
@@ -129,8 +139,9 @@ main(void)
 {
     struct clear_depth_test test = {
         .depth_format = VK_FORMAT_D16_UNORM_S8_UINT,
-        .width = 49,
-        .height = 13,
+        .width = 33,
+        .height = 16,
+        .stride = 64,
         .aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
     };
 
