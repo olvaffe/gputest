@@ -199,6 +199,7 @@ clear_depth_test_dump(struct clear_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
+    vk_dump_image_raw(vk, test->img, "rt.tiled");
     if (test->dump_aspect_mask & VK_IMAGE_ASPECT_DEPTH_BIT) {
         vk_dump_buffer_raw(vk, test->buf, 0, test->depth_size, "rt.depth");
 
@@ -277,8 +278,8 @@ main(void)
             .height = 16,
         },
         .clear_val =  {
-            .depth = 0.5f,
-            .stencil = 8,
+            .depth = 1.0f,
+            .stencil = 4,
         },
         .dump_aspect_mask = VK_IMAGE_ASPECT_STENCIL_BIT,
     };
