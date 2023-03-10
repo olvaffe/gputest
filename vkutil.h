@@ -1054,12 +1054,29 @@ vk_dump_image_raw(struct vk *vk, struct vk_image *img, const char *filename)
 }
 
 static inline void
-vk_dump_buffer_raw(struct vk *vk, struct vk_buffer *buf, const char *filename)
+vk_dump_buffer_raw(struct vk *vk,
+                   struct vk_buffer *buf,
+                   VkDeviceSize offset,
+                   VkDeviceSize size,
+                   const char *filename)
 {
+    if (size) {
+        if (offset >= buf->mem_size)
+            vk_die("bad dump offset");
+
+        if (size == VK_WHOLE_SIZE)
+            size = buf->mem_size - offset;
+
+        if (size > buf->mem_size - offset)
+            vk_die("bad dump size");
+    } else {
+        offset = 0;
+    }
+
     FILE *fp = fopen(filename, "w");
     if (!fp)
         vk_die("failed to open %s", filename);
-    if (fwrite(buf->mem_ptr, 1, buf->mem_size, fp) != buf->mem_size)
+    if (fwrite(buf->mem_ptr + offset, 1, size, fp) != size)
         vk_die("failed to write raw memory");
     fclose(fp);
 }
