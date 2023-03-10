@@ -1053,6 +1053,17 @@ vk_dump_image_raw(struct vk *vk, struct vk_image *img, const char *filename)
     vk->UnmapMemory(vk->dev, img->mem);
 }
 
+static inline void
+vk_dump_buffer_raw(struct vk *vk, struct vk_buffer *buf, const char *filename)
+{
+    FILE *fp = fopen(filename, "w");
+    if (!fp)
+        vk_die("failed to open %s", filename);
+    if (fwrite(buf->mem_ptr, 1, buf->mem_size, fp) != buf->mem_size)
+        vk_die("failed to write raw memory");
+    fclose(fp);
+}
+
 static inline struct vk_framebuffer *
 vk_create_framebuffer(struct vk *vk,
                       struct vk_image *color,
