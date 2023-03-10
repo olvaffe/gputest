@@ -273,7 +273,7 @@ main(void)
     struct clear_depth_test test = {
         .format = VK_FORMAT_D16_UNORM_S8_UINT,
         .size = {
-            .width = 33,
+            .width = 8,
             .height = 16,
         },
         .clear_val =  {
