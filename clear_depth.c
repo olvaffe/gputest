@@ -76,6 +76,7 @@ clear_depth_test_init(struct clear_depth_test *test)
         vk_create_image(vk, test->format, test->size.width, test->size.height,
                         VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vk_fill_image(vk, test->img, 0xab);
 
     if (test->dump_aspect_mask & VK_IMAGE_ASPECT_DEPTH_BIT) {
         test->depth_stride = test->dump_size.width *
@@ -93,7 +94,7 @@ clear_depth_test_init(struct clear_depth_test *test)
 
     const VkDeviceSize buf_size = test->depth_size + test->stencil_size;
     test->buf = vk_create_buffer(vk, buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-    memset(test->buf->mem_ptr, 0xaa, buf_size);
+    memset(test->buf->mem_ptr, 0xcd, buf_size);
 }
 
 static void
@@ -245,7 +246,7 @@ clear_depth_test_dump(struct clear_depth_test *test)
                 test->buf->mem_ptr + test->stencil_offset + test->stencil_stride * y;
             for (uint32_t x = 0; x < test->dump_size.width; x++) {
                 if (row[x] != test->clear_val.stencil) {
-                    vk_die("stencil (%d, %d) is %d, not %d", x, y, row[x],
+                    vk_die("stencil (%d, %d) is 0x%x, not 0x%x", x, y, row[x],
                            test->clear_val.stencil);
                 }
             }
@@ -278,8 +279,8 @@ main(void)
             .height = 16,
         },
         .clear_val =  {
-            .depth = 1.0f,
-            .stencil = 4,
+            .depth = (float)0x1234 / 0xffff,
+            .stencil = 0x56,
         },
         .dump_aspect_mask = VK_IMAGE_ASPECT_STENCIL_BIT,
     };

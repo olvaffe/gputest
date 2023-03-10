@@ -28,7 +28,7 @@ clear_test_init(struct clear_test *test)
     test->img =
         vk_create_image(vk, test->color_format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
                         VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    vk_fill_image(vk, test->img, test->aspect, 0x11);
+    vk_fill_image(vk, test->img, 0x11);
 }
 
 static void

@@ -100,7 +100,7 @@ tri_test_init_framebuffer(struct tri_test *test)
     test->rt =
         vk_create_image(vk, test->color_format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
                         VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    vk_fill_image(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT, 0x11);
+    vk_fill_image(vk, test->rt, 0x11);
     vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
 
     test->fb = vk_create_framebuffer(vk, test->rt, NULL, NULL, VK_ATTACHMENT_LOAD_OP_CLEAR,

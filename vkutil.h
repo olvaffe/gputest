@@ -915,7 +915,7 @@ vk_destroy_image(struct vk *vk, struct vk_image *img)
 }
 
 static inline void
-vk_fill_image(struct vk *vk, struct vk_image *img, VkImageAspectFlagBits aspect, uint8_t val)
+vk_fill_image(struct vk *vk, struct vk_image *img, uint8_t val)
 {
     if (!img->mem_mappable)
         vk_die("cannot fill non-mappable image");
