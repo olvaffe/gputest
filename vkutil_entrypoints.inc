@@ -246,6 +246,10 @@ PFN_DEVICE(GetDeviceBufferMemoryRequirements)
 PFN_DEVICE(GetDeviceImageMemoryRequirements)
 PFN_DEVICE(GetDeviceImageSparseMemoryRequirements)
 
+/* VK_EXT_calibrated_timestamps */
+PFN_DEVICE(GetCalibratedTimestampsEXT)
+PFN_INSTANCE(GetPhysicalDeviceCalibrateableTimeDomainsEXT)
+
 /* VK_KHR_surface */
 PFN_INSTANCE(DestroySurfaceKHR)
 PFN_INSTANCE(GetPhysicalDeviceSurfaceSupportKHR)

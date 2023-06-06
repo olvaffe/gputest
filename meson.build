@@ -28,13 +28,14 @@ endif
 
 dep_dl = cc.find_library('dl')
 dep_m = cc.find_library('m', required: false)
+dep_rt = cc.find_library('rt', required: false)
 dep_sdl2 = dependency('sdl2', required: false)
 
 add_project_arguments(['-D_GNU_SOURCE', warning_args], language: 'c')
 
 idep_vkutil = declare_dependency(
   sources: ['vkutil.h'],
-  dependencies: [dep_dl, dep_m],
+  dependencies: [dep_dl, dep_m, dep_rt],
   include_directories: ['include'],
 )
 
@@ -52,6 +53,7 @@ tests = [
   'tex',
   'tex_depth',
   'tex_ubo',
+  'timestamp',
   'tri',
   'ubo',
   'xfer',

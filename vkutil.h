@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <time.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_android.h>
 
@@ -34,6 +35,8 @@
 #define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_1
 
 struct vk_init_params {
+    uint32_t api_version;
+
     const char *const *instance_exts;
     uint32_t instance_ext_count;
 
@@ -55,9 +58,11 @@ struct vk {
     VkInstance instance;
 
     VkPhysicalDevice physical_dev;
+    VkExtensionProperties *exts;
     VkPhysicalDeviceProperties2 props;
     VkPhysicalDeviceFeatures2 features;
     VkPhysicalDeviceSamplerYcbcrConversionFeatures sampler_ycbcr_conversion_features;
+    VkPhysicalDeviceHostQueryResetFeatures host_query_reset_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
 
     VkPhysicalDeviceMemoryProperties mem_props;
@@ -155,6 +160,14 @@ struct vk_descriptor_set {
     VkDescriptorSet set;
 };
 
+struct vk_event {
+    VkEvent event;
+};
+
+struct vk_query {
+    VkQueryPool pool;
+};
+
 struct vk_swapchain {
     VkSwapchainCreateInfoKHR info;
     VkSwapchainKHR swapchain;
@@ -213,6 +226,19 @@ static inline void PRINTFLIKE(2, 3) vk_check(const struct vk *vk, const char *fo
 }
 
 static inline void
+vk_sleep(uint32_t ms)
+{
+    const struct timespec ts = {
+        .tv_sec = ms / 1000,
+        .tv_nsec = (ms % 1000) * 1000000,
+    };
+
+    const int ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, NULL);
+    if (ret)
+        vk_die("failed to sleep");
+}
+
+static inline void
 vk_init_global_dispatch(struct vk *vk)
 {
 #define PFN_GLOBAL(name) vk->name = (PFN_vk##name)vk->GetInstanceProcAddr(NULL, "vk" #name);
@@ -247,15 +273,15 @@ vk_init_instance(struct vk *vk)
 {
     uint32_t api_version;
     vk->EnumerateInstanceVersion(&api_version);
-    if (api_version < VKUTIL_MIN_API_VERSION)
-        vk_die("instance api version %d < %d", api_version, VKUTIL_MIN_API_VERSION);
+    if (api_version < vk->params.api_version)
+        vk_die("instance api version %d < %d", api_version, vk->params.api_version);
 
     const VkInstanceCreateInfo instance_info = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo =
             &(VkApplicationInfo){
                 .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-                .apiVersion = VKUTIL_MIN_API_VERSION,
+                .apiVersion = vk->params.api_version,
             },
         .enabledExtensionCount = vk->params.instance_ext_count,
         .ppEnabledExtensionNames = vk->params.instance_exts,
@@ -275,22 +301,35 @@ vk_init_physical_device(struct vk *vk)
     if (vk->result < VK_SUCCESS || !count)
         vk_die("failed to enumerate physical devices");
 
+    vk->result = vk->EnumerateInstanceExtensionProperties(NULL, &count, NULL);
+    vk_check(vk, "failed to enumerate ext count");
+    vk->exts = malloc(sizeof(*vk->exts) * count);
+    if (!vk->exts)
+        vk_die("failed to allocate exts");
+    vk->result = vk->EnumerateInstanceExtensionProperties(NULL, &count, vk->exts);
+    vk_check(vk, "failed to enumerate exts");
+
     vk->props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     vk->GetPhysicalDeviceProperties2(vk->physical_dev, &vk->props);
-    if (vk->props.properties.apiVersion < VKUTIL_MIN_API_VERSION) {
+    if (vk->props.properties.apiVersion < vk->params.api_version) {
         vk_die("physical device api version %d < %d", vk->props.properties.apiVersion,
-               VKUTIL_MIN_API_VERSION);
+               vk->params.api_version);
     }
 
     vk->custom_border_color_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
+    vk->host_query_reset_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
+    vk->host_query_reset_features.pNext = &vk->custom_border_color_features;
     vk->sampler_ycbcr_conversion_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
-    vk->sampler_ycbcr_conversion_features.pNext = &vk->custom_border_color_features;
+    vk->sampler_ycbcr_conversion_features.pNext = &vk->host_query_reset_features;
     vk->features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     vk->features.pNext = &vk->sampler_ycbcr_conversion_features;
     vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
 
+    if (!vk->features.features.tessellationShader)
+        vk_die("no tessellation shader support");
     if (!vk->features.features.tessellationShader)
         vk_die("no tessellation shader support");
     if (!vk->features.features.geometryShader)
@@ -299,6 +338,9 @@ vk_init_physical_device(struct vk *vk)
         vk_die("no non-solid fill mode support");
     if (!vk->sampler_ycbcr_conversion_features.samplerYcbcrConversion)
         vk_die("no ycbcr conversion support");
+    if (vk->params.api_version >= VK_API_VERSION_1_2 &&
+        !vk->host_query_reset_features.hostQueryReset)
+        vk_die("no host query reset support");
 
     vk->GetPhysicalDeviceMemoryProperties(vk->physical_dev, &vk->mem_props);
 
@@ -355,6 +397,11 @@ vk_init_device(struct vk *vk)
         }
     }
 
+    if (vk->params.api_version >= VK_API_VERSION_1_2) {
+        vk->host_query_reset_features.pNext = features;
+        features = &vk->host_query_reset_features;
+    }
+
     vk->queue_family_index = 0;
 
     VkQueueFamilyProperties queue_props;
@@ -362,6 +409,8 @@ vk_init_device(struct vk *vk)
     vk->GetPhysicalDeviceQueueFamilyProperties(vk->physical_dev, &queue_count, &queue_props);
     if (!(queue_props.queueFlags & VK_QUEUE_GRAPHICS_BIT))
         vk_die("queue family 0 does not support graphics");
+    if (!queue_props.timestampValidBits)
+        vk_die("queue family 0 does not support timestamps");
 
     const VkDeviceCreateInfo dev_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -432,6 +481,8 @@ vk_init(struct vk *vk, const struct vk_init_params *params)
     memset(vk, 0, sizeof(*vk));
     if (params)
         vk->params = *params;
+    if (vk->params.api_version < VKUTIL_MIN_API_VERSION)
+        vk->params.api_version = VKUTIL_MIN_API_VERSION;
 
     vk_init_library(vk);
 
@@ -466,6 +517,8 @@ vk_cleanup(struct vk *vk)
     vk->DestroyCommandPool(vk->dev, vk->cmd_pool, NULL);
 
     vk->DestroyDevice(vk->dev, NULL);
+
+    free(vk->exts);
 
     vk->DestroyInstance(vk->instance, NULL);
 
@@ -1557,6 +1610,56 @@ static inline void
 vk_destroy_descriptor_set(struct vk *vk, struct vk_descriptor_set *set)
 {
     free(set);
+}
+
+static inline struct vk_event *
+vk_create_event(struct vk *vk)
+{
+    struct vk_event *ev = calloc(1, sizeof(*ev));
+    if (!ev)
+        vk_die("failed to alloc event");
+
+    const VkEventCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO,
+    };
+
+    vk->result = vk->CreateEvent(vk->dev, &info, NULL, &ev->event);
+    vk_check(vk, "failed to create event");
+
+    return ev;
+}
+
+static inline void
+vk_destroy_event(struct vk *vk, struct vk_event *ev)
+{
+    vk->DestroyEvent(vk->dev, ev->event, NULL);
+    free(ev);
+}
+
+static inline struct vk_query *
+vk_create_query(struct vk *vk, VkQueryType type, uint32_t count)
+{
+    struct vk_query *query = calloc(1, sizeof(*query));
+    if (!query)
+        vk_die("failed to alloc query");
+
+    const VkQueryPoolCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+        .queryType = type,
+        .queryCount = count,
+    };
+
+    vk->result = vk->CreateQueryPool(vk->dev, &info, NULL, &query->pool);
+    vk_check(vk, "failed to create query");
+
+    return query;
+}
+
+static inline void
+vk_destroy_query(struct vk *vk, struct vk_query *query)
+{
+    vk->DestroyQueryPool(vk->dev, query->pool, NULL);
+    free(query);
 }
 
 static inline VkCommandBuffer
