@@ -8,6 +8,7 @@
 struct timestamp_test {
     uint32_t sleep;
     bool EXT_calibrated_timestamps;
+    bool loop;
 
     struct vk vk;
     struct vk_event *event;
@@ -181,6 +182,26 @@ timestamp_test_draw_mixed(struct timestamp_test *test)
 }
 
 static void
+timestamp_test_draw_loop(struct timestamp_test *test)
+{
+    struct vk *vk = &test->vk;
+    const VkCalibratedTimestampInfoEXT info = {
+        .sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT,
+        .timeDomain = VK_TIME_DOMAIN_DEVICE_EXT,
+    };
+    uint64_t ts;
+    uint64_t deviation;
+
+    while (true) {
+        vk->result = vk->GetCalibratedTimestampsEXT(vk->dev, 1, &info, &ts, &deviation);
+        const uint64_t ns = (uint64_t)(ts * vk->props.properties.limits.timestampPeriod);
+        const uint64_t ms = ns / 1000000;
+        vk_log("%" PRIu64 ".%03" PRIu64, ms / 1000, ms % 1000);
+        vk_sleep(1000);
+    }
+}
+
+static void
 timestamp_test_draw(struct timestamp_test *test)
 {
     timestamp_test_draw_same_cmd(test);
@@ -189,6 +210,8 @@ timestamp_test_draw(struct timestamp_test *test)
     if (test->EXT_calibrated_timestamps) {
         timestamp_test_draw_calibrated(test);
         timestamp_test_draw_mixed(test);
+        if (test->loop)
+            timestamp_test_draw_loop(test);
     }
 }
 
@@ -198,6 +221,7 @@ main(void)
     struct timestamp_test test = {
         .sleep = 200,
         .EXT_calibrated_timestamps = true,
+        .loop = false,
     };
 
     timestamp_test_init(&test);
