@@ -16,6 +16,7 @@ struct stencil_test {
 
     uint32_t depth_bits;
     uint32_t stencil_bits;
+    VkImageAspectFlags aspect_mask;
 
     struct vk vk;
 
@@ -87,8 +88,7 @@ stencil_test_init_fb(struct stencil_test *test)
         vk, test->depth_format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-    vk_create_image_render_view(vk, test->zs,
-                                VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    vk_create_image_render_view(vk, test->zs, test->aspect_mask);
 
     test->fb = vk_create_framebuffer(vk, NULL, NULL, test->zs, VK_ATTACHMENT_LOAD_OP_CLEAR,
                                      VK_ATTACHMENT_STORE_OP_STORE);
@@ -137,7 +137,7 @@ stencil_test_draw_triangle(struct stencil_test *test, VkCommandBuffer cmd)
         .newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         .image = test->zs->img,
         .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+            .aspectMask = test->aspect_mask,
             .levelCount = 1,
             .layerCount = 1,
         },
@@ -181,7 +181,7 @@ stencil_test_draw_triangle(struct stencil_test *test, VkCommandBuffer cmd)
         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         .image = test->zs->img,
         .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+            .aspectMask = test->aspect_mask,
             .levelCount = 1,
             .layerCount = 1,
         },
@@ -314,6 +314,10 @@ main(void)
     default:
         vk_die("unknown ds format");
     }
+    if (test.depth_bits)
+        test.aspect_mask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (test.stencil_bits)
+        test.aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
 
     stencil_test_init(&test);
     stencil_test_draw(&test);
