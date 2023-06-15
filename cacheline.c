@@ -87,11 +87,11 @@ cacheline_test_draw(struct cacheline_test *test)
     vk_end_cmd(vk);
     /* step 2: wait */
     while (vk->GetEventStatus(vk->dev, test->gpu_done->event) != VK_EVENT_SET)
-	    vk_sleep(1);
+        vk_sleep(1);
 
     vk_log("after CmdFillBuffer but before VkBufferMemoryBarrier");
     for (uint32_t i = 0; i < 4; i++)
-	    vk_log("dword[%d] = %d", i, dwords[i]);
+        vk_log("dword[%d] = %d", i, dwords[i]);
 
     /* step 3: this will be lost */
     dwords[2] = 2;
@@ -100,7 +100,7 @@ cacheline_test_draw(struct cacheline_test *test)
 
     vk_log("after host writes");
     for (uint32_t i = 0; i < 4; i++)
-	    vk_log("dword[%d] = %d", i, dwords[i]);
+        vk_log("dword[%d] = %d", i, dwords[i]);
 
     /* step 4: execute the gpu barrier to flush the gpu cache */
     vk->SetEvent(vk->dev, test->cpu_done->event);
@@ -108,7 +108,7 @@ cacheline_test_draw(struct cacheline_test *test)
 
     vk_log("after VkBufferMemoryBarrier");
     for (uint32_t i = 0; i < 4; i++)
-	    vk_log("dword[%d] = %d", i, dwords[i]);
+        vk_log("dword[%d] = %d", i, dwords[i]);
 }
 
 int

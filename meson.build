@@ -50,6 +50,7 @@ tests = [
   'msaa',
   'push_const',
   'renderpass_ops',
+  'stencil',
   'tess',
   'tex',
   'tex_depth',
