@@ -62,18 +62,20 @@ stencil_test_init_pipeline(struct stencil_test *test)
     vk_setup_pipeline(vk, test->pipeline, test->fb);
     test->pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        /* depth test is silently skipped if depth_bits == 0 */
         .depthTestEnable = true,
         .depthWriteEnable = true,
         .depthCompareOp = VK_COMPARE_OP_LESS,
-        .stencilTestEnable = false,
+        /* depth test is silently skipped if stencil_bits == 0 */
+        .stencilTestEnable = true,
         .front = {
-            .failOp = VK_STENCIL_OP_KEEP,
-            .passOp = VK_STENCIL_OP_KEEP,
-            .depthFailOp = VK_STENCIL_OP_KEEP,
+            .failOp = VK_STENCIL_OP_INCREMENT_AND_CLAMP,
+            .passOp = VK_STENCIL_OP_REPLACE,
+            .depthFailOp = VK_STENCIL_OP_ZERO,
             .compareOp = VK_COMPARE_OP_LESS,
             .compareMask = 0xff,
             .writeMask = 0xff,
-            .reference = 255,
+            .reference = 20,
         },
     };
     vk_compile_pipeline(vk, test->pipeline);
@@ -160,8 +162,8 @@ stencil_test_draw_triangle(struct stencil_test *test, VkCommandBuffer cmd)
         .clearValueCount = 1,
         .pClearValues = &(VkClearValue){
             .depthStencil = {
-                .depth = 1.0f,
-                .stencil = 255,
+                .depth = 0.5f,
+                .stencil = 127,
             },
         },
     };
