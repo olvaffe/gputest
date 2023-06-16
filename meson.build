@@ -44,6 +44,7 @@ tests = [
   'clear',
   'clear_depth',
   'compute',
+  'dynamic_rendering',
   'formats',
   'gs',
   'info',
