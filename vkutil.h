@@ -135,32 +135,32 @@ struct vk_pipeline {
     VkPipelineShaderStageCreateInfo stages[5];
     uint32_t stage_count;
 
-    VkPipelineTessellationStateCreateInfo tess_info;
-
+    /* vertex input state */
     VkVertexInputBindingDescription vi_binding;
     VkVertexInputAttributeDescription vi_attrs[16];
     uint32_t vi_attr_count;
-
     VkPipelineInputAssemblyStateCreateInfo ia_info;
 
+    /* pre-rasterization shader state */
     VkViewport viewport;
     VkRect2D scissor;
-
     VkPipelineRasterizationStateCreateInfo rast_info;
+    VkPipelineTessellationStateCreateInfo tess_info;
 
+    /* fragment shader state */
     VkPipelineMultisampleStateCreateInfo msaa_info;
     VkSampleMask sample_mask;
-
     VkPipelineDepthStencilStateCreateInfo depth_info;
+
+    /* fragment output state */
     VkPipelineColorBlendAttachmentState color_att;
+    VkPipelineRenderingCreateInfo rendering_info;
+    const struct vk_framebuffer *fb;
 
     VkDescriptorSetLayout set_layouts[4];
     uint32_t set_layout_count;
-
     VkPushConstantRange push_const;
     VkPipelineLayout pipeline_layout;
-
-    const struct vk_framebuffer *fb;
 
     VkPipeline pipeline;
 };
@@ -1431,11 +1431,22 @@ vk_set_pipeline_topology(struct vk *vk,
 }
 
 static inline void
-vk_set_pipeline_tessellation(struct vk *vk, struct vk_pipeline *pipeline, uint32_t cp_count)
+vk_set_pipeline_viewport(struct vk *vk,
+                         struct vk_pipeline *pipeline,
+                         uint32_t width,
+                         uint32_t height)
 {
-    pipeline->tess_info = (VkPipelineTessellationStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
-        .patchControlPoints = cp_count,
+    pipeline->viewport = (VkViewport){
+        .width = (float)width,
+        .height = (float)height,
+        .maxDepth = 1.0f,
+    };
+
+    pipeline->scissor = (VkRect2D){
+        .extent = {
+            .width = width,
+            .height = height,
+        },
     };
 }
 
@@ -1448,6 +1459,26 @@ vk_set_pipeline_rasterization(struct vk *vk,
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .polygonMode = poly_mode,
         .lineWidth = 1.0f,
+    };
+}
+
+static inline void
+vk_set_pipeline_tessellation(struct vk *vk, struct vk_pipeline *pipeline, uint32_t cp_count)
+{
+    pipeline->tess_info = (VkPipelineTessellationStateCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
+        .patchControlPoints = cp_count,
+    };
+}
+
+static inline void
+vk_set_pipeline_sample_count(struct vk *vk, struct vk_pipeline *pipeline, uint32_t sample_count)
+{
+    pipeline->sample_mask = (1u << sample_count) - 1;
+    pipeline->msaa_info = (VkPipelineMultisampleStateCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .rasterizationSamples = sample_count,
+        .pSampleMask = &pipeline->sample_mask,
     };
 }
 
@@ -1505,33 +1536,6 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
                                           &pipeline->pipeline_layout);
     vk_check(vk, "failed to create pipeline layout");
 
-    if (!fb) {
-        if (pipeline->stage_count != 1 ||
-            pipeline->stages[0].stage != VK_SHADER_STAGE_COMPUTE_BIT)
-            vk_die("expect a compute pipeline");
-        return;
-    }
-
-    pipeline->viewport = (VkViewport){
-        .width = (float)fb->width,
-        .height = (float)fb->height,
-        .maxDepth = 1.0f,
-    };
-
-    pipeline->scissor = (VkRect2D){
-        .extent = {
-            .width = fb->width,
-            .height = fb->height,
-        },
-    };
-
-    pipeline->sample_mask = (1u << fb->samples) - 1;
-    pipeline->msaa_info = (VkPipelineMultisampleStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .rasterizationSamples = fb->samples,
-        .pSampleMask = &pipeline->sample_mask,
-    };
-
     pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
     };
@@ -1541,13 +1545,17 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
     };
 
+    pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+    };
+
     pipeline->fb = fb;
 }
 
 static inline void
 vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 {
-    if (!pipeline->fb) {
+    if (pipeline->stage_count == 1 && pipeline->stages[0].stage == VK_SHADER_STAGE_COMPUTE_BIT) {
         const VkComputePipelineCreateInfo compute_info = {
             .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
             .stage = pipeline->stages[0],
@@ -1583,6 +1591,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 
     const VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .pNext = pipeline->fb ? NULL : &pipeline->rendering_info,
         .stageCount = pipeline->stage_count,
         .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,
@@ -1594,7 +1603,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pDepthStencilState = &pipeline->depth_info,
         .pColorBlendState = &color_info,
         .layout = pipeline->pipeline_layout,
-        .renderPass = pipeline->fb->pass,
+        .renderPass = pipeline->fb ? pipeline->fb->pass : VK_NULL_HANDLE,
     };
 
     vk->result = vk->CreateGraphicsPipelines(vk->dev, VK_NULL_HANDLE, 1, &pipeline_info, NULL,

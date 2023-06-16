@@ -63,13 +63,17 @@ push_const_init_pipeline(struct push_const_test *test)
     vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, push_const_test_fs,
                            sizeof(push_const_test_fs));
 
+    vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+
+    vk_set_pipeline_viewport(vk, test->pipeline, test->fb->width, test->fb->height);
+    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL);
+
     vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
                                VK_SHADER_STAGE_FRAGMENT_BIT, NULL);
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
                                sizeof(push_const_test_color));
 
-    vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL);
+    vk_set_pipeline_sample_count(vk, test->pipeline, test->fb->samples);
 
     vk_setup_pipeline(vk, test->pipeline, test->fb);
     vk_compile_pipeline(vk, test->pipeline);

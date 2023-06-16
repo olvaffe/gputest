@@ -75,9 +75,12 @@ tex_depth_test_init_pipeline(struct tex_depth_test *test)
 
     const uint32_t comp_count = ARRAY_SIZE(tex_depth_test_vertices[0]);
     vk_set_pipeline_vertices(vk, test->pipeline, &comp_count, 1);
-
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+
+    vk_set_pipeline_viewport(vk, test->pipeline, test->fb->width, test->fb->height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL);
+
+    vk_set_pipeline_sample_count(vk, test->pipeline, test->fb->samples);
 
     vk_setup_pipeline(vk, test->pipeline, test->fb);
     vk_compile_pipeline(vk, test->pipeline);

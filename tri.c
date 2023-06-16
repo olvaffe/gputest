@@ -76,11 +76,9 @@ tri_test_init_pipeline(struct tri_test *test)
 
     const uint32_t comp_counts[2] = { 2, 3 };
     vk_set_pipeline_vertices(vk, test->pipeline, comp_counts, ARRAY_SIZE(comp_counts));
-
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL);
 
-    vk_setup_pipeline(vk, test->pipeline, test->fb);
+    vk_set_pipeline_viewport(vk, test->pipeline, test->fb->width, test->fb->height);
     test->pipeline->viewport.x += (float)tri_border;
     test->pipeline->viewport.y += (float)tri_border;
     test->pipeline->viewport.width -= (float)tri_border * 2.0f;
@@ -89,6 +87,11 @@ tri_test_init_pipeline(struct tri_test *test)
     test->pipeline->scissor.offset.y += tri_border;
     test->pipeline->scissor.extent.width -= tri_border * 2;
     test->pipeline->scissor.extent.height -= tri_border * 2;
+    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL);
+
+    vk_set_pipeline_sample_count(vk, test->pipeline, test->fb->samples);
+
+    vk_setup_pipeline(vk, test->pipeline, test->fb);
     vk_compile_pipeline(vk, test->pipeline);
 }
 
