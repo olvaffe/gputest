@@ -51,6 +51,7 @@ tests = [
   'msaa',
   'push_const',
   'renderpass_ops',
+  'separate_ds',
   'stencil',
   'tess',
   'tex',
