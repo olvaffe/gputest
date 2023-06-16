@@ -40,6 +40,7 @@ idep_vkutil = declare_dependency(
 )
 
 tests = [
+  'buf_align',
   'cacheline',
   'clear',
   'clear_depth',
