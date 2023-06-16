@@ -464,7 +464,7 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
         pnext = &vk->vulkan_12_features.pNext;
     } else {
         *pnext = &vk->sampler_ycbcr_conversion_features;
-        pnext = vk->sampler_ycbcr_conversion_features.pNext;
+        pnext = &vk->sampler_ycbcr_conversion_features.pNext;
     }
     if (vk->params.api_version >= VK_API_VERSION_1_3) {
         *pnext = &vk->vulkan_13_features;
