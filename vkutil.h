@@ -36,6 +36,7 @@
 
 struct vk_init_params {
     uint32_t api_version;
+    bool enable_all_features;
 
     const char *const *instance_exts;
     uint32_t instance_ext_count;
@@ -58,18 +59,26 @@ struct vk {
     VkInstance instance;
 
     VkPhysicalDevice physical_dev;
-    VkExtensionProperties *exts;
+
+    bool KHR_swapchain;
+    bool EXT_custom_border_color;
+
     VkPhysicalDeviceProperties2 props;
+    VkPhysicalDeviceVulkan11Properties vulkan_11_props;
+    VkPhysicalDeviceVulkan12Properties vulkan_12_props;
+    VkPhysicalDeviceVulkan13Properties vulkan_13_props;
+
     VkPhysicalDeviceFeatures2 features;
+    VkPhysicalDeviceVulkan11Features vulkan_11_features;
+    VkPhysicalDeviceVulkan12Features vulkan_12_features;
+    VkPhysicalDeviceVulkan13Features vulkan_13_features;
+
     VkPhysicalDeviceSamplerYcbcrConversionFeatures sampler_ycbcr_conversion_features;
     VkPhysicalDeviceHostQueryResetFeatures host_query_reset_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
 
     VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t buf_mt_index;
-
-    bool KHR_swapchain;
-    bool EXT_custom_border_color;
 
     VkDevice dev;
     VkQueue queue;
@@ -294,54 +303,8 @@ vk_init_instance(struct vk *vk)
 }
 
 static inline void
-vk_init_physical_device(struct vk *vk)
+vk_init_physical_device_memory_properties(struct vk *vk)
 {
-    uint32_t count = 1;
-    vk->result = vk->EnumeratePhysicalDevices(vk->instance, &count, &vk->physical_dev);
-    if (vk->result < VK_SUCCESS || !count)
-        vk_die("failed to enumerate physical devices");
-
-    vk->result = vk->EnumerateInstanceExtensionProperties(NULL, &count, NULL);
-    vk_check(vk, "failed to enumerate ext count");
-    vk->exts = malloc(sizeof(*vk->exts) * count);
-    if (!vk->exts)
-        vk_die("failed to allocate exts");
-    vk->result = vk->EnumerateInstanceExtensionProperties(NULL, &count, vk->exts);
-    vk_check(vk, "failed to enumerate exts");
-
-    vk->props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    vk->GetPhysicalDeviceProperties2(vk->physical_dev, &vk->props);
-    if (vk->props.properties.apiVersion < vk->params.api_version) {
-        vk_die("physical device api version %d < %d", vk->props.properties.apiVersion,
-               vk->params.api_version);
-    }
-
-    vk->custom_border_color_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
-    vk->host_query_reset_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
-    vk->host_query_reset_features.pNext = &vk->custom_border_color_features;
-    vk->sampler_ycbcr_conversion_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
-    vk->sampler_ycbcr_conversion_features.pNext = &vk->host_query_reset_features;
-    vk->features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    vk->features.pNext = &vk->sampler_ycbcr_conversion_features;
-    vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
-
-    if (!vk->features.features.tessellationShader)
-        vk_die("no tessellation shader support");
-    if (!vk->features.features.tessellationShader)
-        vk_die("no tessellation shader support");
-    if (!vk->features.features.geometryShader)
-        vk_die("no geometry shader support");
-    if (!vk->features.features.fillModeNonSolid)
-        vk_die("no non-solid fill mode support");
-    if (!vk->sampler_ycbcr_conversion_features.samplerYcbcrConversion)
-        vk_die("no ycbcr conversion support");
-    if (vk->params.api_version >= VK_API_VERSION_1_2 &&
-        !vk->host_query_reset_features.hostQueryReset)
-        vk_die("no host query reset support");
-
     vk->GetPhysicalDeviceMemoryProperties(vk->physical_dev, &vk->mem_props);
 
     const VkMemoryPropertyFlags mt_flags =
@@ -360,6 +323,97 @@ vk_init_physical_device(struct vk *vk)
 }
 
 static inline void
+vk_init_physical_device_features(struct vk *vk)
+{
+    vk->features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+    void **pnext = &vk->features.pNext;
+    if (vk->params.api_version >= VK_API_VERSION_1_2) {
+        vk->vulkan_11_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+        vk->vulkan_12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+
+        *pnext = &vk->vulkan_11_features;
+        vk->vulkan_11_features.pNext = &vk->vulkan_12_features;
+        pnext = &vk->vulkan_12_features.pNext;
+    } else {
+        vk->sampler_ycbcr_conversion_features.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
+        vk->host_query_reset_features.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
+
+        *pnext = &vk->sampler_ycbcr_conversion_features;
+        vk->sampler_ycbcr_conversion_features.pNext = &vk->host_query_reset_features;
+        pnext = &vk->host_query_reset_features.pNext;
+    }
+    if (vk->params.api_version >= VK_API_VERSION_1_3) {
+        vk->vulkan_13_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+
+        *pnext = &vk->vulkan_13_features;
+        pnext = &vk->vulkan_13_features.pNext;
+    }
+
+    vk->custom_border_color_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
+    *pnext = &vk->custom_border_color_features;
+    pnext = &vk->custom_border_color_features.pNext;
+
+    vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
+}
+
+static inline void
+vk_init_physical_device_properties(struct vk *vk)
+{
+    vk->props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+
+    void **pnext = &vk->props.pNext;
+    if (vk->params.api_version >= VK_API_VERSION_1_2) {
+        vk->vulkan_11_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
+        vk->vulkan_12_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
+
+        *pnext = &vk->vulkan_11_props;
+        vk->vulkan_11_props.pNext = &vk->vulkan_12_props;
+        pnext = &vk->vulkan_12_props.pNext;
+    }
+    if (vk->params.api_version >= VK_API_VERSION_1_3) {
+        vk->vulkan_13_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES;
+
+        *pnext = &vk->vulkan_13_props;
+        pnext = &vk->vulkan_13_props.pNext;
+    }
+
+    vk->GetPhysicalDeviceProperties2(vk->physical_dev, &vk->props);
+    if (vk->props.properties.apiVersion < vk->params.api_version) {
+        vk_die("physical device api version %d < %d", vk->props.properties.apiVersion,
+               vk->params.api_version);
+    }
+}
+
+static inline void
+vk_init_physical_device_extensions(struct vk *vk)
+{
+    for (uint32_t i = 0; i < vk->params.dev_ext_count; i++) {
+        if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_EXTENSION_NAME))
+            vk->KHR_swapchain = true;
+        else if (!strcmp(vk->params.dev_exts[i], VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME))
+            vk->EXT_custom_border_color = true;
+    }
+}
+
+static inline void
+vk_init_physical_device(struct vk *vk)
+{
+    uint32_t count = 1;
+    vk->result = vk->EnumeratePhysicalDevices(vk->instance, &count, &vk->physical_dev);
+    if (vk->result < VK_SUCCESS || !count)
+        vk_die("failed to enumerate physical devices");
+
+    vk_init_physical_device_extensions(vk);
+    vk_init_physical_device_properties(vk);
+    vk_init_physical_device_features(vk);
+    vk_init_physical_device_memory_properties(vk);
+}
+
+static inline void
 vk_init_device_dispatch(struct vk *vk)
 {
     vk->GetDeviceProcAddr =
@@ -370,37 +424,65 @@ vk_init_device_dispatch(struct vk *vk)
 }
 
 static inline void
-vk_init_device(struct vk *vk)
+vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *features)
 {
-    /* required features */
-    VkPhysicalDeviceFeatures2 req_features = {
+    /* check minimum features */
+    if (!vk->features.features.tessellationShader)
+        vk_die("no tessellation shader support");
+    if (!vk->features.features.geometryShader)
+        vk_die("no geometry shader support");
+    if (!vk->features.features.fillModeNonSolid)
+        vk_die("no non-solid fill mode support");
+    if (vk->params.api_version >= VK_API_VERSION_1_2) {
+        if (!vk->vulkan_11_features.samplerYcbcrConversion)
+            vk_die("no ycbcr conversion support");
+        if (!vk->vulkan_12_features.hostQueryReset)
+            vk_die("no host query reset support");
+    } else {
+        if (!vk->sampler_ycbcr_conversion_features.samplerYcbcrConversion)
+            vk_die("no ycbcr conversion support");
+    }
+
+    if (vk->params.enable_all_features) {
+        *features = vk->features;
+        return;
+    }
+
+    *features = (VkPhysicalDeviceFeatures2){
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &(VkPhysicalDeviceSamplerYcbcrConversionFeatures){
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES,
-            .samplerYcbcrConversion = true,
-        },
         .features = {
             .tessellationShader = true,
             .geometryShader = true,
             .fillModeNonSolid = true,
         },
     };
-    void *features = &req_features;
 
-    for (uint32_t i = 0; i < vk->params.dev_ext_count; i++) {
-        if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
-            vk->KHR_swapchain = true;
-        } else if (!strcmp(vk->params.dev_exts[i], VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME)) {
-            vk->EXT_custom_border_color = true;
-            vk->custom_border_color_features.pNext = features;
-            features = &vk->custom_border_color_features;
-        }
-    }
-
+    void **pnext = &features->pNext;
     if (vk->params.api_version >= VK_API_VERSION_1_2) {
-        vk->host_query_reset_features.pNext = features;
-        features = &vk->host_query_reset_features;
+        *pnext = &vk->vulkan_11_features;
+        vk->vulkan_11_features.pNext = &vk->vulkan_12_features;
+        pnext = &vk->vulkan_12_features.pNext;
+    } else {
+        *pnext = &vk->sampler_ycbcr_conversion_features;
+        pnext = vk->sampler_ycbcr_conversion_features.pNext;
     }
+    if (vk->params.api_version >= VK_API_VERSION_1_3) {
+        *pnext = &vk->vulkan_13_features;
+        pnext = &vk->vulkan_13_features.pNext;
+    }
+    if (vk->EXT_custom_border_color) {
+        *pnext = &vk->custom_border_color_features;
+        pnext = &vk->custom_border_color_features.pNext;
+    }
+
+    *pnext = NULL;
+}
+
+static inline void
+vk_init_device(struct vk *vk)
+{
+    VkPhysicalDeviceFeatures2 enabled_features;
+    vk_init_device_enabled_features(vk, &enabled_features);
 
     vk->queue_family_index = 0;
 
@@ -414,7 +496,7 @@ vk_init_device(struct vk *vk)
 
     const VkDeviceCreateInfo dev_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = features,
+        .pNext = &enabled_features,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos =
             &(VkDeviceQueueCreateInfo){
@@ -517,8 +599,6 @@ vk_cleanup(struct vk *vk)
     vk->DestroyCommandPool(vk->dev, vk->cmd_pool, NULL);
 
     vk->DestroyDevice(vk->dev, NULL);
-
-    free(vk->exts);
 
     vk->DestroyInstance(vk->instance, NULL);
 
