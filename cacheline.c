@@ -71,6 +71,7 @@ cacheline_test_draw(struct cacheline_test *test)
 
     /* step 2: build a command to write dword 1 and 2 */
     VkCommandBuffer cmd = vk_begin_cmd(vk);
+
     const VkBufferMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
         .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -79,10 +80,14 @@ cacheline_test_draw(struct cacheline_test *test)
         .offset = 4,
         .size = 8,
     };
+    const VkEvent events[] = { test->gpu_done->event, test->cpu_done->event };
+
     vk->CmdFillBuffer(cmd, test->buf->buf, 4, 8, 1);
     vk->CmdSetEvent(cmd, test->gpu_done->event, VK_PIPELINE_STAGE_TRANSFER_BIT);
-    vk->CmdWaitEvents(cmd, 1, &test->cpu_done->event, VK_PIPELINE_STAGE_TRANSFER_BIT,
+    vk->CmdWaitEvents(cmd, ARRAY_SIZE(events), events,
+                      VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_HOST_BIT,
                       VK_PIPELINE_STAGE_HOST_BIT, 0, NULL, 1, &barrier, 0, NULL);
+
     /* step 2: submit */
     vk_end_cmd(vk);
     /* step 2: wait */
