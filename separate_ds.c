@@ -11,6 +11,8 @@ static const uint32_t separate_ds_test_vs[] = {
 
 struct separate_ds_test {
     VkFormat depth_format;
+    VkImageLayout depth_layout;
+    VkImageLayout stencil_layout;
     uint32_t width;
     uint32_t height;
 
@@ -153,7 +155,7 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
             .srcAccessMask = 0,
             .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+            .newLayout = test->depth_layout,
             .image = test->ds->img,
             .subresourceRange = {
                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -168,7 +170,7 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
             .srcAccessMask = 0,
             .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL,
+            .newLayout = test->stencil_layout,
             .image = test->ds->img,
             .subresourceRange = {
                 .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
@@ -194,7 +196,7 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
         .pDepthAttachment = &(VkRenderingAttachmentInfo){
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = test->ds->render_view,
-            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+            .imageLayout = test->depth_layout,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
             .clearValue = {
@@ -206,7 +208,7 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
         .pStencilAttachment = &(VkRenderingAttachmentInfo){
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = test->ds->render_view,
-            .imageLayout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL,
+            .imageLayout = test->stencil_layout,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
             .clearValue = {
@@ -228,7 +230,7 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+            .oldLayout = test->depth_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             .image = test->ds->img,
             .subresourceRange = {
@@ -243,7 +245,7 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL,
+            .oldLayout = test->stencil_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             .image = test->ds->img,
             .subresourceRange = {
@@ -345,6 +347,8 @@ main(void)
 {
     struct separate_ds_test test = {
         .depth_format = VK_FORMAT_D24_UNORM_S8_UINT,
+        .depth_layout = VK_IMAGE_LAYOUT_GENERAL,
+        .stencil_layout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL,
         .width = 300,
         .height = 300,
     };
