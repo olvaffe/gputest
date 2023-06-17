@@ -121,7 +121,7 @@ buf_align_test_draw(struct buf_align_test *test)
      *  - CML and ADL
      *
      * Setup
-     *  - buffer size is 4 (mem req size=16 alignment=16)
+     *  - buffer size is 4 (mem req size=4 alignment=16)
      *  - disturb buffer is used to affect cacheline with gpu cache flush
      *  - disturb and src_buf are suballocated from the same device memory
      *  - disturb is bound at offset = 0
