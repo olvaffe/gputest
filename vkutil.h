@@ -975,8 +975,8 @@ vk_create_image_ycbcr_conversion(struct vk *vk,
 static inline void
 vk_create_image_sample_view(struct vk *vk,
                             struct vk_image *img,
-                            VkImageAspectFlagBits aspect,
-                            VkFilter filter)
+                            VkImageViewType type,
+                            VkImageAspectFlagBits aspect)
 {
     const VkSamplerYcbcrConversionInfo conv_info = {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO,
@@ -987,7 +987,7 @@ vk_create_image_sample_view(struct vk *vk,
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .pNext = img->ycbcr_conv != VK_NULL_HANDLE ? &conv_info : NULL,
         .image = img->img,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .viewType = type,
         .format = img->info.format,
         .subresourceRange = {
             .aspectMask = aspect,
@@ -997,6 +997,18 @@ vk_create_image_sample_view(struct vk *vk,
     };
     vk->result = vk->CreateImageView(vk->dev, &view_info, NULL, &img->sample_view);
     vk_check(vk, "failed to create image sample view");
+}
+
+static inline void
+vk_create_image_sampler(struct vk *vk,
+                        struct vk_image *img,
+                        VkFilter filter,
+                        VkSamplerMipmapMode mipmap_mode)
+{
+    const VkSamplerYcbcrConversionInfo conv_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO,
+        .conversion = img->ycbcr_conv,
+    };
 
     VkClearColorValue custom_border_color = { 0 };
     VkBorderColor border_color;
@@ -1022,7 +1034,7 @@ vk_create_image_sample_view(struct vk *vk,
         .pNext = img->ycbcr_conv != VK_NULL_HANDLE ? (void *)&conv_info : (void *)&border_info,
         .magFilter = filter,
         .minFilter = filter,
-        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        .mipmapMode = mipmap_mode,
         .addressModeU = addr_mode,
         .addressModeV = addr_mode,
         .addressModeW = addr_mode,

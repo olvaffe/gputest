@@ -134,7 +134,8 @@ tex_ubo_test_init_texture(struct tex_ubo_test *test)
     test->tex = vk_create_image(vk, test->tex_format, test->width, test->height,
                                 VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_LINEAR,
                                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-    vk_create_image_sample_view(vk, test->tex, VK_IMAGE_ASPECT_COLOR_BIT, VK_FILTER_NEAREST);
+    vk_create_image_sample_view(vk, test->tex, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT);
+    vk_create_image_sampler(vk, test->tex, VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST);
 }
 
 static void

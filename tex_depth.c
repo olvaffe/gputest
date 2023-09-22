@@ -108,8 +108,10 @@ tex_depth_test_init_depth_texture(struct tex_depth_test *test)
     test->depth_tex = vk_create_image(
         vk, test->depth_format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-    vk_create_image_sample_view(vk, test->depth_tex, VK_IMAGE_ASPECT_STENCIL_BIT,
-                                VK_FILTER_NEAREST);
+    vk_create_image_sample_view(vk, test->depth_tex, VK_IMAGE_VIEW_TYPE_2D,
+                                VK_IMAGE_ASPECT_STENCIL_BIT);
+    vk_create_image_sampler(vk, test->depth_tex, VK_FILTER_NEAREST,
+                            VK_SAMPLER_MIPMAP_MODE_NEAREST);
 }
 
 static void

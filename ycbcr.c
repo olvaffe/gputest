@@ -110,7 +110,8 @@ ycbcr_test_init_texture(struct ycbcr_test *test)
 
         vk_create_image_ycbcr_conversion(vk, test->tex, test->chroma_loc, test->chroma_filter);
     }
-    vk_create_image_sample_view(vk, test->tex, VK_IMAGE_ASPECT_COLOR_BIT, test->minmag_filter);
+    vk_create_image_sample_view(vk, test->tex, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT);
+    vk_create_image_sampler(vk, test->tex, test->minmag_filter, VK_SAMPLER_MIPMAP_MODE_NEAREST);
 }
 
 static void
