@@ -31,6 +31,12 @@ static const VkExternalMemoryHandleTypeFlagBits formats_test_handles[] = {
 #endif
 };
 
+static const VkImageType formats_test_types[] = {
+    VK_IMAGE_TYPE_1D,
+    VK_IMAGE_TYPE_2D,
+    VK_IMAGE_TYPE_3D,
+};
+
 static const VkImageTiling formats_test_tilings[] = {
     VK_IMAGE_TILING_OPTIMAL,
     VK_IMAGE_TILING_LINEAR,
@@ -105,6 +111,7 @@ static void
 formats_test_dump_image_format(struct vk *vk,
                                VkFormat format,
                                VkExternalMemoryHandleTypeFlagBits handle,
+                               VkImageType type,
                                VkImageTiling tiling,
                                uint64_t drm_modifier,
                                VkImageUsageFlags usage)
@@ -123,7 +130,7 @@ formats_test_dump_image_format(struct vk *vk,
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
         .pNext = &external_info,
         .format = format,
-        .type = VK_IMAGE_TYPE_2D,
+        .type = type,
         .tiling = tiling,
         .usage = usage,
     };
@@ -221,30 +228,50 @@ formats_test_dump_format(struct vk *vk, VkFormat format)
     }
 
     for (uint32_t h = 0; h < ARRAY_SIZE(formats_test_handles); h++) {
-        for (uint32_t t = 0; t < ARRAY_SIZE(formats_test_tilings); t++) {
-            for (uint32_t u = 0; u < ARRAY_SIZE(formats_test_usages); u++) {
-                const VkExternalMemoryHandleTypeFlagBits handle = formats_test_handles[h];
-                const VkImageTiling tiling = formats_test_tilings[t];
-                const VkImageUsageFlags usage = formats_test_usages[u];
+        for (uint32_t u = 0; u < ARRAY_SIZE(formats_test_usages); u++) {
+            for (uint32_t t = 0; t < ARRAY_SIZE(formats_test_tilings); t++) {
+                for (uint32_t ty = 0; ty < ARRAY_SIZE(formats_test_types); ty++) {
+                    const VkExternalMemoryHandleTypeFlagBits handle = formats_test_handles[h];
+                    const VkImageUsageFlags usage = formats_test_usages[u];
+                    const VkImageTiling tiling = formats_test_tilings[t];
+                    const VkImageType type = formats_test_types[ty];
 
-                char usage_str[128];
-                formats_get_usage_str(usage, usage_str, ARRAY_SIZE(usage_str));
+                    char usage_str[128];
+                    formats_get_usage_str(usage, usage_str, ARRAY_SIZE(usage_str));
 
-                if (tiling == VK_IMAGE_TILING_OPTIMAL || tiling == VK_IMAGE_TILING_LINEAR) {
-                    vk_log("  external handle 0x%x, image tiling %s, usage %s", handle,
-                           tiling == VK_IMAGE_TILING_OPTIMAL ? "optimal" : "linear", usage_str);
-                    formats_test_dump_image_format(vk, format, handle, tiling,
-                                                   DRM_FORMAT_MOD_INVALID, usage);
-                } else {
-                    for (uint32_t i = 0; i < mod_props.drmFormatModifierCount; i++) {
-                        const VkDrmFormatModifierPropertiesEXT *p =
-                            &mod_props.pDrmFormatModifierProperties[i];
-                        vk_log("  external handle 0x%x, image modifier 0x%016" PRIx64
-                               ", usage %s",
-                               handle, p->drmFormatModifier, usage_str);
-                        formats_test_dump_image_format(vk, format, handle,
-                                                       VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT,
-                                                       p->drmFormatModifier, usage);
+                    const char *type_str;
+                    switch (type) {
+                    case VK_IMAGE_TYPE_1D:
+                        type_str = "1d";
+                        break;
+                    case VK_IMAGE_TYPE_2D:
+                        type_str = "2d";
+                        break;
+                    case VK_IMAGE_TYPE_3D:
+                        type_str = "3d";
+                        break;
+                    default:
+                        type_str = "xd";
+                        break;
+                    }
+
+                    if (tiling == VK_IMAGE_TILING_OPTIMAL || tiling == VK_IMAGE_TILING_LINEAR) {
+                        vk_log("  external handle 0x%x, usage %s, %s %s image", handle, usage_str,
+                               tiling == VK_IMAGE_TILING_OPTIMAL ? "optimal" : "linear",
+                               type_str);
+                        formats_test_dump_image_format(vk, format, handle, type, tiling,
+                                                       DRM_FORMAT_MOD_INVALID, usage);
+                    } else {
+                        for (uint32_t i = 0; i < mod_props.drmFormatModifierCount; i++) {
+                            const VkDrmFormatModifierPropertiesEXT *p =
+                                &mod_props.pDrmFormatModifierProperties[i];
+                            vk_log("  external handle 0x%x, usage %s, modifier 0x%016" PRIx64
+                                   " %s image",
+                                   handle, usage_str, p->drmFormatModifier, type_str);
+                            formats_test_dump_image_format(
+                                vk, format, handle, type, VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT,
+                                p->drmFormatModifier, usage);
+                        }
                     }
                 }
             }
