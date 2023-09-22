@@ -234,6 +234,13 @@ static inline void PRINTFLIKE(2, 3) vk_check(const struct vk *vk, const char *fo
     va_end(ap);
 }
 
+static inline uint32_t
+vk_minify(uint32_t base, uint32_t level)
+{
+    const uint32_t val = base >> level;
+    return val ? val : 1;
+}
+
 static inline void
 vk_sleep(uint32_t ms)
 {
@@ -434,13 +441,13 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     if (!vk->features.features.fillModeNonSolid)
         vk_die("no non-solid fill mode support");
     if (vk->params.api_version >= VK_API_VERSION_1_2) {
-        if (!vk->vulkan_11_features.samplerYcbcrConversion)
-            vk_die("no ycbcr conversion support");
+        // if (!vk->vulkan_11_features.samplerYcbcrConversion)
+        //     vk_die("no ycbcr conversion support");
         if (!vk->vulkan_12_features.hostQueryReset)
             vk_die("no host query reset support");
     } else {
-        if (!vk->sampler_ycbcr_conversion_features.samplerYcbcrConversion)
-            vk_die("no ycbcr conversion support");
+        // if (!vk->sampler_ycbcr_conversion_features.samplerYcbcrConversion)
+        //     vk_die("no ycbcr conversion support");
     }
 
     if (vk->params.enable_all_features) {
@@ -738,6 +745,19 @@ vk_init_image(struct vk *vk, struct vk_image *img)
 }
 
 static inline struct vk_image *
+vk_create_image_from_info(struct vk *vk, const VkImageCreateInfo *info)
+{
+    struct vk_image *img = calloc(1, sizeof(*img));
+    if (!img)
+        vk_die("failed to alloc img");
+
+    img->info = *info;
+    vk_init_image(vk, img);
+
+    return img;
+}
+
+static inline struct vk_image *
 vk_create_image(struct vk *vk,
                 VkFormat format,
                 uint32_t width,
@@ -750,26 +770,23 @@ vk_create_image(struct vk *vk,
     if (!img)
         vk_die("failed to alloc img");
 
-    img->info = (VkImageCreateInfo){
+    const VkImageCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-            .imageType = VK_IMAGE_TYPE_2D,
-            .format = format,
-            .extent = {
-                .width = width,
-                .height = height,
-                .depth = 1,
-            },
-            .mipLevels = 1,
-            .arrayLayers = 1,
-            .samples = samples,
-            .tiling = tiling,
-            .usage = usage,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = format,
+        .extent = {
+            .width = width,
+            .height = height,
+            .depth = 1,
+        },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = samples,
+        .tiling = tiling,
+        .usage = usage,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
-
-    vk_init_image(vk, img);
-
-    return img;
+    return vk_create_image_from_info(vk, &info);
 }
 
 static inline const void *

@@ -30,6 +30,7 @@ dep_dl = cc.find_library('dl')
 dep_m = cc.find_library('m', required: false)
 dep_rt = cc.find_library('rt', required: false)
 dep_sdl2 = dependency('sdl2', required: false)
+dep_ktx = dependency('Ktx', method: 'cmake', required: false)
 
 add_project_arguments(['-D_GNU_SOURCE', warning_args], language: 'c')
 
@@ -69,6 +70,10 @@ if dep_sdl2.found()
   tests += ['sdl']
 endif
 
+if dep_ktx.found()
+  tests += ['ktx']
+endif
+
 foreach t : tests
   test_incs = []
 
@@ -103,6 +108,8 @@ foreach t : tests
   test_deps = [idep_vkutil]
   if t == 'sdl'
     test_deps += [dep_sdl2]
+  elif t == 'ktx'
+    test_deps += [dep_ktx]
   endif
 
   executable(
