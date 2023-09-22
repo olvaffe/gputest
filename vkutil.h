@@ -119,6 +119,7 @@ struct vk_image {
     uint32_t ycbcr_conv_desc_count;
 
     VkImageView sample_view;
+    VkImageViewType sample_view_type;
     VkSampler sampler;
 };
 
@@ -1014,6 +1015,8 @@ vk_create_image_sample_view(struct vk *vk,
     };
     vk->result = vk->CreateImageView(vk->dev, &view_info, NULL, &img->sample_view);
     vk_check(vk, "failed to create image sample view");
+
+    img->sample_view_type = type;
 }
 
 static inline void

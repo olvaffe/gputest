@@ -16,9 +16,15 @@ static const uint32_t ktx_test_fs[] = {
 #include "ktx_test.frag.inc"
 };
 
+struct ktx_test_push_const {
+    uint32_t view_type;
+    float slice;
+};
+
 struct ktx_test {
     VkFormat rt_format;
     const char *filename;
+    int slice;
     ktxTexture *tex;
 
     struct vk vk;
@@ -127,9 +133,6 @@ ktx_test_load_file(struct ktx_test *test)
         vk_die("only KTX 2.0 is supported");
     if (((ktxTexture2 *)tex)->supercompressionScheme != KTX_SS_NONE)
         vk_die("data is super-compressed");
-    /* XXX is it valid to pass VkImageViewType to fs? */
-    if (tex->numDimensions != 2 || tex->isCubemap || !tex->isArray)
-        vk_die("fs expects a 2D array texture");
 
     test->tex = tex;
 }
@@ -157,6 +160,8 @@ ktx_test_init_pipeline(struct ktx_test *test)
 
     vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
                                VK_SHADER_STAGE_FRAGMENT_BIT, NULL);
+    vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
+                               sizeof(struct ktx_test_push_const));
 
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
@@ -350,6 +355,13 @@ ktx_test_draw_quad(struct ktx_test *test, VkCommandBuffer cmd)
     };
     vk->CmdBeginRendering(cmd, &rendering_info);
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+
+    const struct ktx_test_push_const push = {
+        .view_type = test->tex_img->sample_view_type,
+        .slice = test->slice,
+    };
+    vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                         sizeof(push), &push);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                               test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
     vk->CmdDraw(cmd, 4, 1, 0, 0);
@@ -443,12 +455,13 @@ main(int argc, char **argv)
         .rt_format = VK_FORMAT_B8G8R8A8_UNORM,
     };
 
-    if (argc != 2) {
-        vk_log("Usage: %s <filename.ktx>", argv[0]);
+    if (argc < 2) {
+        vk_log("Usage: %s <filename.ktx> [slice]", argv[0]);
         return -1;
     }
 
     test.filename = argv[1];
+    test.slice = argc > 2 ? atoi(argv[2]) : 0;
 
     ktx_test_init(&test);
     ktx_test_draw(&test);
