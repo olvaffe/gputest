@@ -43,6 +43,28 @@ static const VkImageTiling formats_test_tilings[] = {
     VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT,
 };
 
+static const VkImageUsageFlagBits formats_test_usages[] = {
+    VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+    VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+    VK_IMAGE_USAGE_SAMPLED_BIT,
+    VK_IMAGE_USAGE_STORAGE_BIT,
+    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+    VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
+    VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR,
+    VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT,
+    VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR,
+    VK_IMAGE_USAGE_VIDEO_DECODE_SRC_BIT_KHR,
+    VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR,
+#if 0
+    VK_IMAGE_USAGE_VIDEO_ENCODE_DST_BIT_KHR,
+    VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR,
+    VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR,
+    VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT,
+#endif
+};
+
 static const struct formats_test_name formats_test_usage_names[] = {
     { VK_IMAGE_USAGE_TRANSFER_SRC_BIT, "xfers" },
     { VK_IMAGE_USAGE_TRANSFER_DST_BIT, "xferd" },
@@ -167,6 +189,7 @@ formats_test_dump_image_format(struct vk *vk,
         .type = type,
         .tiling = tiling,
         .usage = 0, /* TBD */
+        .flags = 0,
     };
 
     VkAndroidHardwareBufferUsageANDROID ahb_props = {
@@ -186,8 +209,8 @@ formats_test_dump_image_format(struct vk *vk,
     };
 
     VkImageUsageFlags usage = 0;
-    for (uint32_t i = 0; i < 32; i++) {
-        info.usage = 1u << i;
+    for (uint32_t i = 0; i < ARRAY_SIZE(formats_test_usages); i++) {
+        info.usage = formats_test_usages[i];
         const VkResult result =
             vk->GetPhysicalDeviceImageFormatProperties2(vk->physical_dev, &info, &props);
         if (result == VK_SUCCESS)
@@ -227,59 +250,6 @@ formats_test_dump_image_format(struct vk *vk,
                    ahb_props.androidHardwareBufferUsage);
         }
     }
-
-#if 0
-    for (uint32_t h = 0; h < ARRAY_SIZE(formats_test_handles); h++) {
-        for (uint32_t u = 0; u < ARRAY_SIZE(formats_test_usages); u++) {
-            for (uint32_t t = 0; t < ARRAY_SIZE(formats_test_tilings); t++) {
-                for (uint32_t ty = 0; ty < ARRAY_SIZE(formats_test_types); ty++) {
-                    const VkExternalMemoryHandleTypeFlagBits handle = formats_test_handles[h];
-                    const VkImageUsageFlags usage = formats_test_usages[u];
-                    const VkImageTiling tiling = formats_test_tilings[t];
-                    const VkImageType type = formats_test_types[ty];
-
-                    char usage_str[128];
-                    formats_get_usage_str(usage, usage_str, ARRAY_SIZE(usage_str));
-
-                    const char *type_str;
-                    switch (type) {
-                    case VK_IMAGE_TYPE_1D:
-                        type_str = "1d";
-                        break;
-                    case VK_IMAGE_TYPE_2D:
-                        type_str = "2d";
-                        break;
-                    case VK_IMAGE_TYPE_3D:
-                        type_str = "3d";
-                        break;
-                    default:
-                        type_str = "xd";
-                        break;
-                    }
-
-                    if (tiling == VK_IMAGE_TILING_OPTIMAL || tiling == VK_IMAGE_TILING_LINEAR) {
-                        vk_log("  external handle 0x%x, usage %s, %s %s image", handle, usage_str,
-                               tiling == VK_IMAGE_TILING_OPTIMAL ? "optimal" : "linear",
-                               type_str);
-                        formats_test_dump_image_format(vk, fmt, handle, type, tiling,
-                                                       DRM_FORMAT_MOD_INVALID, usage);
-                    } else {
-                        for (uint32_t i = 0; i < mod_props.drmFormatModifierCount; i++) {
-                            const VkDrmFormatModifierPropertiesEXT *p =
-                                &mod_props.pDrmFormatModifierProperties[i];
-                            vk_log("  external handle 0x%x, usage %s, modifier 0x%016" PRIx64
-                                   " %s image",
-                                   handle, usage_str, p->drmFormatModifier, type_str);
-                            formats_test_dump_image_format(
-                                vk, fmt, handle, type, VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT,
-                                p->drmFormatModifier, usage);
-                        }
-                    }
-                }
-            }
-        }
-    }
-#endif
 }
 
 static void
