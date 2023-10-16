@@ -51,6 +51,7 @@ tests = [
   'gs',
   'info',
   'msaa',
+  'pipeline_stats',
   'push_const',
   'renderpass_ops',
   'separate_ds',

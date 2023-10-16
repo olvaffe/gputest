@@ -1132,6 +1132,14 @@ vk_write_ppm(const char *filename,
         swizzle[1] = 1;
         swizzle[2] = 0;
         break;
+    case VK_FORMAT_R32G32B32A32_UINT:
+        cpp = 16;
+        max_val = 255;
+        packed = false;
+        swizzle[0] = 0;
+        swizzle[1] = 1;
+        swizzle[2] = 2;
+        break;
     default:
         vk_die("cannot write unknown format %d", format);
         break;
@@ -1144,7 +1152,13 @@ vk_write_ppm(const char *filename,
     fprintf(fp, "P6 %u %u %u\n", width, height, max_val);
     for (uint32_t y = 0; y < height; y++) {
         for (uint32_t x = 0; x < width; x++) {
-            if (packed) {
+            if (format == VK_FORMAT_R32G32B32A32_UINT) {
+                const uint32_t *pixel = data + pitch * y + cpp * x;
+                /* discard the higher bytes */
+                const char bytes[3] = { pixel[swizzle[0]], pixel[swizzle[1]], pixel[swizzle[2]] };
+                if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
+                    vk_die("failed to write pixel (%u, %u)", x, y);
+            } else if (packed) {
                 const uint16_t *pixel = data + pitch * y + cpp * x;
                 uint16_t val = *pixel;
                 if (format == VK_FORMAT_R5G5B5A1_UNORM_PACK16)
@@ -1768,6 +1782,18 @@ vk_create_query(struct vk *vk, VkQueryType type, uint32_t count)
         .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
         .queryType = type,
         .queryCount = count,
+        .pipelineStatistics =
+            VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_GEOMETRY_SHADER_INVOCATIONS_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_GEOMETRY_SHADER_PRIMITIVES_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_CONTROL_SHADER_PATCHES_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_EVALUATION_SHADER_INVOCATIONS_BIT |
+            VK_QUERY_PIPELINE_STATISTIC_COMPUTE_SHADER_INVOCATIONS_BIT,
     };
 
     vk->result = vk->CreateQueryPool(vk->dev, &info, NULL, &query->pool);
