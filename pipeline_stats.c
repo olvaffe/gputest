@@ -194,7 +194,7 @@ pipeline_stats_test_draw(struct pipeline_stats_test *test)
         vk_log("COMPUTE_SHADER_INVOCATIONS = %" PRIu64, stats[10]);
     }
 
-    //vk_dump_image(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
+    // vk_dump_image(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
 }
 
 int

@@ -50,6 +50,7 @@ tests = [
   'formats',
   'gs',
   'info',
+  'ktx',
   'msaa',
   'pipeline_stats',
   'push_const',
@@ -69,10 +70,6 @@ tests = [
 
 if dep_sdl2.found()
   tests += ['sdl']
-endif
-
-if dep_ktx.found()
-  tests += ['ktx']
 endif
 
 foreach t : tests
@@ -107,15 +104,21 @@ foreach t : tests
   endforeach
 
   test_deps = [idep_vkutil]
+  test_args = []
   if t == 'sdl'
     test_deps += [dep_sdl2]
   elif t == 'ktx'
-    test_deps += [dep_ktx]
+    if dep_ktx.found()
+      test_deps += [dep_ktx]
+    else
+      test_args += ['-DFAKEKTX']
+    endif
   endif
 
   executable(
     t,
     sources: [t + '.c', test_incs],
     dependencies: test_deps,
+    c_args: test_args,
   )
 endforeach

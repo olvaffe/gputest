@@ -5,8 +5,12 @@
 
 #include "vkutil.h"
 
+#ifdef FAKEKTX
+#include "fakektx.h"
+#else
 #include <ktx.h>
 #include <ktxvulkan.h>
+#endif
 
 static const uint32_t ktx_test_vs[] = {
 #include "ktx_test.vert.inc"
@@ -445,7 +449,7 @@ ktx_test_draw(struct ktx_test *test)
     vk_end_cmd(vk);
     vk_wait(vk);
 
-    vk_dump_image(vk, test->rt_img, VK_IMAGE_ASPECT_COLOR_BIT, "ktx.ppm");
+    vk_dump_image(vk, test->rt_img, VK_IMAGE_ASPECT_COLOR_BIT, "rt.ppm");
 }
 
 int
