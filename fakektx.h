@@ -97,22 +97,26 @@ ktxSupercompressionSchemeString(ktxSupercmpScheme scheme)
 }
 
 static inline KTX_error_code
-ktxTexture_CreateFromNamedFile(const char *const filename, uint32_t, ktxTexture **out_tex)
+ktxTexture_CreateFromNamedFile(const char *const filename,
+                               uint32_t createFlags,
+                               ktxTexture **out_tex)
 {
     vk_log("fakektx: 1 (ignoring %s)", filename);
-
-    const ktxTexture_protected tex_desc = {
-        .format = VK_FORMAT_ASTC_4x4_UNORM_BLOCK,
-        .blockWidth = 4,
-        .blockHeight = 4,
-        .blockSize = 16,
-    };
+    const VkFormat tex_format = VK_FORMAT_ASTC_4x4_UNORM_BLOCK;
+    const uint32_t tex_block_width = 4;
+    const uint32_t tex_block_height = 4;
+    const uint32_t tex_block_size = 16;
     static uint8_t tex_data[16] = {
         0xfc, 0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0x00, 0x00, 0x00, 0x40, 0x00, 0x80, 0x00, 0xc0,
     };
 
-    static ktxTexture_protected tex_protected = tex_desc;
+    static ktxTexture_protected tex_protected = {
+        .format = tex_format,
+        .blockWidth = tex_block_width,
+        .blockHeight = tex_block_height,
+        .blockSize = tex_block_size,
+    };
     static ktxTexture2 tex = {
         .base = {
             .classId = ktxTexture2_c,
@@ -121,8 +125,8 @@ ktxTexture_CreateFromNamedFile(const char *const filename, uint32_t, ktxTexture 
             .isCubemap = false,
             .isCompressed = true,
             .generateMipmaps = false,
-            .baseWidth = tex_desc.blockWidth,
-            .baseHeight = tex_desc.blockHeight,
+            .baseWidth = tex_block_width,
+            .baseHeight = tex_block_height,
             .baseDepth = 1,
             .numDimensions = 2,
             .numLevels = 1,
@@ -139,7 +143,7 @@ ktxTexture_CreateFromNamedFile(const char *const filename, uint32_t, ktxTexture 
             .dataSize = sizeof(tex_data),
             .pData = tex_data,
         },
-        .vkFormat = tex_desc.format,
+        .vkFormat = tex_format,
         .pDfd = NULL,
         .supercompressionScheme = KTX_SS_NONE,
         .isVideo = false,
@@ -154,7 +158,7 @@ ktxTexture_CreateFromNamedFile(const char *const filename, uint32_t, ktxTexture 
 }
 
 static inline void
-ktxTexture_Destroy(ktxTexture *)
+ktxTexture_Destroy(ktxTexture *tex)
 {
 }
 
@@ -167,7 +171,8 @@ ktxTexture_GetDataSizeUncompressed(ktxTexture *tex)
 }
 
 static inline KTX_error_code
-ktxTexture_GetImageOffset(ktxTexture *tex, uint32_t, uint32_t, uint32_t, size_t *pOffset)
+ktxTexture_GetImageOffset(
+    ktxTexture *tex, uint32_t level, uint32_t layer, uint32_t faceSlice, size_t *pOffset)
 {
     assert(tex->numLevels == 1 && tex->numLayers == 1 && tex->numFaces == 1);
     *pOffset = 0;
@@ -175,14 +180,14 @@ ktxTexture_GetImageOffset(ktxTexture *tex, uint32_t, uint32_t, uint32_t, size_t 
 }
 
 static inline size_t
-ktxTexture_GetImageSize(ktxTexture *tex, uint32_t)
+ktxTexture_GetImageSize(ktxTexture *tex, uint32_t level)
 {
     assert(tex->numLevels == 1);
     return ktxTexture_GetDataSizeUncompressed(tex);
 }
 
 static inline uint32_t
-ktxTexture_GetRowPitch(ktxTexture *tex, uint32_t)
+ktxTexture_GetRowPitch(ktxTexture *tex, uint32_t level)
 {
     assert(tex->numLevels == 1);
     return (tex->baseWidth + tex->_protected->blockWidth - 1) / tex->_protected->blockWidth *
@@ -196,19 +201,19 @@ ktxTexture_GetElementSize(ktxTexture *tex)
 }
 
 static inline ktxHashListEntry *
-ktxHashList_Next(ktxHashListEntry *)
+ktxHashList_Next(ktxHashListEntry *entry)
 {
     return NULL;
 }
 
 static inline KTX_error_code
-ktxHashListEntry_GetKey(ktxHashListEntry *, unsigned int *, char **)
+ktxHashListEntry_GetKey(ktxHashListEntry *entry, unsigned int *pKeyLen, char **ppKey)
 {
     return -1;
 }
 
 static inline KTX_error_code
-ktxHashListEntry_GetValue(ktxHashListEntry *, unsigned int *, void **)
+ktxHashListEntry_GetValue(ktxHashListEntry *entry, unsigned int *pValueLen, void **ppValue)
 {
     return -1;
 }
