@@ -268,6 +268,10 @@ PFN_DEVICE(GetDeviceGroupSurfacePresentModesKHR)
 PFN_DEVICE(GetPhysicalDevicePresentRectanglesKHR)
 PFN_DEVICE(AcquireNextImage2KHR)
 
+/* VK_KHR_external_memory_fd */
+PFN_DEVICE(GetMemoryFdKHR)
+PFN_DEVICE(GetMemoryFdPropertiesKHR)
+
 #undef PFN_ALL
 #undef PFN_GPIA
 #undef PFN_GLOBAL
