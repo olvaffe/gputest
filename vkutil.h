@@ -12,6 +12,7 @@
 #include <drm_fourcc.h>
 #include <inttypes.h>
 #include <math.h>
+#include <stdalign.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -19,6 +20,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <time.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_android.h>
@@ -32,9 +35,12 @@
 #define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
 #define NORETURN __attribute__((noreturn))
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+#define ALIGN(v, a) (((v) + (a)-1) & ~((a)-1))
 #define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_1
 
 struct vk_init_params {
+    const char *render_node;
+
     uint32_t api_version;
     bool enable_all_features;
     bool protected_memory;
@@ -48,6 +54,9 @@ struct vk_init_params {
 
 struct vk {
     struct vk_init_params params;
+    bool KHR_swapchain;
+    bool EXT_custom_border_color;
+    bool EXT_physical_device_drm;
 
     struct {
         void *handle;
@@ -61,13 +70,12 @@ struct vk {
 
     VkPhysicalDevice physical_dev;
 
-    bool KHR_swapchain;
-    bool EXT_custom_border_color;
-
     VkPhysicalDeviceProperties2 props;
     VkPhysicalDeviceVulkan11Properties vulkan_11_props;
     VkPhysicalDeviceVulkan12Properties vulkan_12_props;
     VkPhysicalDeviceVulkan13Properties vulkan_13_props;
+
+    VkPhysicalDeviceDrmPropertiesEXT drm_props;
 
     VkPhysicalDeviceFeatures2 features;
     VkPhysicalDeviceVulkan11Features vulkan_11_features;
@@ -260,6 +268,24 @@ vk_sleep(uint32_t ms)
 }
 
 static inline void
+vk_init_params(struct vk *vk, const struct vk_init_params *params)
+{
+    if (params)
+        vk->params = *params;
+    if (vk->params.api_version < VKUTIL_MIN_API_VERSION)
+        vk->params.api_version = VKUTIL_MIN_API_VERSION;
+
+    for (uint32_t i = 0; i < vk->params.dev_ext_count; i++) {
+        if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_EXTENSION_NAME))
+            vk->KHR_swapchain = true;
+        else if (!strcmp(vk->params.dev_exts[i], VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME))
+            vk->EXT_custom_border_color = true;
+        else if (!strcmp(vk->params.dev_exts[i], VK_EXT_PHYSICAL_DEVICE_DRM_EXTENSION_NAME))
+            vk->EXT_physical_device_drm = true;
+    }
+}
+
+static inline void
 vk_init_global_dispatch(struct vk *vk)
 {
 #define PFN_GLOBAL(name) vk->name = (PFN_vk##name)vk->GetInstanceProcAddr(NULL, "vk" #name);
@@ -400,34 +426,49 @@ vk_init_physical_device_properties(struct vk *vk)
         pnext = &vk->vulkan_13_props.pNext;
     }
 
-    vk->GetPhysicalDeviceProperties2(vk->physical_dev, &vk->props);
-    if (vk->props.properties.apiVersion < vk->params.api_version) {
-        vk_die("physical device api version %d < %d", vk->props.properties.apiVersion,
-               vk->params.api_version);
+    if (vk->EXT_physical_device_drm) {
+        vk->drm_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRM_PROPERTIES_EXT;
+        *pnext = &vk->drm_props;
+        pnext = &vk->drm_props.pNext;
     }
-}
 
-static inline void
-vk_init_physical_device_extensions(struct vk *vk)
-{
-    for (uint32_t i = 0; i < vk->params.dev_ext_count; i++) {
-        if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_EXTENSION_NAME))
-            vk->KHR_swapchain = true;
-        else if (!strcmp(vk->params.dev_exts[i], VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME))
-            vk->EXT_custom_border_color = true;
-    }
+    vk->GetPhysicalDeviceProperties2(vk->physical_dev, &vk->props);
 }
 
 static inline void
 vk_init_physical_device(struct vk *vk)
 {
-    uint32_t count = 1;
-    vk->result = vk->EnumeratePhysicalDevices(vk->instance, &count, &vk->physical_dev);
+    VkPhysicalDevice physical_devs[32];
+    uint32_t count = vk->params.render_node ? ARRAY_SIZE(physical_devs) : 1;
+    vk->result = vk->EnumeratePhysicalDevices(vk->instance, &count, physical_devs);
     if (vk->result < VK_SUCCESS || !count)
         vk_die("failed to enumerate physical devices");
 
-    vk_init_physical_device_extensions(vk);
-    vk_init_physical_device_properties(vk);
+    for (uint32_t i = 0; i < count; i++) {
+        vk->physical_dev = physical_devs[i];
+        vk_init_physical_device_properties(vk);
+        if (!vk->params.render_node)
+            break;
+
+        if (!vk->EXT_physical_device_drm)
+            vk_die("no VK_EXT_physical_device_drm");
+
+        struct stat sb;
+        if (stat(vk->params.render_node, &sb) || !S_ISCHR(sb.st_mode))
+            vk_die("bad render node %s", vk->params.render_node);
+        if (makedev(vk->drm_props.primaryMajor, vk->drm_props.primaryMinor) == sb.st_rdev ||
+            makedev(vk->drm_props.renderMajor, vk->drm_props.renderMinor) == sb.st_rdev)
+            break;
+
+        vk->physical_dev = NULL;
+    }
+    if (!vk->physical_dev)
+        vk_die("failed to find the physical device for %s", vk->params.render_node);
+    if (vk->props.properties.apiVersion < vk->params.api_version) {
+        vk_die("physical device api version %d < %d", vk->props.properties.apiVersion,
+               vk->params.api_version);
+    }
+
     vk_init_physical_device_features(vk);
     vk_init_physical_device_memory_properties(vk);
 }
@@ -605,13 +646,9 @@ static inline void
 vk_init(struct vk *vk, const struct vk_init_params *params)
 {
     memset(vk, 0, sizeof(*vk));
-    if (params)
-        vk->params = *params;
-    if (vk->params.api_version < VKUTIL_MIN_API_VERSION)
-        vk->params.api_version = VKUTIL_MIN_API_VERSION;
 
+    vk_init_params(vk, params);
     vk_init_library(vk);
-
     vk_init_instance(vk);
 
     vk_init_physical_device(vk);

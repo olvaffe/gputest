@@ -31,8 +31,6 @@ struct buf_align_test {
     struct vk_event *cpu_done;
 };
 
-#define ALIGN(OFFSET, ALIGN) (((OFFSET) + (ALIGN)-1) & ~((ALIGN)-1))
-
 static void
 buf_align_test_init(struct buf_align_test *test)
 {
