@@ -37,6 +37,7 @@
 struct vk_init_params {
     uint32_t api_version;
     bool enable_all_features;
+    bool protected_memory;
 
     const char *const *instance_exts;
     uint32_t instance_ext_count;
@@ -76,6 +77,7 @@ struct vk {
     VkPhysicalDeviceSamplerYcbcrConversionFeatures sampler_ycbcr_conversion_features;
     VkPhysicalDeviceHostQueryResetFeatures host_query_reset_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
+    VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features;
 
     VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t buf_mt_index;
@@ -87,9 +89,11 @@ struct vk {
     VkDescriptorPool desc_pool;
 
     VkCommandPool cmd_pool;
+    VkCommandPool protected_cmd_pool;
     struct {
         VkCommandBuffer cmds[4];
         VkFence fences[4];
+        bool protected[4];
         uint32_t count;
         uint32_t next;
     } submit;
@@ -365,6 +369,13 @@ vk_init_physical_device_features(struct vk *vk)
     *pnext = &vk->custom_border_color_features;
     pnext = &vk->custom_border_color_features.pNext;
 
+    if (vk->params.protected_memory) {
+        vk->protected_memory_features.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES;
+        *pnext = &vk->protected_memory_features;
+        pnext = &vk->protected_memory_features.pNext;
+    }
+
     vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
 }
 
@@ -442,11 +453,18 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     if (!vk->features.features.fillModeNonSolid)
         vk_die("no non-solid fill mode support");
     if (vk->params.api_version >= VK_API_VERSION_1_2) {
+        if (vk->params.protected_memory && !vk->vulkan_11_features.protectedMemory)
+            vk_die("no protected memory support");
+
         // if (!vk->vulkan_11_features.samplerYcbcrConversion)
         //     vk_die("no ycbcr conversion support");
+
         if (!vk->vulkan_12_features.hostQueryReset)
             vk_die("no host query reset support");
     } else {
+        if (vk->params.protected_memory && !vk->protected_memory_features.protectedMemory)
+            vk_die("no protected memory support");
+
         // if (!vk->sampler_ycbcr_conversion_features.samplerYcbcrConversion)
         //     vk_die("no ycbcr conversion support");
     }
@@ -482,6 +500,10 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
         *pnext = &vk->custom_border_color_features;
         pnext = &vk->custom_border_color_features.pNext;
     }
+    if (vk->params.protected_memory) {
+        *pnext = &vk->protected_memory_features;
+        pnext = &vk->protected_memory_features.pNext;
+    }
 
     *pnext = NULL;
 }
@@ -499,6 +521,8 @@ vk_init_device(struct vk *vk)
     vk->GetPhysicalDeviceQueueFamilyProperties(vk->physical_dev, &queue_count, &queue_props);
     if (!(queue_props.queueFlags & VK_QUEUE_GRAPHICS_BIT))
         vk_die("queue family 0 does not support graphics");
+    if (vk->params.protected_memory && !(queue_props.queueFlags & VK_QUEUE_PROTECTED_BIT))
+        vk_die("queue family 0 does not support protected");
     if (!queue_props.timestampValidBits)
         vk_die("queue family 0 does not support timestamps");
 
@@ -509,6 +533,7 @@ vk_init_device(struct vk *vk)
         .pQueueCreateInfos =
             &(VkDeviceQueueCreateInfo){
                 .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                .flags = vk->params.protected_memory ? VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT : 0,
                 .queueFamilyIndex = vk->queue_family_index,
                 .queueCount = 1,
                 .pQueuePriorities = &(float){ 1.0f },
@@ -521,7 +546,12 @@ vk_init_device(struct vk *vk)
 
     vk_init_device_dispatch(vk);
 
-    vk->GetDeviceQueue(vk->dev, vk->queue_family_index, 0, &vk->queue);
+    const VkDeviceQueueInfo2 queue_info = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2,
+        .flags = vk->params.protected_memory ? VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT : 0,
+        .queueFamilyIndex = vk->queue_family_index,
+    };
+    vk->GetDeviceQueue2(vk->dev, &queue_info, &vk->queue);
 }
 
 static inline void
@@ -555,7 +585,7 @@ vk_init_desc_pool(struct vk *vk)
 static inline void
 vk_init_cmd_pool(struct vk *vk)
 {
-    const VkCommandPoolCreateInfo pool_info = {
+    VkCommandPoolCreateInfo pool_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         .queueFamilyIndex = vk->queue_family_index,
@@ -563,6 +593,12 @@ vk_init_cmd_pool(struct vk *vk)
 
     vk->result = vk->CreateCommandPool(vk->dev, &pool_info, NULL, &vk->cmd_pool);
     vk_check(vk, "failed to create command pool");
+
+    if (vk->params.protected_memory) {
+        pool_info.flags |= VK_COMMAND_POOL_CREATE_PROTECTED_BIT;
+        vk->result = vk->CreateCommandPool(vk->dev, &pool_info, NULL, &vk->protected_cmd_pool);
+        vk_check(vk, "failed to create protected command pool");
+    }
 }
 
 static inline void
@@ -585,6 +621,7 @@ vk_init(struct vk *vk, const struct vk_init_params *params)
     vk_init_cmd_pool(vk);
 
     static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.fences), "");
+    static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.protected), "");
     vk->submit.count = ARRAY_SIZE(vk->submit.cmds);
 
     /* avoid accessing dangling pointers */
@@ -630,7 +667,10 @@ vk_alloc_memory(struct vk *vk, VkDeviceSize size, uint32_t mt_index)
 }
 
 static inline struct vk_buffer *
-vk_create_buffer(struct vk *vk, VkDeviceSize size, VkBufferUsageFlags usage)
+vk_create_buffer(struct vk *vk,
+                 VkBufferCreateFlags flags,
+                 VkDeviceSize size,
+                 VkBufferUsageFlags usage)
 {
     struct vk_buffer *buf = calloc(1, sizeof(*buf));
     if (!buf)
@@ -638,6 +678,7 @@ vk_create_buffer(struct vk *vk, VkDeviceSize size, VkBufferUsageFlags usage)
 
     buf->info = (VkBufferCreateInfo){
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .flags = flags,
         .size = size,
         .usage = usage,
     };
@@ -1810,13 +1851,14 @@ vk_destroy_query(struct vk *vk, struct vk_query *query)
 }
 
 static inline VkCommandBuffer
-vk_begin_cmd(struct vk *vk)
+vk_begin_cmd(struct vk *vk, bool prot)
 {
     VkCommandBuffer *cmd = &vk->submit.cmds[vk->submit.next];
     VkFence *fence = &vk->submit.fences[vk->submit.next];
+    bool *protected = &vk->submit.protected[vk->submit.next];
 
     /* reuse or allocate */
-    if (*cmd) {
+    if (*cmd && *protected == prot) {
         vk->result = vk->WaitForFences(vk->dev, 1, fence, true, UINT64_MAX);
         vk_check(vk, "failed to wait fence");
 
@@ -1826,9 +1868,14 @@ vk_begin_cmd(struct vk *vk)
         vk->result = vk->ResetFences(vk->dev, 1, fence);
         vk_check(vk, "failed to reset fence");
     } else {
+        if (*cmd) {
+            vk->FreeCommandBuffers(vk->dev, *protected ? vk->protected_cmd_pool : vk->cmd_pool, 1,
+                                   cmd);
+        }
+
         const VkCommandBufferAllocateInfo alloc_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-            .commandPool = vk->cmd_pool,
+            .commandPool = prot ? vk->protected_cmd_pool : vk->cmd_pool,
             .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
             .commandBufferCount = 1,
         };
@@ -1841,6 +1888,8 @@ vk_begin_cmd(struct vk *vk)
         };
         vk->result = vk->CreateFence(vk->dev, &fence_info, NULL, fence);
         vk_check(vk, "failed to create fence");
+
+        *protected = prot;
     }
 
     const VkCommandBufferBeginInfo begin_info = {
@@ -1857,6 +1906,7 @@ vk_end_cmd(struct vk *vk)
 {
     VkCommandBuffer cmd = vk->submit.cmds[vk->submit.next];
     VkFence fence = vk->submit.fences[vk->submit.next];
+    bool protected = vk->submit.protected[vk->submit.next];
 
     /* increment */
     vk->submit.next = (vk->submit.next + 1) % vk->submit.count;
@@ -1864,8 +1914,13 @@ vk_end_cmd(struct vk *vk)
     vk->result = vk->EndCommandBuffer(cmd);
     vk_check(vk, "failed to end command buffer");
 
+    const VkProtectedSubmitInfo protected_info = {
+        .sType = VK_STRUCTURE_TYPE_PROTECTED_SUBMIT_INFO,
+        .protectedSubmit = protected,
+    };
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pNext = &protected_info,
         .commandBufferCount = 1,
         .pCommandBuffers = &cmd,
     };

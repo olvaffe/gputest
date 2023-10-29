@@ -115,7 +115,8 @@ tri_test_init_vb(struct tri_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb = vk_create_buffer(vk, sizeof(tri_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    test->vb =
+        vk_create_buffer(vk, 0, sizeof(tri_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, tri_test_vertices, sizeof(tri_test_vertices));
 }
 
@@ -218,7 +219,7 @@ tri_test_draw(struct tri_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     tri_test_draw_triangle(test, cmd);
 

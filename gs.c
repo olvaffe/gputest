@@ -111,7 +111,8 @@ gs_test_init_vb(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb = vk_create_buffer(vk, sizeof(gs_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    test->vb =
+        vk_create_buffer(vk, 0, sizeof(gs_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, gs_test_vertices, sizeof(gs_test_vertices));
 }
 
@@ -210,7 +211,7 @@ gs_test_draw(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     gs_test_draw_points(test, cmd);
 

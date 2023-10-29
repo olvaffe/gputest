@@ -213,7 +213,7 @@ sdl_test_draw(struct sdl_test *test, struct vk_image *img)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     const VkImageSubresourceRange subres_range = {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,

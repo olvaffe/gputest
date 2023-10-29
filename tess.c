@@ -113,7 +113,7 @@ tess_test_init_vb(struct tess_test *test)
     struct vk *vk = &test->vk;
 
     test->vb =
-        vk_create_buffer(vk, sizeof(tess_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        vk_create_buffer(vk, 0, sizeof(tess_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, tess_test_vertices, sizeof(tess_test_vertices));
 }
 
@@ -212,7 +212,7 @@ tess_test_draw(struct tess_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     tess_test_draw_triangle(test, cmd);
 

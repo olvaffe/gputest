@@ -108,7 +108,7 @@ msaa_test_init_vb(struct msaa_test *test)
     struct vk *vk = &test->vk;
 
     test->vb =
-        vk_create_buffer(vk, sizeof(msaa_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        vk_create_buffer(vk, 0, sizeof(msaa_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, msaa_test_vertices, sizeof(msaa_test_vertices));
 }
 
@@ -219,7 +219,7 @@ msaa_test_draw(struct msaa_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     msaa_test_draw_triangle(test, cmd);
 

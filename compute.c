@@ -60,7 +60,7 @@ compute_test_init_ssbo(struct compute_test *test)
     test->grid_size = (uint32_t)sqrt((double)(limits->maxStorageBufferRange / sizeof(uint32_t)));
 
     VkDeviceSize size = test->grid_size * test->grid_size * sizeof(uint32_t);
-    test->ssbo = vk_create_buffer(vk, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    test->ssbo = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     memset(test->ssbo->mem_ptr, 0, size);
 }
 
@@ -119,7 +119,7 @@ compute_test_dispatch(struct compute_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     compute_test_dispatch_ssbo(test, cmd);
 

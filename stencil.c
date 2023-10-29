@@ -37,12 +37,12 @@ stencil_test_init_buffers(struct stencil_test *test)
     if (test->depth_bits) {
         VkDeviceSize size = test->width * test->height;
         size *= (test->depth_bits == 24 ? 32 : test->depth_bits) / 8;
-        test->z_buf = vk_create_buffer(vk, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+        test->z_buf = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     }
 
     if (test->stencil_bits) {
         const VkDeviceSize size = test->width * test->height * test->stencil_bits / 8;
-        test->s_buf = vk_create_buffer(vk, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+        test->s_buf = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     }
 }
 
@@ -259,7 +259,7 @@ stencil_test_draw(struct stencil_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     stencil_test_draw_triangle(test, cmd);
 

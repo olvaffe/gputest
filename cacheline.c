@@ -20,7 +20,7 @@ cacheline_test_init_buf(struct cacheline_test *test)
     struct vk *vk = &test->vk;
 
     const VkDeviceSize size = test->dword_count * 4;
-    test->buf = vk_create_buffer(vk, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    test->buf = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 }
 
 static void
@@ -70,7 +70,7 @@ cacheline_test_draw(struct cacheline_test *test)
     memset(test->buf->mem_ptr, 0, test->dword_count * 4);
 
     /* step 2: build a command to write dword 1 and 2 */
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     const VkBufferMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,

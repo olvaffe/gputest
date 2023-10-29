@@ -93,7 +93,7 @@ clear_depth_test_init(struct clear_depth_test *test)
     }
 
     const VkDeviceSize buf_size = test->depth_size + test->stencil_size;
-    test->buf = vk_create_buffer(vk, buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    test->buf = vk_create_buffer(vk, 0, buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     memset(test->buf->mem_ptr, 0xcd, buf_size);
 }
 
@@ -259,7 +259,7 @@ clear_depth_test_draw(struct clear_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     clear_depth_test_clear(test, cmd);
 

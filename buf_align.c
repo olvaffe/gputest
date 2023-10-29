@@ -83,7 +83,7 @@ buf_align_test_init(struct buf_align_test *test)
     test->src_buf_ptr = (void *)((uint8_t *)test->mem_ptr + mem_offset);
     vk_log("suballoc src_buf of size=%" PRIu64 " at offset=%" PRIu64 "", reqs.size, mem_offset);
 
-    test->buf_with_mem = vk_create_buffer(vk, test->buf_size, test->buf_usage);
+    test->buf_with_mem = vk_create_buffer(vk, 0, test->buf_size, test->buf_usage);
     test->dst_buf = test->buf_with_mem->buf;
     test->dst_buf_ptr = test->buf_with_mem->mem_ptr;
     vk_log("allocate dst_buf of size=%" PRIu64 " from separate memory", reqs.size);
@@ -147,7 +147,7 @@ buf_align_test_draw(struct buf_align_test *test)
     memset(test->buf_with_mem->mem_ptr, 0, test->buf_with_mem->mem_size);
 
     /* step 2: build a command to write 1 to disturb */
-    VkCommandBuffer cmd1 = vk_begin_cmd(vk);
+    VkCommandBuffer cmd1 = vk_begin_cmd(vk, false);
     const VkBufferMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
         .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -187,7 +187,7 @@ buf_align_test_draw(struct buf_align_test *test)
     vk_log("dst_buf = %u", *test->dst_buf_ptr);
 
     /* step 5: build a command to blit src_buf to dst_buf */
-    VkCommandBuffer cmd2 = vk_begin_cmd(vk);
+    VkCommandBuffer cmd2 = vk_begin_cmd(vk, false);
     const VkBufferMemoryBarrier src_buf_barrier = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
         .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,

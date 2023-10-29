@@ -163,7 +163,7 @@ dynamic_rendering_test_draw(struct dynamic_rendering_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     dynamic_rendering_test_draw_triangle(test, cmd);
 

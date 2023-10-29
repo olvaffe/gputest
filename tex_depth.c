@@ -119,8 +119,8 @@ tex_depth_test_init_vb(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb =
-        vk_create_buffer(vk, sizeof(tex_depth_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    test->vb = vk_create_buffer(vk, 0, sizeof(tex_depth_test_vertices),
+                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, tex_depth_test_vertices, sizeof(tex_depth_test_vertices));
 }
 
@@ -269,7 +269,7 @@ tex_depth_test_draw(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     tex_depth_test_draw_prep_texture(test, cmd);
     tex_depth_test_draw_triangle(test, cmd);

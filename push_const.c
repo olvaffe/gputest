@@ -105,7 +105,7 @@ push_const_test_init_ubo(struct push_const_test *test)
         0.0f,
     };
 
-    test->ubo = vk_create_buffer(vk, sizeof(color), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    test->ubo = vk_create_buffer(vk, 0, sizeof(color), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     memcpy(test->ubo->mem_ptr, color, sizeof(color));
 }
 
@@ -210,7 +210,7 @@ push_const_draw(struct push_const_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     push_const_draw_triangle(test, cmd);
 

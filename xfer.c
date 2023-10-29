@@ -129,7 +129,7 @@ static VkCommandBuffer
 xfer_test_begin_cmd(struct xfer_test *test)
 {
     struct vk *vk = &test->vk;
-    test->cmd = vk_begin_cmd(vk);
+    test->cmd = vk_begin_cmd(vk, false);
     return test->cmd;
 }
 
@@ -144,7 +144,7 @@ xfer_test_begin_buffer(struct xfer_test *test, VkBufferUsageFlags usage)
     if (test->buf_count >= ARRAY_SIZE(test->bufs))
         vk_die("too many buffers");
 
-    struct vk_buffer *buf = vk_create_buffer(vk, test->buf_size, usage);
+    struct vk_buffer *buf = vk_create_buffer(vk, 0, test->buf_size, usage);
     test->bufs[test->buf_count++] = buf;
     return buf;
 }

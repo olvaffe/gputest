@@ -96,7 +96,7 @@ clear_test_draw(struct clear_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     clear_test_clear(test, cmd);
 

@@ -89,7 +89,7 @@ timestamp_test_draw_same_cmd(struct timestamp_test *test)
     vk->ResetQueryPool(vk->dev, test->query->pool, 0, 2);
     vk->ResetEvent(vk->dev, test->event->event);
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     vk->CmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, test->query->pool, 0);
     vk->CmdWaitEvents(cmd, 1, &test->event->event, VK_PIPELINE_STAGE_HOST_BIT,
@@ -115,14 +115,14 @@ timestamp_test_draw_two_cmds(struct timestamp_test *test)
 
     vk->ResetQueryPool(vk->dev, test->query->pool, 0, 2);
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
     vk->CmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, test->query->pool, 0);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     vk_sleep(test->sleep);
 
-    cmd = vk_begin_cmd(vk);
+    cmd = vk_begin_cmd(vk, false);
     vk->CmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, test->query->pool, 1);
     vk_end_cmd(vk);
     vk_wait(vk);
@@ -167,7 +167,7 @@ timestamp_test_draw_mixed(struct timestamp_test *test)
 
     vk_sleep(test->sleep / 2);
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
     vk->CmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, test->query->pool, 0);
     vk_end_cmd(vk);
     vk_wait(vk);

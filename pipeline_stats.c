@@ -168,7 +168,7 @@ pipeline_stats_test_draw(struct pipeline_stats_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     pipeline_stats_test_draw_triangle(test, cmd);
 

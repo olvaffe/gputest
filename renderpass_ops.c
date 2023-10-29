@@ -138,7 +138,7 @@ static VkCommandBuffer
 renderpass_ops_test_begin_cmd(struct renderpass_ops_test *test)
 {
     struct vk *vk = &test->vk;
-    test->cmd = vk_begin_cmd(vk);
+    test->cmd = vk_begin_cmd(vk, false);
     return test->cmd;
 }
 

@@ -112,7 +112,8 @@ tex_test_init_vb(struct tex_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb = vk_create_buffer(vk, sizeof(tex_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    test->vb =
+        vk_create_buffer(vk, 0, sizeof(tex_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, tex_test_vertices, sizeof(tex_test_vertices));
 }
 
@@ -259,7 +260,7 @@ tex_test_draw(struct tex_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     tex_test_draw_prep_texture(test, cmd);
     tex_test_draw_triangle(test, cmd);

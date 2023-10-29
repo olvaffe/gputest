@@ -265,7 +265,7 @@ ktx_test_init_staging_buffer(struct ktx_test *test)
     struct vk *vk = &test->vk;
     ktxTexture *tex = test->tex;
 
-    test->staging_buf = vk_create_buffer(vk, tex->dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    test->staging_buf = vk_create_buffer(vk, 0, tex->dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
     memcpy(test->staging_buf->mem_ptr, tex->pData, tex->dataSize);
 }
 
@@ -443,7 +443,7 @@ ktx_test_draw(struct ktx_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
     ktx_test_draw_prep_texture(test, cmd);
     ktx_test_draw_quad(test, cmd);
     vk_end_cmd(vk);
