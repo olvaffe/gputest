@@ -230,10 +230,12 @@ ktx_test_init_texture_image(struct ktx_test *test)
     VkImageCreateFlags flags = 0;
     if (tex->isCubemap)
         flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+#if 0
     if (tex->isCompressed) {
         flags |=
             VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT;
     }
+#endif
 
     const VkImageCreateInfo img_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -362,7 +364,8 @@ ktx_test_draw_quad(struct ktx_test *test, VkCommandBuffer cmd)
 
     const struct ktx_test_push_const push = {
         .view_type = test->tex_img->sample_view_type,
-        .slice = test->slice,
+        .slice =
+            (float)test->slice / (test->tex->baseDepth == 1 ? 1 : (test->tex->baseDepth - 1)),
     };
     vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(push), &push);
@@ -408,7 +411,7 @@ ktx_test_draw_prep_texture(struct ktx_test *test, VkCommandBuffer cmd)
     VkBufferImageCopy *copies = malloc(sizeof(*copies) * tex->numLevels);
     if (!copies)
         vk_die("failed to alloc copies");
-    for (int i = tex->numLevels - 1; i >= 0; i--) {
+    for (uint32_t i = 0; i < tex->numLevels; i++) {
         ktx_size_t offset;
         ktxTexture_GetImageOffset(tex, i, 0, 0, &offset);
 

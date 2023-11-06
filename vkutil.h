@@ -32,11 +32,14 @@
 #define LIBVULKAN_NAME "libvulkan.so.1"
 #endif
 
+#define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_1
+
 #define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
 #define NORETURN __attribute__((noreturn))
+
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define ALIGN(v, a) (((v) + (a)-1) & ~((a)-1))
-#define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_1
+#define DIV_ROUND_UP(v, d) (((v) + (d)-1) / (d))
 
 struct vk_init_params {
     const char *render_node;
