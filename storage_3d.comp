@@ -1,0 +1,24 @@
+/*
+ * Copyright 2022 Google LLC
+ * SPDX-License-Identifier: MIT
+ */
+
+#version 460 core
+
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+layout(binding = 0, rgba8ui) uniform writeonly uimage3D img;
+
+layout(push_constant) uniform CONSTS {
+    uint level;
+} consts;
+
+void main()
+{
+    ivec3 coord = ivec3(gl_GlobalInvocationID);
+    uvec4 val = uvec4(coord.x & 0xff,
+                      coord.y & 0xff,
+                      coord.z & 0xff,
+                      consts.level & 0xff);
+    imageStore(img, coord, val);
+}

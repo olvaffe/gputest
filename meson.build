@@ -58,6 +58,7 @@ tests = [
   'renderpass_ops',
   'separate_ds',
   'stencil',
+  'storage_3d',
   'tess',
   'tex',
   'tex_depth',
