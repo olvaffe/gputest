@@ -74,15 +74,19 @@ depth_resolve_test_init_images(struct depth_resolve_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->ds =
-        vk_create_image(vk, test->format, test->width, test->height, test->sample_count,
-                        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    /* this triggers a bug on radv on gfx9 */
+    const VkImageUsageFlags extra_usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    test->ds = vk_create_image(vk, test->format, test->width, test->height, test->sample_count,
+                               VK_IMAGE_TILING_OPTIMAL,
+                               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | extra_usage);
     vk_create_image_render_view(vk, test->ds, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    test->resolve = vk_create_image(
-        vk, test->format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    test->resolve =
+        vk_create_image(vk, test->format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
+                        VK_IMAGE_TILING_OPTIMAL,
+                        VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | extra_usage);
     vk_create_image_render_view(vk, test->resolve, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
@@ -248,35 +252,45 @@ depth_resolve_test_draw(struct depth_resolve_test *test)
     vk_end_cmd(vk);
     vk_wait(vk);
 
+    float prev_z = 0.0f;
     for (uint32_t y = 0; y < test->height; y++) {
         const uint32_t pitch = test->width * test->format_bits / 8;
         const void *row = test->buf->mem_ptr + y * pitch;
 
         const uint32_t x = test->width - 1;
-        const void *z = row + x * test->format_bits / 8;
+        const void *pixel = row + x * test->format_bits / 8;
 
         union {
-            uint16_t u16;
-            uint32_t u24;
             uint32_t u32;
             float f32;
-        } u;
+        } val;
+        float z;
         switch (test->format_bits) {
         case 16:
-            u.u16 = *((const uint16_t *)z);
-            vk_log("z[%d][%d] = %.2f (0x%04x)", x, y, (float)u.u16 / 0xffff, u.u16);
+            val.u32 = *((const uint16_t *)pixel);
+            z = (float)val.u32 / 0xffff;
+            if (y == 0 || y == test->height - 1)
+                vk_log("z[%d][%d] = %f (0x%04x)", x, y, z, val.u32);
             break;
         case 24:
-            u.u24 = *((const uint32_t *)z);
-            vk_log("z[%d][%d] = %.2f (0x%06x)", x, y, (float)u.u24 / 0xffffff, u.u24);
+            val.u32 = *((const uint32_t *)pixel);
+            z = (float)val.u32 / 0xffffff;
+            if (y == 0 || y == test->height - 1)
+                vk_log("z[%d][%d] = %f (0x%06x)", x, y, z, val.u32);
             break;
         case 32:
-            u.u32 = *((const uint32_t *)z);
-            vk_log("z[%d][%d] = %.2f", x, y, u.f32);
+            val.u32 = *((const uint32_t *)pixel);
+            z = val.f32;
+            if (y == 0 || y == test->height - 1)
+                vk_log("z[%d][%d] = %f", x, y, z);
             break;
         default:
             vk_die("bad format bits");
         }
+
+        if (z < prev_z)
+            vk_die("z[%d][%d] = %f < %f", x, y, z, prev_z);
+        prev_z = z;
     }
 }
 
