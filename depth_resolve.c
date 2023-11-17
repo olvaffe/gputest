@@ -128,6 +128,15 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
 {
     struct vk *vk = &test->vk;
 
+#if 1
+    const VkImageLayout ds_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    const VkImageLayout resolve_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+#else
+    /* even using the general layout, we still see the issue on radv gfx9 */
+    const VkImageLayout ds_layout = VK_IMAGE_LAYOUT_GENERAL;
+    const VkImageLayout resolve_layout = VK_IMAGE_LAYOUT_GENERAL;
+#endif
+
     const VkImageMemoryBarrier before_barriers[2] = {
         [0] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -135,7 +144,7 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
             .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .newLayout = ds_layout,
             .image = test->ds->img,
             .subresourceRange = {
                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -149,7 +158,7 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
             .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
                              VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .newLayout = resolve_layout,
             .image = test->resolve->img,
             .subresourceRange = {
                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -175,10 +184,10 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
         .pDepthAttachment = &(VkRenderingAttachmentInfo){
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = test->ds->render_view,
-            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .imageLayout = ds_layout,
             .resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT,
             .resolveImageView = test->resolve->render_view,
-            .resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .resolveImageLayout = resolve_layout,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .clearValue = {
@@ -199,7 +208,7 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
             .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
                              VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
             .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .oldLayout = resolve_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             .image = test->resolve->img,
             .subresourceRange = {
@@ -273,7 +282,7 @@ depth_resolve_test_draw(struct depth_resolve_test *test)
                 vk_log("z[%d][%d] = %f (0x%04x)", x, y, z, val.u32);
             break;
         case 24:
-            val.u32 = *((const uint32_t *)pixel);
+            val.u32 = *((const uint32_t *)pixel) & 0xffffff;
             z = (float)val.u32 / 0xffffff;
             if (y == 0 || y == test->height - 1)
                 vk_log("z[%d][%d] = %f (0x%06x)", x, y, z, val.u32);
@@ -295,7 +304,7 @@ depth_resolve_test_draw(struct depth_resolve_test *test)
 }
 
 int
-main(void)
+main(int argc, char **argv)
 {
     struct depth_resolve_test test = {
         .format = VK_FORMAT_D16_UNORM,
@@ -303,6 +312,42 @@ main(void)
         .width = 119,
         .height = 131,
         .sample_count = VK_SAMPLE_COUNT_4_BIT,
+    };
+
+    if (argc != 1 && argc != 5)
+        vk_die("usage: %s [<format_bits> <width> <height> <sample_count>]", argv[0]);
+
+    if (argc == 5) {
+        test.format_bits = atoi(argv[1]);
+        test.width = atoi(argv[2]);
+        test.height = atoi(argv[3]);
+        test.sample_count = atoi(argv[4]);
+
+        switch (test.format_bits) {
+        case 16:
+            test.format = VK_FORMAT_D16_UNORM;
+            break;
+        case 24:
+            test.format = VK_FORMAT_X8_D24_UNORM_PACK32;
+            break;
+        case 32:
+            test.format = VK_FORMAT_D32_SFLOAT;
+            break;
+        default:
+            vk_die("bad format bits %d", test.format_bits);
+        }
+
+        switch (test.sample_count) {
+        case VK_SAMPLE_COUNT_2_BIT:
+        case VK_SAMPLE_COUNT_4_BIT:
+        case VK_SAMPLE_COUNT_8_BIT:
+        case VK_SAMPLE_COUNT_16_BIT:
+        case VK_SAMPLE_COUNT_32_BIT:
+        case VK_SAMPLE_COUNT_64_BIT:
+            break;
+        default:
+            vk_die("bad sample count %d", test.sample_count);
+        }
     };
 
     depth_resolve_test_init(&test);
