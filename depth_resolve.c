@@ -74,14 +74,15 @@ depth_resolve_test_init_images(struct depth_resolve_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->ds = vk_create_image(
-        vk, test->format, test->width, test->height, test->sample_count, VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    test->ds =
+        vk_create_image(vk, test->format, test->width, test->height, test->sample_count,
+                        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     vk_create_image_render_view(vk, test->ds, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    test->resolve =
-        vk_create_image(vk, test->format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
-                        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    test->resolve = vk_create_image(
+        vk, test->format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     vk_create_image_render_view(vk, test->resolve, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
@@ -154,8 +155,9 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
         },
     };
     vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, NULL, 0, NULL,
-                           ARRAY_SIZE(before_barriers), before_barriers);
+                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           0, 0, NULL, 0, NULL, ARRAY_SIZE(before_barriers), before_barriers);
 
     const VkRenderingInfo rendering_info = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -218,7 +220,7 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
             .depth = 1,
         },
     };
-    vk->CmdCopyImageToBuffer(cmd, test->ds->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    vk->CmdCopyImageToBuffer(cmd, test->resolve->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                              test->buf->buf, 1, &copy);
 
     const VkBufferMemoryBarrier copy_barriers[1] = {
