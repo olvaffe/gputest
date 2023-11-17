@@ -128,14 +128,8 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
 {
     struct vk *vk = &test->vk;
 
-#if 1
     const VkImageLayout ds_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     const VkImageLayout resolve_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-#else
-    /* even using the general layout, we still see the issue on radv gfx9 */
-    const VkImageLayout ds_layout = VK_IMAGE_LAYOUT_GENERAL;
-    const VkImageLayout resolve_layout = VK_IMAGE_LAYOUT_GENERAL;
-#endif
 
     const VkImageMemoryBarrier before_barriers[2] = {
         [0] = {
