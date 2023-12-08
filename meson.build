@@ -53,6 +53,7 @@ tests = [
   'gs',
   'info',
   'ktx',
+  'memory',
   'msaa',
   'pipeline_stats',
   'push_const',

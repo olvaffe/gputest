@@ -257,6 +257,18 @@ vk_minify(uint32_t base, uint32_t level)
     return val ? val : 1;
 }
 
+static inline uint64_t
+vk_now(void)
+{
+    struct timespec ts;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &ts))
+        return 0;
+
+    const uint64_t ns = 1000000000ull;
+    return ns * ts.tv_sec + ts.tv_nsec;
+}
+
 static inline void
 vk_sleep(uint32_t ms)
 {
