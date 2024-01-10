@@ -91,8 +91,10 @@ memory_test_draw(struct memory_test *test)
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
         const VkMemoryType *mt = &vk->mem_props.memoryTypes[i];
 
-        if (!(mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+        if (!(mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
             vk_log("mt %d is not host-visible", i);
+            continue;
+        }
 
         VkDeviceMemory mem = vk_alloc_memory(vk, size, i);
         void *src;
