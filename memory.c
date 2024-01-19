@@ -29,10 +29,19 @@ memory_test_cleanup(struct memory_test *test)
 }
 
 static void
-memory_test_timed_memcpy(void *dst, const void *src, int size, const char *what)
+memory_test_timed_memcpy(struct memory_test *test,
+                         const VkMappedMemoryRange *invalidate,
+                         void *dst,
+                         const void *src,
+                         int size,
+                         const char *what)
 {
+    struct vk *vk = &test->vk;
+
     for (int i = 0; i < 3; i++) {
         const uint64_t begin = vk_now();
+        if (invalidate)
+            vk->InvalidateMappedMemoryRanges(vk->dev, 1, invalidate);
         memcpy(dst, src, size);
         const uint64_t end = vk_now();
 
@@ -64,7 +73,7 @@ memory_test_draw(struct memory_test *test)
             vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &src);
             vk_check(vk, "failed to map image memory");
 
-            memory_test_timed_memcpy(dst, src, size, "linear image");
+            memory_test_timed_memcpy(test, NULL, dst, src, size, "linear image");
 
             vk->UnmapMemory(vk->dev, img->mem);
         }
@@ -76,7 +85,7 @@ memory_test_draw(struct memory_test *test)
         void *src = malloc(size);
         if (!src)
             vk_die("failed to alloc src");
-        memory_test_timed_memcpy(dst, src, size, "malloc");
+        memory_test_timed_memcpy(test, NULL, dst, src, size, "malloc");
         free(src);
     }
 
@@ -84,7 +93,7 @@ memory_test_draw(struct memory_test *test)
         void *src = calloc(1, size);
         if (!src)
             vk_die("failed to alloc src");
-        memory_test_timed_memcpy(dst, src, size, "calloc");
+        memory_test_timed_memcpy(test, NULL, dst, src, size, "calloc");
         free(src);
     }
 
@@ -101,13 +110,20 @@ memory_test_draw(struct memory_test *test)
         vk->result = vk->MapMemory(vk->dev, mem, 0, size, 0, &src);
         vk_check(vk, "failed to map memory");
 
+        const bool mt_local = mt->propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        const bool mt_coherent = mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        const bool mt_cached = mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
         char desc[64];
-        snprintf(desc, sizeof(desc), "memory type %d (%s%s%s)", i,
-                 (mt->propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? "Lo" : "..",
-                 (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) ? "Co" : "..",
-                 (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) ? "Ca" : "..");
+        snprintf(desc, sizeof(desc), "memory type %d (%s%s%s)", i, mt_local ? "Lo" : "..",
+                 mt_coherent ? "Co" : "..", mt_cached ? "Ca" : "..");
 
-        memory_test_timed_memcpy(dst, src, size, desc);
+        const VkMappedMemoryRange invalidate = {
+            .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+            .memory = mem,
+            .size = size,
+        };
+
+        memory_test_timed_memcpy(test, mt_coherent ? NULL : &invalidate, dst, src, size, desc);
 
         vk->FreeMemory(vk->dev, mem, NULL);
     }
