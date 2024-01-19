@@ -10,6 +10,9 @@ struct memory_test {
     uint32_t width;
     uint32_t height;
 
+    int loop;
+    int bench_mt;
+
     struct vk vk;
 };
 
@@ -38,15 +41,30 @@ memory_test_timed_memcpy(struct memory_test *test,
 {
     struct vk *vk = &test->vk;
 
-    for (int i = 0; i < 3; i++) {
+    if (test->bench_mt == -1) {
+        for (int i = 0; i < test->loop; i++) {
+            const uint64_t begin = vk_now();
+            if (invalidate)
+                vk->InvalidateMappedMemoryRanges(vk->dev, 1, invalidate);
+            memcpy(dst, src, size);
+            const uint64_t end = vk_now();
+
+            const int us = (end - begin) / 1000;
+            vk_log("%s iter %d took %d.%dms", what, i, us / 1000, us % 1000);
+        }
+    } else {
         const uint64_t begin = vk_now();
-        if (invalidate)
-            vk->InvalidateMappedMemoryRanges(vk->dev, 1, invalidate);
-        memcpy(dst, src, size);
+        for (int i = 0; i < test->loop; i++) {
+            if (invalidate)
+                vk->InvalidateMappedMemoryRanges(vk->dev, 1, invalidate);
+            memcpy(dst, src, size);
+        }
         const uint64_t end = vk_now();
 
-        const int us = (end - begin) / 1000;
-        vk_log("%s iter %d took %d.%dms", what, i, us / 1000, us % 1000);
+        const uint64_t us = (end - begin) / 1000;
+        const int avg = us / test->loop;
+        vk_log("%s took %d.%dms on average (total %d iters)", what, avg / 1000, avg % 1000,
+               test->loop);
     }
 }
 
@@ -68,7 +86,7 @@ memory_test_draw(struct memory_test *test)
         if (!dst)
             vk_die("failed to alloc dst");
 
-        if (img->mem_mappable) {
+        if (test->bench_mt == -1 && img->mem_mappable) {
             void *src;
             vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &src);
             vk_check(vk, "failed to map image memory");
@@ -81,7 +99,7 @@ memory_test_draw(struct memory_test *test)
         vk_destroy_image(vk, img);
     }
 
-    {
+    if (test->bench_mt == -1) {
         void *src = malloc(size);
         if (!src)
             vk_die("failed to alloc src");
@@ -89,7 +107,7 @@ memory_test_draw(struct memory_test *test)
         free(src);
     }
 
-    {
+    if (test->bench_mt == -1) {
         void *src = calloc(1, size);
         if (!src)
             vk_die("failed to alloc src");
@@ -99,6 +117,9 @@ memory_test_draw(struct memory_test *test)
 
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
         const VkMemoryType *mt = &vk->mem_props.memoryTypes[i];
+
+        if (test->bench_mt >= 0 && test->bench_mt != (int)i)
+            continue;
 
         if (!(mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
             vk_log("mt %d is not host-visible", i);
@@ -132,13 +153,23 @@ memory_test_draw(struct memory_test *test)
 }
 
 int
-main(void)
+main(int argc, char **argv)
 {
     struct memory_test test = {
         .format = VK_FORMAT_B8G8R8A8_UNORM,
         .width = 1080,
         .height = 1080,
+
+        .loop = 3,
+        .bench_mt = -1,
     };
+
+    if (argc == 3) {
+        test.loop = atoi(argv[1]);
+        test.bench_mt = atoi(argv[2]);
+    } else if (argc != 1) {
+        vk_die("usage: %s [<loop> <mt>]", argv[0]);
+    }
 
     memory_test_init(&test);
     memory_test_draw(&test);
