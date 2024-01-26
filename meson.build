@@ -51,6 +51,7 @@ tests = [
   'external',
   'formats',
   'gs',
+  'image',
   'info',
   'ktx',
   'memory',
