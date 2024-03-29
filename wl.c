@@ -54,9 +54,54 @@ wl_test_dispatch_redraw(void *data)
     const struct wl_swapchain_image *img = wl_acquire_swapchain_image(wl, test->swapchain);
 
     if (test->shm) {
-        const uint32_t img_size =
-            test->width * test->height * wl_drm_format_cpp(test->drm_format);
-        memset(img->data, 0x80, img_size);
+        const uint32_t pitch = test->width * wl_drm_format_cpp(test->drm_format);
+
+        for (uint32_t y = 0; y < test->height; y++) {
+            const float v = (float)y / (test->height - 1);
+            const float rgba[4] = {
+                1.0f - v,
+                0.1f,
+                v,
+                0.3f,
+            };
+
+            union {
+                void *ptr;
+                uint16_t *u16;
+                uint32_t *u32;
+            } row;
+            row.ptr = img->data + y * pitch;
+
+            union {
+                uint16_t u16;
+                uint32_t u32;
+            } packed;
+
+            for (uint32_t x = 0; x < test->width; x++) {
+                switch (test->drm_format) {
+                case DRM_FORMAT_ARGB8888:
+                case DRM_FORMAT_XRGB8888:
+                    packed.u32 = (int)(rgba[0] * 255) << 16 | (int)(rgba[1] * 255) << 8 |
+                                 (int)(rgba[2] * 255) << 0 | (int)(rgba[3] * 255) << 24;
+                    row.u32[x] = packed.u32;
+                    break;
+                case DRM_FORMAT_ABGR8888:
+                case DRM_FORMAT_XBGR8888:
+                    packed.u32 = (int)(rgba[0] * 255) << 0 | (int)(rgba[1] * 255) << 8 |
+                                 (int)(rgba[2] * 255) << 16 | (int)(rgba[3] * 255) << 24;
+                    row.u32[x] = packed.u32;
+                    break;
+                case DRM_FORMAT_RGB565:
+                    packed.u16 = (int)(rgba[0] * 31) << 11 | (int)(rgba[1] * 63) << 5 |
+                                 (int)(rgba[2] * 31) << 0;
+                    row.u16[x] = packed.u16;
+                    break;
+                default:
+                    wl_die("unsupported format");
+                    break;
+                }
+            }
+        }
     } else if (test->modifier == DRM_FORMAT_MOD_LINEAR) {
         struct vk_allocator_bo *bo = img->data;
 

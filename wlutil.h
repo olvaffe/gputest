@@ -584,7 +584,11 @@ wl_drm_format_cpp(uint32_t format)
     switch (format) {
     case DRM_FORMAT_ARGB8888:
     case DRM_FORMAT_XRGB8888:
+    case DRM_FORMAT_ABGR8888:
+    case DRM_FORMAT_XBGR8888:
         return 4;
+    case DRM_FORMAT_RGB565:
+        return 2;
     default:
         return 0;
     }
