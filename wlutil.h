@@ -68,6 +68,7 @@ struct wl_swapchain {
     uint32_t width;
     uint32_t height;
     uint32_t format;
+    uint64_t modifier;
     uint32_t image_count;
 
     uint32_t shm_size;
@@ -297,15 +298,6 @@ static void
 wl_shm_event_format(void *data, struct wl_shm *wl_shm, uint32_t format)
 {
     struct wl *wl = data;
-
-    switch (format) {
-    case WL_SHM_FORMAT_ARGB8888:
-        format = DRM_FORMAT_ARGB8888;
-        break;
-    case WL_SHM_FORMAT_XRGB8888:
-        format = DRM_FORMAT_XRGB8888;
-        break;
-    }
 
     uint32_t *iter = wl_array_add(&wl->shm_formats, sizeof(format));
     *iter = format;
@@ -611,9 +603,26 @@ wl_drm_format_to_shm_format(uint32_t format)
     }
 }
 
+static inline bool
+wl_query_shm_format_support(const struct wl *wl, uint32_t format)
+{
+    const uint32_t *iter;
+    wl_array_for_each(iter, &wl->shm_formats)
+    {
+        if (*iter == format)
+            return true;
+    }
+
+    return false;
+}
+
 static inline struct wl_swapchain *
-wl_create_swapchain(
-    struct wl *wl, uint32_t width, uint32_t height, uint32_t format, uint32_t image_count)
+wl_create_swapchain(struct wl *wl,
+                    uint32_t width,
+                    uint32_t height,
+                    uint32_t format,
+                    uint64_t modifier,
+                    uint32_t image_count)
 {
     struct wl_swapchain *swapchain = calloc(1, sizeof(*swapchain));
     if (!swapchain)
@@ -629,6 +638,7 @@ wl_create_swapchain(
     swapchain->width = width;
     swapchain->height = height;
     swapchain->format = format;
+    swapchain->modifier = modifier;
     swapchain->image_count = image_count;
 
     return swapchain;
@@ -651,18 +661,13 @@ wl_destroy_swapchain(struct wl *wl, struct wl_swapchain *swapchain)
 }
 
 static inline void
-wl_init_swapchain_images_shm(struct wl *wl, struct wl_swapchain *swapchain)
+wl_add_swapchain_images_shm(struct wl *wl, struct wl_swapchain *swapchain)
 {
-    const uint32_t *iter;
-    bool found = false;
-    wl_array_for_each(iter, &wl->shm_formats)
-    {
-        if (*iter == swapchain->format) {
-            found = true;
-            break;
-        }
-    }
-    if (!found)
+    if (swapchain->modifier != DRM_FORMAT_MOD_LINEAR)
+        wl_die("shm only supports linear modifier");
+
+    const uint32_t shm_format = wl_drm_format_to_shm_format(swapchain->format);
+    if (!wl_query_shm_format_support(wl, shm_format))
         wl_die("unsupported shm format '%.*s'", 4, (const char *)&swapchain->format);
 
     const uint32_t img_cpp = wl_drm_format_cpp(swapchain->format);
@@ -685,9 +690,8 @@ wl_init_swapchain_images_shm(struct wl *wl, struct wl_swapchain *swapchain)
         struct wl_swapchain_image *img = &swapchain->images[i];
         const uint32_t shm_offset = img_size * i;
 
-        img->buffer =
-            wl_shm_pool_create_buffer(shm_pool, shm_offset, swapchain->width, swapchain->height,
-                                      img_pitch, wl_drm_format_to_shm_format(swapchain->format));
+        img->buffer = wl_shm_pool_create_buffer(shm_pool, shm_offset, swapchain->width,
+                                                swapchain->height, img_pitch, shm_format);
         wl_buffer_add_listener(img->buffer, &wl_buffer_listener, img);
         img->data = shm_ptr + shm_offset;
     }
@@ -696,6 +700,24 @@ wl_init_swapchain_images_shm(struct wl *wl, struct wl_swapchain *swapchain)
     close(shm_fd);
 
     swapchain->shm_size = shm_size;
+}
+
+static inline void
+wl_add_swapchain_image_dmabuf(struct wl *wl,
+                              struct wl_swapchain *swapchain,
+                              struct wl_swapchain_image *img,
+                              int fd,
+                              const uint32_t *offsets,
+                              const uint32_t *pitches,
+                              uint32_t mem_plane_count)
+{
+    struct zwp_linux_buffer_params_v1 *params = zwp_linux_dmabuf_v1_create_params(wl->dmabuf);
+    for (uint32_t i = 0; i < mem_plane_count; i++) {
+        zwp_linux_buffer_params_v1_add(params, fd, i, offsets[i], pitches[i],
+                                       swapchain->modifier >> 32, (uint32_t)swapchain->modifier);
+    }
+    img->buffer = zwp_linux_buffer_params_v1_create_immed(
+        params, swapchain->width, swapchain->height, swapchain->format, 0);
 }
 
 static inline const struct wl_swapchain_image *
