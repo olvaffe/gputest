@@ -33,26 +33,33 @@ dep_sdl2 = dependency('sdl2', required: false)
 dep_ktx = dependency('Ktx', method: 'cmake', required: false)
 
 dep_wl_client = dependency('wayland-client', required: false)
-dep_wl_protocols = dependency('wayland-protocols', required: dep_wl_client.found())
 wl_protocols_files = []
 if dep_wl_client.found()
-  wl_scanner = find_program('wayland-scanner')
-  wl_protocols_dir = dep_wl_protocols.get_pkgconfig_variable('pkgdatadir')
-  xdg_shell_xml_path = wl_protocols_dir + '/stable/xdg-shell/xdg-shell.xml'
-  xdg_shell_client_header = custom_target(
-        'xdg-shell client-header',
-        command: [ wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@' ],
-        input: xdg_shell_xml_path,
-        output: 'xdg-shell-protocol.h',
-        )
-    xdg_shell_private_code = custom_target(
-        'xdg-shell private-code',
-        command: [ wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@' ],
-        input: xdg_shell_xml_path,
-        output: 'xdg-shell-protocol.c',
-        )
+  protocols = [
+    ['xdg-shell', 'stable/xdg-shell'],
+    ['linux-dmabuf-unstable-v1', 'unstable/linux-dmabuf'],
+  ]
 
-  wl_protocols_files += [ xdg_shell_client_header, xdg_shell_private_code ]
+  dep_wl_scanner = dependency('wayland-scanner')
+  wl_scanner = find_program(dep_wl_scanner.get_variable(pkgconfig: 'wayland_scanner'))
+
+  dep_wl_protocols = dependency('wayland-protocols')
+  wl_protocols_dir = dep_wl_protocols.get_variable(pkgconfig: 'pkgdatadir')
+
+  foreach proto : protocols
+    xml_path = wl_protocols_dir / proto[1] / proto[0] + '.xml'
+
+    wl_protocols_files += custom_target(proto[0] + ' client-header',
+      command: [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
+      input: xml_path,
+      output: proto[0] + '-protocol.h',
+    )
+    wl_protocols_files += custom_target(proto[0] + ' private-code',
+      command: [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
+      input: xml_path,
+      output: proto[0] + '-protocol.c',
+    )
+  endforeach
 endif
 
 add_project_arguments(['-D_GNU_SOURCE', warning_args], language: 'c')

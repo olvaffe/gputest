@@ -6,6 +6,7 @@
 #ifndef WLUTIL_H
 #define WLUTIL_H
 
+#include "linux-dmabuf-unstable-v1-protocol.h"
 #include "xdg-shell-protocol.h"
 
 #include <linux/input.h>
@@ -42,10 +43,25 @@ struct wl {
     struct wl_shm *shm;
     struct wl_array shm_formats;
 
+    struct zwp_linux_dmabuf_v1 *dmabuf;
+
     struct wl_surface *surface;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
     bool xdg_ready;
+
+    struct zwp_linux_dmabuf_feedback_v1 *dmabuf_feedback;
+    const void *dmabuf_format_table;
+    uint32_t dmabuf_format_table_size;
+    struct {
+        dev_t main_dev;
+        dev_t target_dev;
+        bool scanout;
+        struct wl_array formats;
+        uint32_t tranche_count;
+    } pending, active;
+
+    bool dispatch_ready;
 };
 
 struct wl_swapchain {
@@ -95,6 +111,139 @@ static inline void PRINTFLIKE(1, 2) NORETURN wl_die(const char *format, ...)
 }
 
 static void
+zwp_linux_dmabuf_feedback_v1_event_format_table(void *data,
+                                                struct zwp_linux_dmabuf_feedback_v1 *feedback,
+                                                int32_t fd,
+                                                uint32_t size)
+{
+    struct wl *wl = data;
+
+    if (wl->dmabuf_format_table)
+        munmap((void *)wl->dmabuf_format_table, wl->dmabuf_format_table_size);
+
+    wl->dmabuf_format_table = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (wl->dmabuf_format_table == MAP_FAILED)
+        wl_die("failed to map format table");
+    close(fd);
+
+    wl->dmabuf_format_table_size = size;
+}
+
+static void
+zwp_linux_dmabuf_feedback_v1_event_main_device(void *data,
+                                               struct zwp_linux_dmabuf_feedback_v1 *feedback,
+                                               struct wl_array *dev)
+{
+    struct wl *wl = data;
+
+    if (dev->size != sizeof(wl->pending.main_dev))
+        wl_die("bad main dev size");
+    memcpy(&wl->pending.main_dev, dev->data, dev->size);
+
+    wl->pending.tranche_count = 0;
+}
+
+static void
+zwp_linux_dmabuf_feedback_v1_event_tranche_target_device(
+    void *data, struct zwp_linux_dmabuf_feedback_v1 *feedback, struct wl_array *dev)
+{
+    struct wl *wl = data;
+
+    if (wl->pending.tranche_count)
+        return;
+
+    if (dev->size != sizeof(wl->pending.target_dev))
+        wl_die("bad target dev size");
+    memcpy(&wl->pending.target_dev, dev->data, dev->size);
+}
+
+static void
+zwp_linux_dmabuf_feedback_v1_event_tranche_flags(void *data,
+                                                 struct zwp_linux_dmabuf_feedback_v1 *feedback,
+                                                 uint32_t flags)
+{
+    struct wl *wl = data;
+
+    if (wl->pending.tranche_count)
+        return;
+
+    if (flags & ZWP_LINUX_DMABUF_FEEDBACK_V1_TRANCHE_FLAGS_SCANOUT)
+        wl->pending.scanout = true;
+}
+
+static void
+zwp_linux_dmabuf_feedback_v1_event_tranche_formats(void *data,
+                                                   struct zwp_linux_dmabuf_feedback_v1 *feedback,
+                                                   struct wl_array *indices)
+{
+    struct wl *wl = data;
+
+    if (wl->pending.tranche_count)
+        return;
+
+    wl_array_init(&wl->pending.formats);
+
+    const uint16_t *idx_iter;
+    wl_array_for_each(idx_iter, indices)
+    {
+        const uint32_t offset = *idx_iter * 16;
+        const uint32_t *fmt = wl->dmabuf_format_table + offset;
+        const uint64_t *mod = wl->dmabuf_format_table + offset + 8;
+
+        struct wl_array *fmt_iter;
+        bool found = false;
+        wl_array_for_each(fmt_iter, &wl->pending.formats)
+        {
+            const uint64_t *fmt_iter_fmt = fmt_iter->data;
+            if (*fmt_iter_fmt == *fmt) {
+                uint64_t *mod_iter = wl_array_add(fmt_iter, sizeof(*mod_iter));
+                *mod_iter = *mod;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            fmt_iter = wl_array_add(&wl->pending.formats, sizeof(*fmt_iter));
+            wl_array_init(fmt_iter);
+
+            uint64_t *fmt_iter_fmt = wl_array_add(fmt_iter, sizeof(*fmt_iter_fmt));
+            *fmt_iter_fmt = *fmt;
+        }
+    }
+}
+
+static void
+zwp_linux_dmabuf_feedback_v1_event_tranche_done(void *data,
+                                                struct zwp_linux_dmabuf_feedback_v1 *feedback)
+{
+    struct wl *wl = data;
+    wl->pending.tranche_count++;
+}
+
+static void
+zwp_linux_dmabuf_feedback_v1_event_done(void *data, struct zwp_linux_dmabuf_feedback_v1 *feedback)
+{
+    struct wl *wl = data;
+
+    struct wl_array *dmabuf_iter;
+    wl_array_for_each(dmabuf_iter, &wl->active.formats) wl_array_release(dmabuf_iter);
+    wl_array_release(&wl->active.formats);
+
+    wl->active = wl->pending;
+}
+
+static const struct zwp_linux_dmabuf_feedback_v1_listener zwp_linux_dmabuf_feedback_v1_listener = {
+    .format_table = zwp_linux_dmabuf_feedback_v1_event_format_table,
+    .main_device = zwp_linux_dmabuf_feedback_v1_event_main_device,
+    .tranche_target_device = zwp_linux_dmabuf_feedback_v1_event_tranche_target_device,
+    .tranche_formats = zwp_linux_dmabuf_feedback_v1_event_tranche_formats,
+    .tranche_flags = zwp_linux_dmabuf_feedback_v1_event_tranche_flags,
+    .tranche_done = zwp_linux_dmabuf_feedback_v1_event_tranche_done,
+    .done = zwp_linux_dmabuf_feedback_v1_event_done,
+};
+
+static void
 xdg_toplevel_event_configure(void *data,
                              struct xdg_toplevel *toplevel,
                              int32_t width,
@@ -108,7 +257,7 @@ xdg_toplevel_event_close(void *data, struct xdg_toplevel *toplevel)
 {
     struct wl *wl = data;
 
-    if (wl->params.close)
+    if (wl->dispatch_ready && wl->params.close)
         wl->params.close(wl->params.data);
 }
 
@@ -125,7 +274,7 @@ xdg_surface_event_configure(void *data, struct xdg_surface *surface, uint32_t se
     xdg_surface_ack_configure(surface, serial);
     wl->xdg_ready = true;
 
-    if (wl->params.redraw)
+    if (wl->dispatch_ready && wl->params.redraw)
         wl->params.redraw(wl->params.data);
 }
 
@@ -200,7 +349,7 @@ wl_keyboard_event_key(void *data,
 {
     struct wl *wl = data;
 
-    if (state == WL_KEYBOARD_KEY_STATE_RELEASED)
+    if (state == WL_KEYBOARD_KEY_STATE_RELEASED && wl->dispatch_ready && wl->params.key)
         wl->params.key(wl->params.data, key);
 }
 
@@ -266,7 +415,8 @@ wl_registry_event_global(
 {
     struct wl *wl = data;
 
-    if (!strcmp(interface, wl_compositor_interface.name)) {
+    if (!strcmp(interface, wl_compositor_interface.name) &&
+        version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
         wl->compositor = wl_registry_bind(reg, name, &wl_compositor_interface,
                                           WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION);
     } else if (!strcmp(interface, xdg_wm_base_interface.name)) {
@@ -280,6 +430,10 @@ wl_registry_event_global(
         wl_shm_add_listener(wl->shm, &wl_shm_listener, wl);
 
         wl_array_init(&wl->shm_formats);
+    } else if (!strcmp(interface, zwp_linux_dmabuf_v1_interface.name) &&
+               version >= ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
+        wl->dmabuf = wl_registry_bind(reg, name, &zwp_linux_dmabuf_v1_interface,
+                                      ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION);
     }
 }
 
@@ -333,6 +487,15 @@ wl_init_surface(struct wl *wl)
 }
 
 static inline void
+wl_init_surface_dmabuf(struct wl *wl)
+{
+    wl->dmabuf_feedback = zwp_linux_dmabuf_v1_get_surface_feedback(wl->dmabuf, wl->surface);
+    zwp_linux_dmabuf_feedback_v1_add_listener(wl->dmabuf_feedback,
+                                              &zwp_linux_dmabuf_feedback_v1_listener, wl);
+    wl_display_roundtrip(wl->display);
+}
+
+static inline void
 wl_init(struct wl *wl, const struct wl_init_params *params)
 {
     memset(wl, 0, sizeof(*wl));
@@ -344,14 +507,28 @@ wl_init(struct wl *wl, const struct wl_init_params *params)
     wl_init_display(wl);
     wl_init_globals(wl);
     wl_init_surface(wl);
+    wl_init_surface_dmabuf(wl);
+
+    wl->dispatch_ready = true;
 }
 
 static inline void
 wl_cleanup(struct wl *wl)
 {
+    struct wl_array *dmabuf_iter;
+    wl_array_for_each(dmabuf_iter, &wl->active.formats) wl_array_release(dmabuf_iter);
+    wl_array_release(&wl->active.formats);
+
+    if (wl->dmabuf_format_table)
+        munmap((void *)wl->dmabuf_format_table, wl->dmabuf_format_table_size);
+
+    zwp_linux_dmabuf_feedback_v1_destroy(wl->dmabuf_feedback);
+
     xdg_toplevel_destroy(wl->xdg_toplevel);
     xdg_surface_destroy(wl->xdg_surface);
     wl_surface_destroy(wl->surface);
+
+    zwp_linux_dmabuf_v1_destroy(wl->dmabuf);
 
     wl_array_release(&wl->shm_formats);
     wl_shm_destroy(wl->shm);
@@ -368,7 +545,42 @@ wl_cleanup(struct wl *wl)
 }
 
 static inline void
-wl_dispatch(struct wl *wl)
+wl_info(const struct wl *wl)
+{
+    const uint32_t *shm_iter;
+    uint32_t idx = 0;
+    wl_array_for_each(shm_iter, &wl->shm_formats)
+    {
+        wl_log("shm format %d: '%.*s'", idx++, 4, (const char *)shm_iter);
+    }
+
+    wl_log("dmabuf: main %s target, scanout %d, tranche count %d",
+           wl->active.main_dev == wl->active.target_dev ? "==" : "!=", wl->active.scanout,
+           wl->active.tranche_count);
+
+    struct wl_array *dmabuf_iter;
+    idx = 0;
+    wl_array_for_each(dmabuf_iter, &wl->active.formats)
+    {
+        const uint32_t fmt = *((uint64_t *)dmabuf_iter->data);
+        uint32_t mod_count = dmabuf_iter->size / sizeof(uint64_t) - 1;
+        wl_log("dmabuf format %d: '%.*s', modifier count %d", idx++, 4, (const char *)&fmt,
+               mod_count);
+
+        if (false) {
+            const uint64_t *mod_iter;
+            wl_array_for_each(mod_iter, dmabuf_iter)
+            {
+                if (mod_iter == dmabuf_iter->data)
+                    continue;
+                wl_log("  modifier 0x%" PRIx64, *mod_iter);
+            }
+        }
+    }
+}
+
+static inline void
+wl_dispatch(const struct wl *wl)
 {
     if (wl_display_dispatch(wl->display) < 0)
         wl_die("failed to dispatch display");

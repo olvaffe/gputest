@@ -61,6 +61,8 @@ wl_test_loop(struct wl_test *test)
 {
     struct wl *wl = &test->wl;
 
+    wl_test_dispatch_redraw(test);
+
     while (!test->quit)
         wl_dispatch(wl);
 }
@@ -78,6 +80,8 @@ wl_test_init(struct wl_test *test)
         .key = wl_test_dispatch_key,
     };
     wl_init(wl, &wl_params);
+    wl_info(wl);
+
     vk_init(vk, NULL);
 
     test->swapchain = wl_create_swapchain(wl, test->width, test->height, DRM_FORMAT_XRGB8888, 3);
