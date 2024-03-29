@@ -32,6 +32,29 @@ dep_rt = cc.find_library('rt', required: false)
 dep_sdl2 = dependency('sdl2', required: false)
 dep_ktx = dependency('Ktx', method: 'cmake', required: false)
 
+dep_wl_client = dependency('wayland-client', required: false)
+dep_wl_protocols = dependency('wayland-protocols', required: dep_wl_client.found())
+wl_protocols_files = []
+if dep_wl_client.found()
+  wl_scanner = find_program('wayland-scanner')
+  wl_protocols_dir = dep_wl_protocols.get_pkgconfig_variable('pkgdatadir')
+  xdg_shell_xml_path = wl_protocols_dir + '/stable/xdg-shell/xdg-shell.xml'
+  xdg_shell_client_header = custom_target(
+        'xdg-shell client-header',
+        command: [ wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@' ],
+        input: xdg_shell_xml_path,
+        output: 'xdg-shell-protocol.h',
+        )
+    xdg_shell_private_code = custom_target(
+        'xdg-shell private-code',
+        command: [ wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@' ],
+        input: xdg_shell_xml_path,
+        output: 'xdg-shell-protocol.c',
+        )
+
+  wl_protocols_files += [ xdg_shell_client_header, xdg_shell_private_code ]
+endif
+
 add_project_arguments(['-D_GNU_SOURCE', warning_args], language: 'c')
 
 idep_vkutil = declare_dependency(
@@ -73,6 +96,9 @@ tests = [
   'ycbcr',
 ]
 
+if dep_wl_client.found()
+  tests += ['wl']
+endif
 if dep_sdl2.found()
   tests += ['sdl']
 endif
@@ -110,7 +136,10 @@ foreach t : tests
 
   test_deps = [idep_vkutil]
   test_args = []
-  if t == 'sdl'
+  if t == 'wl'
+    test_incs += wl_protocols_files
+    test_deps += [dep_wl_client]
+  elif t == 'sdl'
     test_deps += [dep_sdl2]
   elif t == 'ktx'
     if dep_ktx.found()
