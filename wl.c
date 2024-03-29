@@ -45,6 +45,57 @@ wl_test_dispatch_close(void *data)
 }
 
 static void
+wl_test_paint_rgba_pattern(struct wl_test *test, void *dst, uint32_t pitch)
+{
+    for (uint32_t y = 0; y < test->height; y++) {
+        const float v = (float)y / (test->height - 1);
+        const float rgba[4] = {
+            1.0f - v,
+            0.1f,
+            v,
+            0.3f,
+        };
+
+        union {
+            void *ptr;
+            uint16_t *u16;
+            uint32_t *u32;
+        } row;
+        row.ptr = dst + y * pitch;
+
+        union {
+            uint16_t u16;
+            uint32_t u32;
+        } packed;
+
+        for (uint32_t x = 0; x < test->width; x++) {
+            switch (test->drm_format) {
+            case DRM_FORMAT_ARGB8888:
+            case DRM_FORMAT_XRGB8888:
+                packed.u32 = (int)(rgba[0] * 255) << 16 | (int)(rgba[1] * 255) << 8 |
+                             (int)(rgba[2] * 255) << 0 | (int)(rgba[3] * 255) << 24;
+                row.u32[x] = packed.u32;
+                break;
+            case DRM_FORMAT_ABGR8888:
+            case DRM_FORMAT_XBGR8888:
+                packed.u32 = (int)(rgba[0] * 255) << 0 | (int)(rgba[1] * 255) << 8 |
+                             (int)(rgba[2] * 255) << 16 | (int)(rgba[3] * 255) << 24;
+                row.u32[x] = packed.u32;
+                break;
+            case DRM_FORMAT_RGB565:
+                packed.u16 = (int)(rgba[0] * 31) << 11 | (int)(rgba[1] * 63) << 5 |
+                             (int)(rgba[2] * 31) << 0;
+                row.u16[x] = packed.u16;
+                break;
+            default:
+                wl_die("unsupported format");
+                break;
+            }
+        }
+    }
+}
+
+static void
 wl_test_dispatch_redraw(void *data)
 {
     struct wl_test *test = data;
@@ -55,53 +106,7 @@ wl_test_dispatch_redraw(void *data)
 
     if (test->shm) {
         const uint32_t pitch = test->width * wl_drm_format_cpp(test->drm_format);
-
-        for (uint32_t y = 0; y < test->height; y++) {
-            const float v = (float)y / (test->height - 1);
-            const float rgba[4] = {
-                1.0f - v,
-                0.1f,
-                v,
-                0.3f,
-            };
-
-            union {
-                void *ptr;
-                uint16_t *u16;
-                uint32_t *u32;
-            } row;
-            row.ptr = img->data + y * pitch;
-
-            union {
-                uint16_t u16;
-                uint32_t u32;
-            } packed;
-
-            for (uint32_t x = 0; x < test->width; x++) {
-                switch (test->drm_format) {
-                case DRM_FORMAT_ARGB8888:
-                case DRM_FORMAT_XRGB8888:
-                    packed.u32 = (int)(rgba[0] * 255) << 16 | (int)(rgba[1] * 255) << 8 |
-                                 (int)(rgba[2] * 255) << 0 | (int)(rgba[3] * 255) << 24;
-                    row.u32[x] = packed.u32;
-                    break;
-                case DRM_FORMAT_ABGR8888:
-                case DRM_FORMAT_XBGR8888:
-                    packed.u32 = (int)(rgba[0] * 255) << 0 | (int)(rgba[1] * 255) << 8 |
-                                 (int)(rgba[2] * 255) << 16 | (int)(rgba[3] * 255) << 24;
-                    row.u32[x] = packed.u32;
-                    break;
-                case DRM_FORMAT_RGB565:
-                    packed.u16 = (int)(rgba[0] * 31) << 11 | (int)(rgba[1] * 63) << 5 |
-                                 (int)(rgba[2] * 31) << 0;
-                    row.u16[x] = packed.u16;
-                    break;
-                default:
-                    wl_die("unsupported format");
-                    break;
-                }
-            }
-        }
+        wl_test_paint_rgba_pattern(test, img->data, pitch);
     } else if (test->modifier == DRM_FORMAT_MOD_LINEAR) {
         struct vk_allocator_bo *bo = img->data;
 
@@ -109,27 +114,39 @@ wl_test_dispatch_redraw(void *data)
         uint32_t pitches[VK_ALLOCATOR_MEMORY_PLANE_MAX];
         vk_allocator_bo_query_layout(alloc, bo, offsets, pitches);
 
+        assert(bo->mem_plane_count == wl_drm_format_plane_count(test->drm_format));
         for (uint32_t plane = 0; plane < bo->mem_plane_count; plane++) {
             void *ptr = vk_allocator_bo_map(alloc, bo, plane);
 
-            for (uint32_t y = 0; y < test->height; y++) {
-                const uint32_t row_size = test->width * wl_drm_format_cpp(test->drm_format);
-                void *dst = ptr + offsets[plane] + pitches[plane] * y;
-                memset(dst, 0x80, row_size);
-            }
+            if (bo->mem_plane_count > 1)
+                wl_die("TODO multiplanar");
+            else
+                wl_test_paint_rgba_pattern(test, ptr + offsets[plane], pitches[plane]);
+
             vk_allocator_bo_unmap(alloc, bo, plane);
         }
     } else {
-        const uint32_t img_size =
-            test->width * test->height * wl_drm_format_cpp(test->drm_format);
         struct vk_allocator_bo *bo = img->data;
-        struct vk_allocator_transfer *xfer = vk_allocator_bo_map_transfer(
-            alloc, bo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, 0, 0,
-            test->width, test->height);
 
-        memset(xfer->staging->mem_ptr, 0x80, img_size);
+        if ((bo->mem_plane_count != wl_drm_format_plane_count(test->drm_format)))
+            wl_die("no aux plane support");
 
-        vk_allocator_bo_unmap_transfer(alloc, bo, xfer);
+        for (uint32_t plane = 0; plane < bo->mem_plane_count; plane++) {
+            const uint32_t pitch = test->width * wl_drm_format_cpp(test->drm_format);
+            const VkImageAspectFlagBits aspect = bo->mem_plane_count > 1
+                                                     ? (VK_IMAGE_ASPECT_PLANE_0_BIT << plane)
+                                                     : VK_IMAGE_ASPECT_COLOR_BIT;
+            struct vk_allocator_transfer *xfer =
+                vk_allocator_bo_map_transfer(alloc, bo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, aspect,
+                                             0, 0, test->width, test->height);
+
+            if (bo->mem_plane_count > 1)
+                wl_die("TODO multiplanar");
+            else
+                wl_test_paint_rgba_pattern(test, xfer->staging->mem_ptr, pitch);
+
+            vk_allocator_bo_unmap_transfer(alloc, bo, xfer);
+        }
     }
 
     wl_present_swapchain_image(wl, test->swapchain, img);

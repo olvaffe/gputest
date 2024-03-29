@@ -197,13 +197,10 @@ zwp_linux_dmabuf_feedback_v1_event_tranche_formats(void *data,
         {
             const uint64_t *fmt_iter_fmt = fmt_iter->data;
             if (*fmt_iter_fmt == *fmt) {
-                uint64_t *mod_iter = wl_array_add(fmt_iter, sizeof(*mod_iter));
-                *mod_iter = *mod;
                 found = true;
                 break;
             }
         }
-
         if (!found) {
             fmt_iter = wl_array_add(&wl->pending.formats, sizeof(*fmt_iter));
             wl_array_init(fmt_iter);
@@ -211,6 +208,9 @@ zwp_linux_dmabuf_feedback_v1_event_tranche_formats(void *data,
             uint64_t *fmt_iter_fmt = wl_array_add(fmt_iter, sizeof(*fmt_iter_fmt));
             *fmt_iter_fmt = *fmt;
         }
+
+        uint64_t *mod_iter = wl_array_add(fmt_iter, sizeof(*mod_iter));
+        *mod_iter = *mod;
     }
 }
 
@@ -595,6 +595,15 @@ wl_drm_format_cpp(uint32_t format)
 }
 
 static inline uint32_t
+wl_drm_format_plane_count(uint32_t format)
+{
+    switch (format) {
+    default:
+        return 1;
+    }
+}
+
+static inline uint32_t
 wl_drm_format_to_shm_format(uint32_t format)
 {
     switch (format) {
@@ -608,13 +617,38 @@ wl_drm_format_to_shm_format(uint32_t format)
 }
 
 static inline bool
-wl_query_shm_format_support(const struct wl *wl, uint32_t format)
+wl_query_shm_format_support(const struct wl *wl, uint32_t format, uint64_t modifier)
 {
+    if (modifier != DRM_FORMAT_MOD_LINEAR)
+        return false;
+
     const uint32_t *iter;
     wl_array_for_each(iter, &wl->shm_formats)
     {
         if (*iter == format)
             return true;
+    }
+
+    return false;
+}
+
+static inline bool
+wl_query_dmabuf_format_support(const struct wl *wl, uint32_t format, uint64_t modifier)
+{
+    const struct wl_array *iter;
+    wl_array_for_each(iter, &wl->active.formats)
+    {
+        const uint64_t *iter2 = iter->data;
+        if ((uint32_t)*iter2 == format) {
+            wl_array_for_each(iter2, iter)
+            {
+                if (iter2 == iter->data)
+                    continue;
+                else if (*iter2 == modifier)
+                    return true;
+            }
+            break;
+        }
     }
 
     return false;
@@ -667,12 +701,11 @@ wl_destroy_swapchain(struct wl *wl, struct wl_swapchain *swapchain)
 static inline void
 wl_add_swapchain_images_shm(struct wl *wl, struct wl_swapchain *swapchain)
 {
-    if (swapchain->modifier != DRM_FORMAT_MOD_LINEAR)
-        wl_die("shm only supports linear modifier");
-
     const uint32_t shm_format = wl_drm_format_to_shm_format(swapchain->format);
-    if (!wl_query_shm_format_support(wl, shm_format))
-        wl_die("unsupported shm format '%.*s'", 4, (const char *)&swapchain->format);
+    if (!wl_query_shm_format_support(wl, shm_format, swapchain->modifier)) {
+        wl_die("unsupported shm format '%.*s', modifier 0x%" PRIx64, 4,
+               (const char *)&swapchain->format, swapchain->modifier);
+    }
 
     const uint32_t img_cpp = wl_drm_format_cpp(swapchain->format);
     const uint32_t img_pitch = img_cpp * swapchain->width;
@@ -715,6 +748,11 @@ wl_add_swapchain_image_dmabuf(struct wl *wl,
                               const uint32_t *pitches,
                               uint32_t mem_plane_count)
 {
+    if (!wl_query_dmabuf_format_support(wl, swapchain->format, swapchain->modifier)) {
+        wl_die("unsupported dmabuf format '%.*s', modifier 0x%" PRIx64, 4,
+               (const char *)&swapchain->format, swapchain->modifier);
+    }
+
     struct zwp_linux_buffer_params_v1 *params = zwp_linux_dmabuf_v1_create_params(wl->dmabuf);
     for (uint32_t i = 0; i < mem_plane_count; i++) {
         zwp_linux_buffer_params_v1_add(params, fd, i, offsets[i], pitches[i],
