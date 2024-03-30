@@ -31,6 +31,7 @@ dep_m = cc.find_library('m', required: false)
 dep_rt = cc.find_library('rt', required: false)
 dep_sdl2 = dependency('sdl2', required: false)
 dep_ktx = dependency('Ktx', method: 'cmake', required: false)
+dep_drm = dependency('libdrm', required: false)
 
 dep_wl_client = dependency('wayland-client', required: false)
 wl_protocols_files = []
@@ -109,6 +110,9 @@ endif
 if dep_sdl2.found()
   tests += ['sdl']
 endif
+if dep_drm.found()
+  tests += ['drm']
+endif
 
 foreach t : tests
   test_incs = []
@@ -148,6 +152,8 @@ foreach t : tests
     test_deps += [dep_wl_client]
   elif t == 'sdl'
     test_deps += [dep_sdl2]
+  elif t == 'drm'
+    test_deps += [dep_drm]
   elif t == 'ktx'
     if dep_ktx.found()
       test_deps += [dep_ktx]
