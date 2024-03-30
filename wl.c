@@ -45,6 +45,57 @@ wl_test_dispatch_close(void *data)
 }
 
 static void
+wl_test_paint_yuv_pattern(struct wl_test *test, void *dst, uint32_t pitch, uint32_t plane)
+{
+    for (uint32_t y = 0; y < test->height; y++) {
+        const float v = (float)y / (test->height - 1);
+        const float yuv[3] = {
+            1.0f - v,
+            0.0f,
+            0.0f,
+        };
+
+        union {
+            void *ptr;
+            uint8_t *u8;
+            uint16_t *u16;
+        } row;
+        row.ptr = dst + y * pitch;
+
+        union {
+            uint8_t u8;
+            uint16_t u16;
+        } packed;
+
+        if (plane == 0) {
+            packed.u8 = (int)(yuv[0] * 255);
+            memset(row.u8, packed.u8, test->width);
+            continue;
+        }
+
+        /* 420 subsampling */
+        if (y & 1)
+            continue;
+        row.ptr = dst + y / 2 * pitch;
+        for (uint32_t x = 0; x < test->width / 2; x++) {
+            switch (test->drm_format) {
+            case DRM_FORMAT_YVU420:
+                packed.u8 = (int)(yuv[3 - plane] * 255);
+                row.u8[x] = packed.u8;
+                break;
+            case DRM_FORMAT_NV12:
+                packed.u16 = (int)(yuv[1] * 255) << 0 | (int)(yuv[2] * 255) << 8;
+                row.u16[x] = packed.u16;
+                break;
+            default:
+                wl_die("unsupported planar format");
+                break;
+            }
+        }
+    }
+}
+
+static void
 wl_test_paint_rgba_pattern(struct wl_test *test, void *dst, uint32_t pitch)
 {
     for (uint32_t y = 0; y < test->height; y++) {
@@ -109,6 +160,7 @@ wl_test_dispatch_redraw(void *data)
         wl_test_paint_rgba_pattern(test, img->data, pitch);
     } else if (test->modifier == DRM_FORMAT_MOD_LINEAR) {
         struct vk_allocator_bo *bo = img->data;
+        void *ptr = vk_allocator_bo_map(alloc, bo, 0);
 
         uint32_t offsets[VK_ALLOCATOR_MEMORY_PLANE_MAX];
         uint32_t pitches[VK_ALLOCATOR_MEMORY_PLANE_MAX];
@@ -116,15 +168,14 @@ wl_test_dispatch_redraw(void *data)
 
         assert(bo->mem_plane_count == wl_drm_format_plane_count(test->drm_format));
         for (uint32_t plane = 0; plane < bo->mem_plane_count; plane++) {
-            void *ptr = vk_allocator_bo_map(alloc, bo, plane);
 
             if (bo->mem_plane_count > 1)
-                wl_die("TODO multiplanar");
+                wl_test_paint_yuv_pattern(test, ptr + offsets[plane], pitches[plane], plane);
             else
                 wl_test_paint_rgba_pattern(test, ptr + offsets[plane], pitches[plane]);
-
-            vk_allocator_bo_unmap(alloc, bo, plane);
         }
+
+        vk_allocator_bo_unmap(alloc, bo, 0);
     } else {
         struct vk_allocator_bo *bo = img->data;
 
@@ -132,7 +183,6 @@ wl_test_dispatch_redraw(void *data)
             wl_die("no aux plane support");
 
         for (uint32_t plane = 0; plane < bo->mem_plane_count; plane++) {
-            const uint32_t pitch = test->width * wl_drm_format_cpp(test->drm_format);
             const VkImageAspectFlagBits aspect = bo->mem_plane_count > 1
                                                      ? (VK_IMAGE_ASPECT_PLANE_0_BIT << plane)
                                                      : VK_IMAGE_ASPECT_COLOR_BIT;
@@ -140,8 +190,14 @@ wl_test_dispatch_redraw(void *data)
                 vk_allocator_bo_map_transfer(alloc, bo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, aspect,
                                              0, 0, test->width, test->height);
 
+            uint32_t pitch = test->width;
+            if (bo->mem_plane_count == 1)
+                pitch *= wl_drm_format_cpp(test->drm_format);
+            else if (plane > 0 && bo->mem_plane_count > 2)
+                pitch /= 2;
+
             if (bo->mem_plane_count > 1)
-                wl_die("TODO multiplanar");
+                wl_test_paint_yuv_pattern(test, xfer->staging->mem_ptr, pitch, plane);
             else
                 wl_test_paint_rgba_pattern(test, xfer->staging->mem_ptr, pitch);
 

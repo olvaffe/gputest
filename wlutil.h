@@ -589,6 +589,10 @@ wl_drm_format_cpp(uint32_t format)
         return 4;
     case DRM_FORMAT_RGB565:
         return 2;
+    case DRM_FORMAT_YVU420:
+    case DRM_FORMAT_NV12:
+        /* it's more like 1.5 but it does not really matter */
+        return 2;
     default:
         return 0;
     }
@@ -598,6 +602,10 @@ static inline uint32_t
 wl_drm_format_plane_count(uint32_t format)
 {
     switch (format) {
+    case DRM_FORMAT_YVU420:
+        return 3;
+    case DRM_FORMAT_NV12:
+        return 2;
     default:
         return 1;
     }
