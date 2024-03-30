@@ -49,11 +49,13 @@ wl_test_paint_yuv_pattern(struct wl_test *test, void *dst, uint32_t pitch, uint3
 {
     for (uint32_t y = 0; y < test->height; y++) {
         const float v = (float)y / (test->height - 1);
-        const float yuv[3] = {
-            1.0f - v,
-            0.0f,
-            0.0f,
+        const uint8_t rgb[3] = {
+            (int)((1.0f - v) * 255),
+            (int)(0.1f * 255),
+            (int)(v * 255),
         };
+        uint8_t yuv[3];
+        vk_rgb_to_yuv(rgb, yuv);
 
         union {
             void *ptr;
@@ -68,7 +70,7 @@ wl_test_paint_yuv_pattern(struct wl_test *test, void *dst, uint32_t pitch, uint3
         } packed;
 
         if (plane == 0) {
-            packed.u8 = (int)(yuv[0] * 255);
+            packed.u8 = yuv[0];
             memset(row.u8, packed.u8, test->width);
             continue;
         }
@@ -80,11 +82,11 @@ wl_test_paint_yuv_pattern(struct wl_test *test, void *dst, uint32_t pitch, uint3
         for (uint32_t x = 0; x < test->width / 2; x++) {
             switch (test->drm_format) {
             case DRM_FORMAT_YVU420:
-                packed.u8 = (int)(yuv[3 - plane] * 255);
+                packed.u8 = yuv[3 - plane];
                 row.u8[x] = packed.u8;
                 break;
             case DRM_FORMAT_NV12:
-                packed.u16 = (int)(yuv[1] * 255) << 0 | (int)(yuv[2] * 255) << 8;
+                packed.u16 = yuv[1] | yuv[2] << 8;
                 row.u16[x] = packed.u16;
                 break;
             default:
@@ -168,7 +170,6 @@ wl_test_dispatch_redraw(void *data)
 
         assert(bo->mem_plane_count == wl_drm_format_plane_count(test->drm_format));
         for (uint32_t plane = 0; plane < bo->mem_plane_count; plane++) {
-
             if (bo->mem_plane_count > 1)
                 wl_test_paint_yuv_pattern(test, ptr + offsets[plane], pitches[plane], plane);
             else
@@ -178,30 +179,44 @@ wl_test_dispatch_redraw(void *data)
         vk_allocator_bo_unmap(alloc, bo, 0);
     } else {
         struct vk_allocator_bo *bo = img->data;
+        if (bo->mem_plane_count == 1) {
+            const uint32_t pitch = test->width * wl_drm_format_cpp(test->drm_format);
+            struct vk_allocator_bo *bo = img->data;
+            struct vk_allocator_transfer *xfer = vk_allocator_bo_map_transfer(
+                alloc, bo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, 0, 0,
+                test->width, test->height);
 
-        if ((bo->mem_plane_count != wl_drm_format_plane_count(test->drm_format)))
-            wl_die("no aux plane support");
-
-        for (uint32_t plane = 0; plane < bo->mem_plane_count; plane++) {
-            const VkImageAspectFlagBits aspect = bo->mem_plane_count > 1
-                                                     ? (VK_IMAGE_ASPECT_PLANE_0_BIT << plane)
-                                                     : VK_IMAGE_ASPECT_COLOR_BIT;
-            struct vk_allocator_transfer *xfer =
-                vk_allocator_bo_map_transfer(alloc, bo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, aspect,
-                                             0, 0, test->width, test->height);
-
-            uint32_t pitch = test->width;
-            if (bo->mem_plane_count == 1)
-                pitch *= wl_drm_format_cpp(test->drm_format);
-            else if (plane > 0 && bo->mem_plane_count > 2)
-                pitch /= 2;
-
-            if (bo->mem_plane_count > 1)
-                wl_test_paint_yuv_pattern(test, xfer->staging->mem_ptr, pitch, plane);
-            else
-                wl_test_paint_rgba_pattern(test, xfer->staging->mem_ptr, pitch);
+            wl_test_paint_rgba_pattern(test, xfer->staging->mem_ptr, pitch);
 
             vk_allocator_bo_unmap_transfer(alloc, bo, xfer);
+        } else {
+            struct vk_allocator_bo *bo = img->data;
+
+            if (bo->mem_plane_count != wl_drm_format_plane_count(test->drm_format))
+                wl_die("no aux plane support");
+
+            for (uint32_t plane = 0; plane < bo->mem_plane_count; plane++) {
+                const VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_PLANE_0_BIT << plane;
+                uint32_t width = test->width;
+                uint32_t height = test->height;
+                uint32_t pitch = test->width;
+
+                /* 420 subsampling */
+                if (plane > 0) {
+                    width /= 2;
+                    height /= 2;
+
+                    if (bo->mem_plane_count == 3)
+                        pitch /= 2;
+                }
+
+                struct vk_allocator_transfer *xfer = vk_allocator_bo_map_transfer(
+                    alloc, bo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, aspect, 0, 0, width, height);
+
+                wl_test_paint_yuv_pattern(test, xfer->staging->mem_ptr, pitch, plane);
+
+                vk_allocator_bo_unmap_transfer(alloc, bo, xfer);
+            }
         }
     }
 
