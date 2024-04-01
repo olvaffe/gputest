@@ -7,6 +7,9 @@
 #define DRMUTIL_H
 
 #include <assert.h>
+#include <drm.h>
+#include <drm_fourcc.h>
+#include <drm_mode.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -28,6 +31,27 @@ struct drm_init_params {
     int unused;
 };
 
+struct drm_properties {
+    drmModePropertyPtr *props;
+    uint64_t *values;
+    uint32_t count;
+};
+
+struct drm_fb {
+    uint32_t id;
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+    uint64_t modifier;
+
+    uint32_t handles[4];
+    uint32_t offsets[4];
+    uint32_t pitches[4];
+    uint32_t plane_count;
+
+    struct drm_properties *properties;
+};
+
 struct drm_plane {
     uint32_t id;
     uint32_t *formats;
@@ -36,15 +60,22 @@ struct drm_plane {
 
     uint32_t fb_id;
     uint32_t crtc_id;
+
+    struct drm_properties *properties;
 };
 
 struct drm_crtc {
     uint32_t id;
     uint32_t gamma_size;
 
+    bool mode_valid;
     struct drm_mode_modeinfo mode;
     uint32_t x;
     uint32_t y;
+    uint64_t seq;
+    uint64_t ns;
+
+    struct drm_properties *properties;
 };
 
 struct drm_connector {
@@ -57,6 +88,8 @@ struct drm_connector {
 
     uint32_t crtc_id;
     bool connected;
+
+    struct drm_properties *properties;
 };
 
 struct drm {
@@ -77,6 +110,9 @@ struct drm {
     uint32_t max_height;
     uint32_t min_width;
     uint32_t min_height;
+
+    struct drm_fb *fbs;
+    uint32_t fb_count;
 
     struct drm_plane *planes;
     uint32_t plane_count;
@@ -229,12 +265,37 @@ drm_open(struct drm *drm, uint32_t idx, int node_type)
 static inline void
 drm_close(struct drm *drm)
 {
-    if (drm->connectors)
-        free(drm->connectors);
-    if (drm->crtcs)
-        free(drm->crtcs);
-    if (drm->planes)
-        free(drm->planes);
+    for (uint32_t i = 0; i < drm->connector_count; i++)
+        free(drm->connectors[i].properties);
+    free(drm->connectors);
+
+    for (uint32_t i = 0; i < drm->crtc_count; i++)
+        free(drm->crtcs[i].properties);
+    free(drm->crtcs);
+
+    for (uint32_t i = 0; i < drm->plane_count; i++) {
+        free(drm->planes[i].formats);
+        free(drm->planes[i].properties);
+    }
+    free(drm->planes);
+
+    for (uint32_t i = 0; i < drm->plane_count; i++) {
+        struct drm_fb *fb = &drm->fbs[i];
+
+        for (uint32_t j = 0; j < fb->plane_count; j++) {
+            if (!fb->handles[j])
+                continue;
+
+            drmCloseBufferHandle(drm->fd, fb->handles[j]);
+            for (uint32_t k = j + 1; k < fb->plane_count; k++) {
+                if (fb->handles[k] == fb->handles[j])
+                    fb->handles[k] = 0;
+            }
+        }
+
+        free(fb->properties);
+    }
+    free(drm->fbs);
 
     memset(drm->client_caps, 0, sizeof(drm->client_caps));
     memset(drm->caps, 0, sizeof(drm->caps));
@@ -247,6 +308,32 @@ drm_close(struct drm *drm)
 
     close(drm->fd);
     drm->fd = -1;
+}
+
+static inline struct drm_properties *
+drm_scan_resource_properties(struct drm *drm, uint32_t res_id)
+{
+    drmModeObjectPropertiesPtr src =
+        drmModeObjectGetProperties(drm->fd, res_id, DRM_MODE_OBJECT_ANY);
+    if (!src)
+        return NULL;
+
+    struct drm_properties *dst =
+        malloc(sizeof(*dst) + (sizeof(*dst->props) + sizeof(*dst->values)) * src->count_props);
+    if (!dst)
+        drm_die("failed to alloc props");
+    dst->props = (void *)&dst[1];
+    dst->values = (void *)&dst->props[src->count_props];
+    dst->count = src->count_props;
+
+    for (uint32_t i = 0; i < src->count_props; i++) {
+        dst->props[i] = drmModeGetProperty(drm->fd, src->props[i]);
+        dst->values[i] = src->prop_values[i];
+    }
+
+    drmModeFreeObjectProperties(src);
+
+    return dst;
 }
 
 static inline void
@@ -264,6 +351,9 @@ drm_scan_resources(struct drm *drm)
 
     if (res->count_fbs)
         drm_die("unexpected fb count");
+    drm->fbs = calloc(plane_res->count_planes, sizeof(*drm->fbs));
+    if (!drm->fbs)
+        drm_die("failed to alloc fbs");
 
     drm->plane_count = plane_res->count_planes;
     drm->planes = calloc(plane_res->count_planes, sizeof(*drm->planes));
@@ -275,7 +365,11 @@ drm_scan_resources(struct drm *drm)
         drmModePlanePtr src = drmModeGetPlane(drm->fd, res_id);
 
         dst->id = src->plane_id;
-        dst->formats = NULL;
+
+        static_assert(sizeof(*dst->formats) == sizeof(*src->formats), "");
+        const size_t formats_size = sizeof(*src->formats) * src->count_formats;
+        dst->formats = malloc(formats_size);
+        memcpy(dst->formats, src->formats, formats_size);
         dst->format_count = src->count_formats;
         dst->possible_crtcs = src->possible_crtcs;
 
@@ -288,6 +382,48 @@ drm_scan_resources(struct drm *drm)
             drm_die("plane gamma is unexpectedly initialized by kernel");
 
         drmModeFreePlane(src);
+
+        dst->properties = drm_scan_resource_properties(drm, res_id);
+
+        /* count unique fb ids */
+        if (dst->fb_id) {
+            bool found = false;
+            for (uint32_t i = 0; i < drm->fb_count; i++) {
+                if (drm->fbs[i].id == dst->fb_id) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                drm->fbs[drm->fb_count++].id = dst->fb_id;
+        }
+    }
+
+    for (uint32_t i = 0; i < drm->fb_count; i++) {
+        struct drm_fb *dst = &drm->fbs[i];
+        const uint32_t res_id = dst->id;
+        drmModeFB2Ptr src = drmModeGetFB2(drm->fd, res_id);
+
+        dst->width = src->width;
+        dst->height = src->height;
+        dst->format = src->pixel_format;
+        dst->modifier =
+            src->flags & DRM_MODE_FB_MODIFIERS ? src->modifier : DRM_FORMAT_MOD_INVALID;
+
+        for (uint32_t j = 0; j < ARRAY_SIZE(src->pitches); j++) {
+            if (src->pitches[j])
+                dst->plane_count++;
+        }
+        static_assert(sizeof(dst->handles) == sizeof(src->handles), "");
+        static_assert(sizeof(dst->offsets) == sizeof(src->offsets), "");
+        static_assert(sizeof(dst->pitches) == sizeof(src->pitches), "");
+        memcpy(dst->handles, src->handles, sizeof(*dst->handles) * dst->plane_count);
+        memcpy(dst->offsets, src->offsets, sizeof(*dst->offsets) * dst->plane_count);
+        memcpy(dst->pitches, src->pitches, sizeof(*dst->pitches) * dst->plane_count);
+
+        drmModeFreeFB2(src);
+
+        dst->properties = drm_scan_resource_properties(drm, res_id);
     }
 
     drm->crtc_count = res->count_crtcs;
@@ -302,6 +438,7 @@ drm_scan_resources(struct drm *drm)
         dst->id = src->crtc_id;
         dst->gamma_size = src->gamma_size;
 
+        dst->mode_valid = src->mode_valid;
         if (src->mode_valid) {
             static_assert(sizeof(dst->mode) == sizeof(src->mode), "");
             memcpy(&dst->mode, &src->mode, sizeof(src->mode));
@@ -310,6 +447,10 @@ drm_scan_resources(struct drm *drm)
         dst->y = src->y;
 
         drmModeFreeCrtc(src);
+
+        drmCrtcGetSequence(drm->fd, dst->id, &dst->seq, &dst->ns);
+
+        dst->properties = drm_scan_resource_properties(drm, res_id);
     }
 
     drmModeEncoderPtr *encoders = calloc(res->count_encoders, sizeof(*encoders));
@@ -346,6 +487,8 @@ drm_scan_resources(struct drm *drm)
         dst->connected = src->connection == DRM_MODE_CONNECTED;
 
         drmModeFreeConnector(src);
+
+        dst->properties = drm_scan_resource_properties(drm, res_id);
     }
 
     for (int i = 0; i < res->count_encoders; i++)
@@ -354,6 +497,88 @@ drm_scan_resources(struct drm *drm)
 
     drmModeFreeResources(res);
     drmModeFreePlaneResources(plane_res);
+}
+
+static inline void
+drm_dump_property(struct drm *drm, const drmModePropertyPtr prop, uint64_t val, const char *indent)
+{
+    const bool immutable = prop->flags & DRM_MODE_PROP_IMMUTABLE;
+    const bool atomic = prop->flags & DRM_MODE_PROP_ATOMIC;
+    const uint32_t type = drmModeGetPropertyType(prop);
+
+    char val_str[DRM_PROP_NAME_LEN * 3] = "invalid";
+    int cur = 0;
+    switch (type) {
+    case DRM_MODE_PROP_RANGE:
+        snprintf(val_str, sizeof(val_str), "val %" PRIu64, val);
+        break;
+    case DRM_MODE_PROP_ENUM:
+        for (int i = 0; i < prop->count_enums; i++) {
+            const struct drm_mode_property_enum *p = &prop->enums[i];
+            if (p->value == val) {
+                snprintf(val_str, sizeof(val_str), "val %" PRIi64 " (%s)", val, p->name);
+                break;
+            }
+        }
+        break;
+    case DRM_MODE_PROP_BLOB:
+        snprintf(val_str, sizeof(val_str), "blob %d", (uint32_t)val);
+        break;
+    case DRM_MODE_PROP_BITMASK:
+        cur = snprintf(val_str, sizeof(val_str), "val 0x%" PRIx64, val);
+        if (val) {
+            cur += snprintf(val_str + cur, sizeof(val_str) - cur, " (");
+
+            for (int i = 0; i < prop->count_enums; i++) {
+                const struct drm_mode_property_enum *p = &prop->enums[i];
+                if (val & (1ull << p->value))
+                    cur += snprintf(val_str + cur, sizeof(val_str) - cur, "%s|", p->name);
+            }
+            cur -= 1;
+
+            cur += snprintf(val_str + cur, sizeof(val_str) - cur, ")");
+        }
+        break;
+    case DRM_MODE_PROP_OBJECT:
+        snprintf(val_str, sizeof(val_str), "obj %d", (uint32_t)val);
+        break;
+    case DRM_MODE_PROP_SIGNED_RANGE:
+        snprintf(val_str, sizeof(val_str), "val %" PRIi64, val);
+        break;
+    default:
+        break;
+    }
+
+    drm_log("%s%s%s \"%s\": %s", indent, immutable ? "immutable " : "",
+            atomic ? "atomic" : "prop", prop->name, val_str);
+}
+
+static inline void
+drm_dump_properties(struct drm *drm, const struct drm_properties *props, const char *indent)
+{
+    for (uint32_t i = 0; i < props->count; i++)
+        drm_dump_property(drm, props->props[i], props->values[i], indent);
+}
+
+static inline void
+drm_dump_plane_formats(struct drm *drm, const struct drm_plane *plane, const char *indent)
+{
+            const struct drm_properties *props = plane->properties;
+
+            for (uint32_t j = 0; j < plane->format_count; j++)
+                drm_log("      '%.*s'", 4, (const char *)&plane->formats[j]);
+
+            for (uint32_t j = 0; j < props->count; j++) {
+                const drmModePropertyPtr prop = props->props[j];
+                if (drmModeGetPropertyType(prop) != DRM_MODE_PROP_BLOB ||
+                    strcmp(prop->name, "IN_FORMATS"))
+                    continue;
+
+                const uint32_t blob_id = props->values[j];
+                drm_log("blob count %d id %lld", prop->count_blobs, (long long)props->values[j]);
+            }
+    for (uint32_t i = 0; i < props->count; i++)
+        drm_dump_property(drm, props->props[i], props->values[i], indent);
 }
 
 #endif /* DRMUTIL_H */

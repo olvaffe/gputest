@@ -5,6 +5,8 @@
 
 #include "drmutil.h"
 
+static bool opt_verbose = false;
+
 static void
 drm_dump_primary_device(struct drm *drm, uint32_t idx)
 {
@@ -24,30 +26,69 @@ drm_dump_primary_device(struct drm *drm, uint32_t idx)
     drm_log("  min size: %dx%d", drm->min_width, drm->min_height);
     drm_log("  max size: %dx%d", drm->max_width, drm->max_height);
 
+    drm_log("  fb count: %d", drm->fb_count);
+    for (uint32_t i = 0; i < drm->fb_count; i++) {
+        const struct drm_fb *fb = &drm->fbs[i];
+        drm_log("    fb[%d]: id %d, size %dx%d, format '%.*s', modifier 0x%" PRIx64
+                ", plane count %d",
+                i, fb->id, fb->width, fb->height, 4, (const char *)&fb->format, fb->modifier,
+                fb->plane_count);
+
+        for (uint32_t j = 0; j < fb->plane_count; j++) {
+            drm_log("      plane[%d]: handle %d, offset %d, pitch %d", j, fb->handles[j],
+                    fb->offsets[j], fb->pitches[j]);
+        }
+
+        if (fb->properties)
+            drm_dump_properties(drm, fb->properties, "      ");
+    }
+
     drm_log("  plane count: %d", drm->plane_count);
     for (uint32_t i = 0; i < drm->plane_count; i++) {
         const struct drm_plane *plane = &drm->planes[i];
-        drm_log("    plane[%d]: id %d, fb %d, crtc %d, mask 0x%x", i, plane->id, plane->fb_id,
-                plane->crtc_id, plane->possible_crtcs);
-        // drm_log("    plane[%d] format count: %d", i, plane->format_count);
+        if (!plane->crtc_id && !opt_verbose)
+            continue;
+
+        drm_log("    plane[%d]: id %d, fb id %d, crtc id %d, mask 0x%x, format count %d", i,
+                plane->id, plane->fb_id, plane->crtc_id, plane->possible_crtcs,
+                plane->format_count);
+
+        if (true || opt_verbose)
+            drm_dump_plane_formats(drm, plane, "      ");
+
+        if (plane->properties)
+            drm_dump_properties(drm, plane->properties, "      ");
     }
 
     drm_log("  crtc count: %d", drm->crtc_count);
     for (uint32_t i = 0; i < drm->crtc_count; i++) {
         const struct drm_crtc *crtc = &drm->crtcs[i];
-        drm_log("    crtc[%d]: id %d, mode %s, offset %dx%d, gamma %d", i, crtc->id,
-                crtc->mode.name[0] != '\0' ? crtc->mode.name : "invalid", crtc->x, crtc->y,
-                crtc->gamma_size);
+        if (!crtc->mode_valid && !opt_verbose)
+            continue;
+
+        drm_log("    crtc[%d]: id %d, mode %s, offset %dx%d, seq %" PRIu64 ", ns %" PRIu64
+                ", gamma %d",
+                i, crtc->id, crtc->mode.name[0] != '\0' ? crtc->mode.name : "invalid", crtc->x,
+                crtc->y, crtc->seq, crtc->ns, crtc->gamma_size);
+
+        if (crtc->properties)
+            drm_dump_properties(drm, crtc->properties, "      ");
     }
 
     drm_log("  connector count: %d", drm->connector_count);
     for (uint32_t i = 0; i < drm->connector_count; i++) {
         const struct drm_connector *connector = &drm->connectors[i];
-        drm_log("    connector[%d]: id %d, crtc %d, connected %d, type %s-%d, size %dx%d, "
+        if (!connector->crtc_id && !opt_verbose)
+            continue;
+
+        drm_log("    connector[%d]: id %d, crtc id %d, connected %d, type %s-%d, size %dx%d, "
                 "mask 0x%x",
                 i, connector->id, connector->crtc_id, connector->connected,
                 drmModeGetConnectorTypeName(connector->type), connector->type_id,
                 connector->width_mm, connector->height_mm, connector->possible_crtcs);
+
+        if (connector->properties)
+            drm_dump_properties(drm, connector->properties, "      ");
     }
 }
 
@@ -119,8 +160,13 @@ drm_dump_devices(struct drm *drm)
 }
 
 int
-main(void)
+main(int argc, char **argv)
 {
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-v"))
+            opt_verbose = true;
+    }
+
     struct drm drm;
     drm_init(&drm, NULL);
     drm_dump_devices(&drm);
