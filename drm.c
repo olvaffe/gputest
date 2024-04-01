@@ -6,7 +6,53 @@
 #include "drmutil.h"
 
 static void
-drm_dump_device(struct drm *drm, int idx)
+drm_dump_primary_device(struct drm *drm, uint32_t idx)
+{
+    drm_log("device %d client caps set", idx);
+    drm_log("  stereo_3d: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_STEREO_3D]);
+    drm_log("  universal_planes: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_UNIVERSAL_PLANES]);
+    drm_log("  atomic: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_ATOMIC]);
+    drm_log("  aspect_ratio: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_ASPECT_RATIO]);
+    drm_log("  writeback_connectors: %" PRIu64,
+            drm->client_caps[DRM_CLIENT_CAP_WRITEBACK_CONNECTORS]);
+    drm_log("  cursor_plane_hotspot: %" PRIu64,
+            drm->client_caps[DRM_CLIENT_CAP_CURSOR_PLANE_HOTSPOT]);
+
+    drm_scan_resources(drm);
+    drm_log("device %d scanned", idx);
+
+    drm_log("  min size: %dx%d", drm->min_width, drm->min_height);
+    drm_log("  max size: %dx%d", drm->max_width, drm->max_height);
+
+    drm_log("  plane count: %d", drm->plane_count);
+    for (uint32_t i = 0; i < drm->plane_count; i++) {
+        const struct drm_plane *plane = &drm->planes[i];
+        drm_log("    plane[%d]: id %d, fb %d, crtc %d, mask 0x%x", i, plane->id, plane->fb_id,
+                plane->crtc_id, plane->possible_crtcs);
+        // drm_log("    plane[%d] format count: %d", i, plane->format_count);
+    }
+
+    drm_log("  crtc count: %d", drm->crtc_count);
+    for (uint32_t i = 0; i < drm->crtc_count; i++) {
+        const struct drm_crtc *crtc = &drm->crtcs[i];
+        drm_log("    crtc[%d]: id %d, mode %s, offset %dx%d, gamma %d", i, crtc->id,
+                crtc->mode.name[0] != '\0' ? crtc->mode.name : "invalid", crtc->x, crtc->y,
+                crtc->gamma_size);
+    }
+
+    drm_log("  connector count: %d", drm->connector_count);
+    for (uint32_t i = 0; i < drm->connector_count; i++) {
+        const struct drm_connector *connector = &drm->connectors[i];
+        drm_log("    connector[%d]: id %d, crtc %d, connected %d, type %s-%d, size %dx%d, "
+                "mask 0x%x",
+                i, connector->id, connector->crtc_id, connector->connected,
+                drmModeGetConnectorTypeName(connector->type), connector->type_id,
+                connector->width_mm, connector->height_mm, connector->possible_crtcs);
+    }
+}
+
+static void
+drm_dump_device(struct drm *drm, uint32_t idx)
 {
     drmDevicePtr dev = drm->devices[idx];
 
@@ -33,15 +79,16 @@ drm_dump_device(struct drm *drm, int idx)
     }
 
     drm_open(drm, idx, DRM_NODE_PRIMARY);
+    drm_log("device %d opened", idx);
 
-    drm_log("  node type: %s", drm->node_type == DRM_NODE_PRIMARY ? "primary" : "render");
-    drm_log("  master: %d", drm->master);
-    drm_log("  kmd version: %d.%d.%d", drm->version->version_major, drm->version->version_minor,
+    drm_log("  fd node type: %s", drm->node_type == DRM_NODE_PRIMARY ? "primary" : "render");
+    drm_log("  fd master: %d", drm->master);
+    drm_log("  version: %d.%d.%d", drm->version->version_major, drm->version->version_minor,
             drm->version->version_patchlevel);
-    drm_log("  kmd name: %s", drm->version->name);
-    drm_log("  kmd date: %s", drm->version->date);
-    drm_log("  kmd desc: %s", drm->version->desc);
-    drm_log("  kmd caps:");
+    drm_log("    name: %s", drm->version->name);
+    drm_log("    date: %s", drm->version->date);
+    drm_log("    desc: %s", drm->version->desc);
+    drm_log("  caps:");
     drm_log("    dumb_buffer: %" PRIu64, drm->caps[DRM_CAP_DUMB_BUFFER]);
     drm_log("    vblank_high_crtc: %" PRIu64, drm->caps[DRM_CAP_VBLANK_HIGH_CRTC]);
     drm_log("    dumb_preferred_depth: %" PRIu64, drm->caps[DRM_CAP_DUMB_PREFERRED_DEPTH]);
@@ -57,23 +104,9 @@ drm_dump_device(struct drm *drm, int idx)
     drm_log("    syncobj: %" PRIu64, drm->caps[DRM_CAP_SYNCOBJ]);
     drm_log("    syncobj_timeline: %" PRIu64, drm->caps[DRM_CAP_SYNCOBJ_TIMELINE]);
     drm_log("    atomic_async_page_flip: %" PRIu64, drm->caps[DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP]);
-    drm_log("  kmd client caps:");
-    drm_log("    stereo_3d: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_STEREO_3D]);
-    drm_log("    universal_planes: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_UNIVERSAL_PLANES]);
-    drm_log("    atomic: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_ATOMIC]);
-    drm_log("    aspect_ratio: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_ASPECT_RATIO]);
-    drm_log("    writeback_connectors: %" PRIu64,
-            drm->client_caps[DRM_CLIENT_CAP_WRITEBACK_CONNECTORS]);
-    drm_log("    cursor_plane_hotspot: %" PRIu64,
-            drm->client_caps[DRM_CLIENT_CAP_CURSOR_PLANE_HOTSPOT]);
 
-    drm_log("  fb count: %d", drm->resources->count_fbs);
-    drm_log("  crtc count: %d", drm->resources->count_crtcs);
-    drm_log("  connector count: %d", drm->resources->count_connectors);
-    drm_log("  encoder count: %d", drm->resources->count_encoders);
-    drm_log("  min size: (%d, %d)", drm->resources->min_width, drm->resources->min_height);
-    drm_log("  max size: (%d, %d)", drm->resources->max_width, drm->resources->max_height);
-    drm_log("  plane count: %d", drm->plane_resources->count_planes);
+    if (drm->node_type == DRM_NODE_PRIMARY)
+        drm_dump_primary_device(drm, idx);
 
     drm_close(drm);
 }
@@ -81,7 +114,7 @@ drm_dump_device(struct drm *drm, int idx)
 static void
 drm_dump_devices(struct drm *drm)
 {
-    for (int i = 0; i < drm->device_count; i++)
+    for (uint32_t i = 0; i < drm->device_count; i++)
         drm_dump_device(drm, i);
 }
 
