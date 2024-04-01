@@ -265,8 +265,7 @@ wl_test_init_swapchain(struct wl_test *test)
 
     const VkMemoryPropertyFlags mt_flags =
         test->modifier == DRM_FORMAT_MOD_LINEAR
-            ? (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-               VK_MEMORY_PROPERTY_HOST_CACHED_BIT)
+            ? (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT)
             : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     const VkImageUsageFlags img_usage =
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -350,8 +349,8 @@ main(void)
     struct wl_test test = {
         .width = 320,
         .height = 240,
-        .vk_format = VK_FORMAT_B8G8R8A8_UNORM,
-        .drm_format = DRM_FORMAT_ARGB8888,
+        .vk_format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
+        .drm_format = DRM_FORMAT_NV12,
         .modifier = DRM_FORMAT_MOD_LINEAR,
         .shm = false,
     };

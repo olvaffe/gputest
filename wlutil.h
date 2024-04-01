@@ -407,10 +407,8 @@ wl_registry_event_global(
 {
     struct wl *wl = data;
 
-    if (!strcmp(interface, wl_compositor_interface.name) &&
-        version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
-        wl->compositor = wl_registry_bind(reg, name, &wl_compositor_interface,
-                                          WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION);
+    if (!strcmp(interface, wl_compositor_interface.name)) {
+        wl->compositor = wl_registry_bind(reg, name, &wl_compositor_interface, 1);
     } else if (!strcmp(interface, xdg_wm_base_interface.name)) {
         wl->wm_base = wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(wl->wm_base, &xdg_wm_base_listener, wl);
@@ -793,7 +791,7 @@ wl_present_swapchain_image(struct wl *wl,
     assert(wl->xdg_ready);
 
     wl_surface_attach(wl->surface, img->buffer, 0, 0);
-    wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
+    wl_surface_damage(wl->surface, 0, 0, swapchain->width, swapchain->height);
     wl_surface_commit(wl->surface);
 }
 
