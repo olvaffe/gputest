@@ -11,12 +11,10 @@ drm_dump_device(struct drm *drm, int idx)
     drmDevicePtr dev = drm->devices[idx];
 
     drm_log("device %d", idx);
-    int node_type = -1;
     for (int i = 0; i < DRM_NODE_MAX; i++) {
         if (!(dev->available_nodes & (1 << i)))
             continue;
         drm_log("  node type %d: %s", i, dev->nodes[i]);
-        node_type = i;
     }
 
     switch (dev->bustype) {
@@ -34,7 +32,10 @@ drm_dump_device(struct drm *drm, int idx)
         break;
     }
 
-    drm_open(drm, idx, node_type);
+    drm_open(drm, idx, DRM_NODE_PRIMARY);
+
+    drm_log("  node type: %s", drm->node_type == DRM_NODE_PRIMARY ? "primary" : "render");
+    drm_log("  master: %d", drm->master);
     drm_log("  kmd version: %d.%d.%d", drm->version->version_major, drm->version->version_minor,
             drm->version->version_patchlevel);
     drm_log("  kmd name: %s", drm->version->name);
@@ -56,6 +57,24 @@ drm_dump_device(struct drm *drm, int idx)
     drm_log("    syncobj: %" PRIu64, drm->caps[DRM_CAP_SYNCOBJ]);
     drm_log("    syncobj_timeline: %" PRIu64, drm->caps[DRM_CAP_SYNCOBJ_TIMELINE]);
     drm_log("    atomic_async_page_flip: %" PRIu64, drm->caps[DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP]);
+    drm_log("  kmd client caps:");
+    drm_log("    stereo_3d: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_STEREO_3D]);
+    drm_log("    universal_planes: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_UNIVERSAL_PLANES]);
+    drm_log("    atomic: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_ATOMIC]);
+    drm_log("    aspect_ratio: %" PRIu64, drm->client_caps[DRM_CLIENT_CAP_ASPECT_RATIO]);
+    drm_log("    writeback_connectors: %" PRIu64,
+            drm->client_caps[DRM_CLIENT_CAP_WRITEBACK_CONNECTORS]);
+    drm_log("    cursor_plane_hotspot: %" PRIu64,
+            drm->client_caps[DRM_CLIENT_CAP_CURSOR_PLANE_HOTSPOT]);
+
+    drm_log("  fb count: %d", drm->resources->count_fbs);
+    drm_log("  crtc count: %d", drm->resources->count_crtcs);
+    drm_log("  connector count: %d", drm->resources->count_connectors);
+    drm_log("  encoder count: %d", drm->resources->count_encoders);
+    drm_log("  min size: (%d, %d)", drm->resources->min_width, drm->resources->min_height);
+    drm_log("  max size: (%d, %d)", drm->resources->max_width, drm->resources->max_height);
+    drm_log("  plane count: %d", drm->plane_resources->count_planes);
+
     drm_close(drm);
 }
 

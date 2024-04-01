@@ -36,8 +36,13 @@ struct drm {
     int device_count;
 
     int fd;
+    int node_type;
+    bool master;
     drmVersionPtr version;
     uint64_t caps[64];
+    uint64_t client_caps[64];
+    drmModeResPtr resources;
+    drmModePlaneResPtr plane_resources;
 };
 
 static inline void
@@ -128,6 +133,9 @@ drm_open(struct drm *drm, int idx, int type)
     if (drm->fd < 0)
         drm_die("failed to open %s", dev->nodes[type]);
 
+    drm->node_type = type;
+    drm->master = drmIsMaster(drm->fd);
+
     drm->version = drmGetVersion(drm->fd);
     if (!drm->version)
         drm_die("failed to get version");
@@ -156,11 +164,38 @@ drm_open(struct drm *drm, int idx, int type)
         if (drm->ret < 0)
             drm->caps[key] = 0;
     }
+
+    if (type == DRM_NODE_PRIMARY) {
+        const uint64_t client_cap_keys[] = { DRM_CLIENT_CAP_STEREO_3D,
+                                             DRM_CLIENT_CAP_UNIVERSAL_PLANES,
+                                             DRM_CLIENT_CAP_ATOMIC,
+                                             DRM_CLIENT_CAP_ASPECT_RATIO,
+                                             DRM_CLIENT_CAP_WRITEBACK_CONNECTORS,
+                                             DRM_CLIENT_CAP_CURSOR_PLANE_HOTSPOT };
+        for (uint32_t i = 0; i < ARRAY_SIZE(client_cap_keys); i++) {
+            const uint64_t key = client_cap_keys[i];
+            const uint64_t val = 1;
+            assert(key < ARRAY_SIZE(drm->client_caps));
+            drm->ret = drmSetClientCap(drm->fd, key, val);
+            if (!drm->ret)
+                drm->client_caps[key] = val;
+        }
+
+        drm->resources = drmModeGetResources(drm->fd);
+        drm->plane_resources = drmModeGetPlaneResources(drm->fd);
+    }
 }
 
 static inline void
 drm_close(struct drm *drm)
 {
+    if (drm->node_type == DRM_NODE_PRIMARY) {
+        drmModeFreePlaneResources(drm->plane_resources);
+        drmModeFreeResources(drm->resources);
+
+        memset(drm->client_caps, 0, sizeof(drm->client_caps));
+    }
+
     memset(drm->caps, 0, sizeof(drm->caps));
 
     drmFreeVersion(drm->version);
