@@ -34,6 +34,7 @@ struct wl {
     int display_fd;
 
     struct wl_compositor *compositor;
+    uint32_t compositor_version;
 
     struct wl_seat *seat;
     struct wl_keyboard *keyboard;
@@ -44,6 +45,7 @@ struct wl {
     struct wl_array shm_formats;
 
     struct zwp_linux_dmabuf_v1 *dmabuf;
+    uint32_t dmabuf_version;
 
     struct wl_surface *surface;
     struct xdg_surface *xdg_surface;
@@ -295,6 +297,49 @@ static const struct wl_buffer_listener wl_buffer_listener = {
 };
 
 static void
+zwp_linux_dmabuf_v1_event_format(void *data, struct zwp_linux_dmabuf_v1 *dmabuf, uint32_t format)
+{
+}
+
+static void
+zwp_linux_dmabuf_v1_event_modifier(void *data,
+                                   struct zwp_linux_dmabuf_v1 *dmabuf,
+                                   uint32_t format,
+                                   uint32_t modifier_hi,
+                                   uint32_t modifier_lo)
+{
+    struct wl *wl = data;
+
+    assert(wl->dmabuf_version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION);
+
+    struct wl_array *fmt_iter;
+    bool found = false;
+    wl_array_for_each(fmt_iter, &wl->active.formats)
+    {
+        const uint64_t *fmt_iter_fmt = fmt_iter->data;
+        if (*fmt_iter_fmt == format) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        fmt_iter = wl_array_add(&wl->active.formats, sizeof(*fmt_iter));
+        wl_array_init(fmt_iter);
+
+        uint64_t *fmt_iter_fmt = wl_array_add(fmt_iter, sizeof(*fmt_iter_fmt));
+        *fmt_iter_fmt = format;
+    }
+
+    uint64_t *mod_iter = wl_array_add(fmt_iter, sizeof(*mod_iter));
+    *mod_iter = (uint64_t)modifier_hi << 32 | modifier_lo;
+}
+
+static const struct zwp_linux_dmabuf_v1_listener zwp_linux_dmabuf_v1_listener = {
+    .format = zwp_linux_dmabuf_v1_event_format,
+    .modifier = zwp_linux_dmabuf_v1_event_modifier,
+};
+
+static void
 wl_shm_event_format(void *data, struct wl_shm *wl_shm, uint32_t format)
 {
     struct wl *wl = data;
@@ -408,7 +453,10 @@ wl_registry_event_global(
     struct wl *wl = data;
 
     if (!strcmp(interface, wl_compositor_interface.name)) {
-        wl->compositor = wl_registry_bind(reg, name, &wl_compositor_interface, 1);
+        if (version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
+            version = WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION;
+        wl->compositor = wl_registry_bind(reg, name, &wl_compositor_interface, version);
+        wl->compositor_version = version;
     } else if (!strcmp(interface, xdg_wm_base_interface.name)) {
         wl->wm_base = wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(wl->wm_base, &xdg_wm_base_listener, wl);
@@ -421,9 +469,17 @@ wl_registry_event_global(
 
         wl_array_init(&wl->shm_formats);
     } else if (!strcmp(interface, zwp_linux_dmabuf_v1_interface.name) &&
-               version >= ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
-        wl->dmabuf = wl_registry_bind(reg, name, &zwp_linux_dmabuf_v1_interface,
-                                      ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION);
+               version >= ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION) {
+        if (version >= ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION)
+            version = ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION;
+        wl->dmabuf = wl_registry_bind(reg, name, &zwp_linux_dmabuf_v1_interface, version);
+        wl->dmabuf_version = version;
+
+        if (version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
+            zwp_linux_dmabuf_v1_add_listener(wl->dmabuf, &zwp_linux_dmabuf_v1_listener, wl);
+            wl_array_init(&wl->active.formats);
+            wl->active.tranche_count = 1;
+        }
     }
 }
 
@@ -479,6 +535,9 @@ wl_init_surface(struct wl *wl)
 static inline void
 wl_init_surface_dmabuf(struct wl *wl)
 {
+    if (wl->dmabuf_version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION)
+        return;
+
     wl->dmabuf_feedback = zwp_linux_dmabuf_v1_get_surface_feedback(wl->dmabuf, wl->surface);
     zwp_linux_dmabuf_feedback_v1_add_listener(wl->dmabuf_feedback,
                                               &zwp_linux_dmabuf_feedback_v1_listener, wl);
@@ -512,7 +571,8 @@ wl_cleanup(struct wl *wl)
     if (wl->dmabuf_format_table)
         munmap((void *)wl->dmabuf_format_table, wl->dmabuf_format_table_size);
 
-    zwp_linux_dmabuf_feedback_v1_destroy(wl->dmabuf_feedback);
+    if (wl->dmabuf_feedback)
+        zwp_linux_dmabuf_feedback_v1_destroy(wl->dmabuf_feedback);
 
     xdg_toplevel_destroy(wl->xdg_toplevel);
     xdg_surface_destroy(wl->xdg_surface);
@@ -572,6 +632,8 @@ wl_info(const struct wl *wl)
 static inline void
 wl_dispatch(const struct wl *wl)
 {
+    assert(wl->dispatch_ready);
+
     if (wl_display_dispatch(wl->display) < 0)
         wl_die("failed to dispatch display");
 }
@@ -791,7 +853,10 @@ wl_present_swapchain_image(struct wl *wl,
     assert(wl->xdg_ready);
 
     wl_surface_attach(wl->surface, img->buffer, 0, 0);
-    wl_surface_damage(wl->surface, 0, 0, swapchain->width, swapchain->height);
+    if (wl->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
+        wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
+    else
+        wl_surface_damage(wl->surface, 0, 0, swapchain->width, swapchain->height);
     wl_surface_commit(wl->surface);
 }
 
