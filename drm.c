@@ -26,10 +26,10 @@ drm_dump_primary_device(struct drm *drm, uint32_t idx)
     drm_log("  min size: %dx%d", drm->min_width, drm->min_height);
     drm_log("  max size: %dx%d", drm->max_width, drm->max_height);
 
-    drm_log("  fb count: %d", drm->fb_count);
-    for (uint32_t i = 0; i < drm->fb_count; i++) {
-        const struct drm_fb *fb = &drm->fbs[i];
-        drm_log("    fb[%d]: id %d, size %dx%d, format '%.*s', modifier 0x%" PRIx64
+    drm_log("  active fb count: %d", drm->active_fb_count);
+    for (uint32_t i = 0; i < drm->active_fb_count; i++) {
+        const struct drm_fb *fb = &drm->active_fbs[i];
+        drm_log("    active fb[%d]: id %d, size %dx%d, format '%.*s', modifier 0x%" PRIx64
                 ", plane count %d",
                 i, fb->id, fb->width, fb->height, 4, (const char *)&fb->format, fb->modifier,
                 fb->plane_count);
@@ -53,7 +53,7 @@ drm_dump_primary_device(struct drm *drm, uint32_t idx)
                 plane->id, plane->fb_id, plane->crtc_id, plane->possible_crtcs,
                 plane->format_count);
 
-        if (true || opt_verbose)
+        if (opt_verbose)
             drm_dump_plane_formats(drm, plane, "      ");
 
         if (plane->properties)

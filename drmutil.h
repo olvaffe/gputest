@@ -111,8 +111,8 @@ struct drm {
     uint32_t min_width;
     uint32_t min_height;
 
-    struct drm_fb *fbs;
-    uint32_t fb_count;
+    struct drm_fb *active_fbs;
+    uint32_t active_fb_count;
 
     struct drm_plane *planes;
     uint32_t plane_count;
@@ -279,8 +279,8 @@ drm_close(struct drm *drm)
     }
     free(drm->planes);
 
-    for (uint32_t i = 0; i < drm->plane_count; i++) {
-        struct drm_fb *fb = &drm->fbs[i];
+    for (uint32_t i = 0; i < drm->active_fb_count; i++) {
+        struct drm_fb *fb = &drm->active_fbs[i];
 
         for (uint32_t j = 0; j < fb->plane_count; j++) {
             if (!fb->handles[j])
@@ -295,7 +295,7 @@ drm_close(struct drm *drm)
 
         free(fb->properties);
     }
-    free(drm->fbs);
+    free(drm->active_fbs);
 
     memset(drm->client_caps, 0, sizeof(drm->client_caps));
     memset(drm->caps, 0, sizeof(drm->caps));
@@ -351,8 +351,8 @@ drm_scan_resources(struct drm *drm)
 
     if (res->count_fbs)
         drm_die("unexpected fb count");
-    drm->fbs = calloc(plane_res->count_planes, sizeof(*drm->fbs));
-    if (!drm->fbs)
+    drm->active_fbs = calloc(plane_res->count_planes, sizeof(*drm->active_fbs));
+    if (!drm->active_fbs)
         drm_die("failed to alloc fbs");
 
     drm->plane_count = plane_res->count_planes;
@@ -388,19 +388,19 @@ drm_scan_resources(struct drm *drm)
         /* count unique fb ids */
         if (dst->fb_id) {
             bool found = false;
-            for (uint32_t i = 0; i < drm->fb_count; i++) {
-                if (drm->fbs[i].id == dst->fb_id) {
+            for (uint32_t i = 0; i < drm->active_fb_count; i++) {
+                if (drm->active_fbs[i].id == dst->fb_id) {
                     found = true;
                     break;
                 }
             }
             if (!found)
-                drm->fbs[drm->fb_count++].id = dst->fb_id;
+                drm->active_fbs[drm->active_fb_count++].id = dst->fb_id;
         }
     }
 
-    for (uint32_t i = 0; i < drm->fb_count; i++) {
-        struct drm_fb *dst = &drm->fbs[i];
+    for (uint32_t i = 0; i < drm->active_fb_count; i++) {
+        struct drm_fb *dst = &drm->active_fbs[i];
         const uint32_t res_id = dst->id;
         drmModeFB2Ptr src = drmModeGetFB2(drm->fd, res_id);
 
@@ -563,22 +563,31 @@ drm_dump_properties(struct drm *drm, const struct drm_properties *props, const c
 static inline void
 drm_dump_plane_formats(struct drm *drm, const struct drm_plane *plane, const char *indent)
 {
-            const struct drm_properties *props = plane->properties;
+    const struct drm_properties *props = plane->properties;
 
-            for (uint32_t j = 0; j < plane->format_count; j++)
-                drm_log("      '%.*s'", 4, (const char *)&plane->formats[j]);
+    drmModePropertyBlobPtr in_formats_blob = NULL;
+    for (uint32_t i = 0; i < props->count; i++) {
+        const drmModePropertyPtr prop = props->props[i];
+        if (drmModeGetPropertyType(prop) != DRM_MODE_PROP_BLOB ||
+            strcmp(prop->name, "IN_FORMATS"))
+            continue;
 
-            for (uint32_t j = 0; j < props->count; j++) {
-                const drmModePropertyPtr prop = props->props[j];
-                if (drmModeGetPropertyType(prop) != DRM_MODE_PROP_BLOB ||
-                    strcmp(prop->name, "IN_FORMATS"))
-                    continue;
+        const uint32_t blob_id = props->values[i];
+        in_formats_blob = drmModeGetPropertyBlob(drm->fd, blob_id);
+        break;
+    }
 
-                const uint32_t blob_id = props->values[j];
-                drm_log("blob count %d id %lld", prop->count_blobs, (long long)props->values[j]);
-            }
-    for (uint32_t i = 0; i < props->count; i++)
-        drm_dump_property(drm, props->props[i], props->values[i], indent);
+    if (in_formats_blob) {
+        drmModeFormatModifierIterator iter;
+        memset(&iter, 0, sizeof(iter));
+        while (drmModeFormatModifierBlobIterNext(in_formats_blob, &iter)) {
+            drm_log("%sformat '%.*s': 0x%" PRIx64, indent, 4, (const char *)&iter.fmt, iter.mod);
+        }
+        drmModeFreePropertyBlob(in_formats_blob);
+    } else {
+        for (uint32_t j = 0; j < plane->format_count; j++)
+            drm_log("%sformat '%.*s'", indent, 4, (const char *)&plane->formats[j]);
+    }
 }
 
 #endif /* DRMUTIL_H */
