@@ -1,0 +1,9 @@
+# Copyright 2023 Google LLC
+# SPDX-License-Identifier: MIT
+
+option(
+  'skia-path',
+  type: 'string',
+  value: 'skia',
+  description: 'Path to skia',
+)

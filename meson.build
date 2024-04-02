@@ -3,10 +3,10 @@
 
 project(
   'gputest',
-  'c',
+  ['c', 'cpp'],
   version: '0.1',
   license: 'MIT',
-  meson_version: '>=0.53',
+  meson_version: '>=1.1.0',
   default_options: ['c_std=c11', 'warning_level=3'],
 )
 
@@ -17,6 +17,7 @@ prog_python = import('python').find_installation('python3')
 prog_xxd = find_program('xxd')
 
 cc = meson.get_compiler('c')
+cpp = meson.get_compiler('cpp')
 
 warning_args = cc.get_supported_arguments([
   '-Wno-pedantic',
@@ -24,7 +25,7 @@ warning_args = cc.get_supported_arguments([
   '-Wno-unused-parameter',
 ])
 
-add_project_arguments(['-D_GNU_SOURCE', warning_args], language: 'c')
+add_project_arguments(['-D_GNU_SOURCE', warning_args], language: ['c', 'cpp'])
 
 dep_dl = cc.find_library('dl')
 dep_m = cc.find_library('m', required: false)
@@ -45,6 +46,29 @@ dep_libavcodec = dependency('libavcodec', required: false)
 dep_libavformat = dependency('libavformat', required: false)
 dep_libavutil = dependency('libavutil', required: false)
 
+with_sk = false
+skia_path = get_option('skia-path')
+skia_path = fs.expanduser(skia_path)
+if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
+  dep_libskia = cpp.find_library(
+    'skia',
+    dirs: [skia_path / 'out'],
+    has_headers: ['include/core/SkGraphics.h'],
+    header_include_directories: include_directories(skia_path),
+  )
+
+  dep_skia = declare_dependency(
+    compile_args: ['-L' + skia_path / 'out', '-fno-rtti',
+                   '-DSK_DEBUG', '-DSK_GANESH', '-DSK_GL', '-DSK_VULKAN'],
+    dependencies: dep_libskia,
+    include_directories: [skia_path],
+  )
+
+  with_sk = true
+else
+  message('skia-path ' + skia_path + ' is not an absolute directory')
+endif
+
 with_egl = false
 if host_machine.system() == 'android'
   with_egl = dep_nativewindow.found()
@@ -60,6 +84,10 @@ subdir('vk')
 
 if with_egl
   subdir('egl')
+endif
+
+if with_sk
+  subdir('sk')
 endif
 
 if with_va
