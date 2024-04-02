@@ -35,7 +35,10 @@ dep_rt = cc.find_library('rt', required: false)
 dep_drm = dependency('libdrm', required: false)
 dep_ktx = dependency('Ktx', method: 'cmake', required: false)
 dep_sdl2 = dependency('sdl2', required: false)
+
 dep_wl_client = dependency('wayland-client', required: false)
+dep_wl_protocols = dependency('wayland-protocols', required: false)
+dep_wl_scanner = dependency('wayland-scanner', required: false)
 
 dep_nativewindow = cc.find_library('nativewindow', required: false)
 dep_gbm = dependency('gbm', required: false)

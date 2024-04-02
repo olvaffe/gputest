@@ -42,3 +42,36 @@ idep_vkutil = declare_dependency(
   dependencies: [dep_dl, dep_m, dep_rt],
   include_directories: ['.', inc_include],
 )
+
+idep_wlutil = dep_not_found
+if dep_wl_client.found() and dep_wl_protocols.found() and dep_wl_scanner.found()
+  protocols = [
+    ['xdg-shell', 'stable/xdg-shell'],
+    ['linux-dmabuf-unstable-v1', 'unstable/linux-dmabuf'],
+  ]
+
+  wl_scanner = find_program(dep_wl_scanner.get_variable(pkgconfig: 'wayland_scanner'))
+  wl_protocols_dir = dep_wl_protocols.get_variable(pkgconfig: 'pkgdatadir')
+
+  wl_protocols_files = []
+  foreach proto : protocols
+    xml_path = wl_protocols_dir / proto[1] / proto[0] + '.xml'
+
+    wl_protocols_files += custom_target(proto[0] + ' client-header',
+      command: [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
+      input: xml_path,
+      output: proto[0] + '-protocol.h',
+    )
+    wl_protocols_files += custom_target(proto[0] + ' private-code',
+      command: [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
+      input: xml_path,
+      output: proto[0] + '-protocol.c',
+    )
+  endforeach
+
+  idep_wlutil = declare_dependency(
+    sources: ['wlutil.h', wl_protocols_files],
+    dependencies: [dep_wl_client],
+    include_directories: ['.', inc_include],
+  )
+endif
