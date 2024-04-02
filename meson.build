@@ -38,6 +38,13 @@ dep_wl_client = dependency('wayland-client', required: false)
 dep_nativewindow = cc.find_library('nativewindow', required: false)
 dep_gbm = dependency('gbm', required: false)
 
+dep_libva = dependency('libva', required: false)
+dep_libva_drm = dependency('libva-drm', required: false)
+
+dep_libavcodec = dependency('libavcodec', required: false)
+dep_libavformat = dependency('libavformat', required: false)
+dep_libavutil = dependency('libavutil', required: false)
+
 with_egl = false
 if host_machine.system() == 'android'
   with_egl = dep_nativewindow.found()
@@ -45,9 +52,16 @@ else
   with_egl = dep_gbm.found()
 endif
 
+with_va = dep_libva.found() and dep_libva_drm.found()
+
 inc_include = include_directories('include')
 
 subdir('vk')
+
 if with_egl
   subdir('egl')
+endif
+
+if with_va
+  subdir('va')
 endif
