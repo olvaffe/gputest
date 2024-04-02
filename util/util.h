@@ -6,7 +6,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include "drm_fourcc.h"
+#include "drm/drm_fourcc.h"
 
 #include <assert.h>
 #include <inttypes.h>
