@@ -1,6 +1,15 @@
 # Copyright 2024 Google LLC
 # SPDX-License-Identifier: MIT
 
+idep_eglutil = dep_not_found
+if dep_gbm.found() or dep_nativewindow.found()
+  idep_eglutil = declare_dependency(
+    sources: ['eglutil.h'],
+    dependencies: [dep_dl, dep_m, dep_gbm, dep_nativewindow],
+    include_directories: ['.', inc_include],
+  )
+endif
+
 idep_ffutil = dep_not_found
 if dep_libavcodec.found() and dep_libavformat.found() and dep_libavutil.found()
   idep_ffutil = declare_dependency(

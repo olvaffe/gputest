@@ -66,16 +66,7 @@ if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
   )
 endif
 
-with_egl = false
-if host_machine.system() == 'android'
-  with_egl = dep_nativewindow.found()
-else
-  with_egl = dep_gbm.found()
-endif
-
 with_sk = dep_skia.found()
-
-with_va = dep_libva.found() and dep_libva_drm.found()
 
 with_vk = cc.has_header('vulkan/vulkan.h')
 
@@ -83,7 +74,7 @@ inc_include = include_directories('include')
 
 subdir('util')
 
-if with_egl
+if idep_eglutil.found()
   subdir('egl')
 endif
 

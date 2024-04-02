@@ -1,12 +1,6 @@
 # Copyright 2022 Google LLC
 # SPDX-License-Identifier: MIT
 
-idep_eglutil = declare_dependency(
-  sources: ['eglutil.h'],
-  dependencies: [dep_dl, dep_m, dep_gbm, dep_nativewindow],
-  include_directories: [inc_include],
-)
-
 tests = [
   'clear',
   'fbo',
