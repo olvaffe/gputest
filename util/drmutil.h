@@ -6,17 +6,9 @@
 #ifndef DRMUTIL_H
 #define DRMUTIL_H
 
-#include <assert.h>
-#include <drm.h>
-#include <drm_fourcc.h>
-#include <drm_mode.h>
+#include "util.h"
+
 #include <fcntl.h>
-#include <inttypes.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
@@ -124,26 +116,11 @@ struct drm {
     uint32_t connector_count;
 };
 
-static inline void
-drm_logv(const char *format, va_list ap)
-{
-    printf("DRM: ");
-    vprintf(format, ap);
-    printf("\n");
-}
-
-static inline void NORETURN
-drm_diev(const char *format, va_list ap)
-{
-    drm_logv(format, ap);
-    abort();
-}
-
 static inline void PRINTFLIKE(1, 2) drm_log(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    drm_logv(format, ap);
+    u_logv("DRM", format, ap);
     va_end(ap);
 }
 
@@ -151,7 +128,7 @@ static inline void PRINTFLIKE(1, 2) NORETURN drm_die(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    drm_diev(format, ap);
+    u_diev("DRM", format, ap);
     va_end(ap);
 }
 
@@ -162,7 +139,7 @@ static inline void PRINTFLIKE(2, 3) drm_check(const struct drm *drm, const char 
 
     va_list ap;
     va_start(ap, format);
-    drm_diev(format, ap);
+    u_diev("DRM", format, ap);
     va_end(ap);
 }
 

@@ -107,8 +107,8 @@ storage_3d_test_get_miplevel_size(struct storage_3d_test *test, uint32_t level)
         break;
     }
 
-    return vk_minify(test->width, level) * vk_minify(test->height, level) *
-           vk_minify(test->depth, level) * bpp;
+    return u_minify(test->width, level) * u_minify(test->height, level) *
+           u_minify(test->depth, level) * bpp;
 }
 
 static void
@@ -137,7 +137,7 @@ storage_3d_test_init_image(struct storage_3d_test *test)
             max = test->depth;
 
         while (max != 1) {
-            max = vk_minify(max, 1);
+            max = u_minify(max, 1);
             level_count++;
         }
     }
@@ -252,9 +252,9 @@ storage_3d_test_draw_quad(struct storage_3d_test *test, VkCommandBuffer cmd)
 
         const uint32_t workgroup_size[3] = { 4, 4, 4 };
         const uint32_t workgroup_count[3] = {
-            DIV_ROUND_UP(vk_minify(test->width, i), workgroup_size[0]),
-            DIV_ROUND_UP(vk_minify(test->height, i), workgroup_size[1]),
-            DIV_ROUND_UP(vk_minify(test->depth, i), workgroup_size[2]),
+            DIV_ROUND_UP(u_minify(test->width, i), workgroup_size[0]),
+            DIV_ROUND_UP(u_minify(test->height, i), workgroup_size[1]),
+            DIV_ROUND_UP(u_minify(test->depth, i), workgroup_size[2]),
         };
         vk->CmdDispatch(cmd, workgroup_count[0], workgroup_count[1], workgroup_count[2]);
     }
@@ -275,9 +275,9 @@ storage_3d_test_draw_quad(struct storage_3d_test *test, VkCommandBuffer cmd)
                 .layerCount = test->img->info.arrayLayers,
             },
             .imageExtent = {
-                .width = vk_minify(test->width, i),
-                .height = vk_minify(test->height, i),
-                .depth = vk_minify(test->depth, i),
+                .width = u_minify(test->width, i),
+                .height = u_minify(test->height, i),
+                .depth = u_minify(test->depth, i),
             },
         };
         buf_offset += storage_3d_test_get_miplevel_size(test, i);
@@ -309,9 +309,9 @@ storage_3d_test_draw(struct storage_3d_test *test)
 
     VkDeviceSize buf_offset = 0;
     for (uint32_t i = 0; i < test->img->info.mipLevels; i++) {
-        const uint32_t mip_width = vk_minify(test->width, i);
-        const uint32_t mip_height = vk_minify(test->height, i);
-        const uint32_t mip_depth = vk_minify(test->depth, i);
+        const uint32_t mip_width = u_minify(test->width, i);
+        const uint32_t mip_height = u_minify(test->height, i);
+        const uint32_t mip_depth = u_minify(test->depth, i);
 
         const uint8_t *ptr = test->buf->mem_ptr + buf_offset;
         buf_offset += storage_3d_test_get_miplevel_size(test, i);

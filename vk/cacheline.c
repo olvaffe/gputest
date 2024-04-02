@@ -92,7 +92,7 @@ cacheline_test_draw(struct cacheline_test *test)
     vk_end_cmd(vk);
     /* step 2: wait */
     while (vk->GetEventStatus(vk->dev, test->gpu_done->event) != VK_EVENT_SET)
-        vk_sleep(1);
+        u_sleep(1);
 
     vk_log("after CmdFillBuffer but before VkBufferMemoryBarrier");
     for (uint32_t i = 0; i < 4; i++)

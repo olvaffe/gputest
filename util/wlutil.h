@@ -7,18 +7,13 @@
 #define WLUTIL_H
 
 #include "linux-dmabuf-unstable-v1-protocol.h"
+#include "util.h"
 #include "xdg-shell-protocol.h"
 
 #include <linux/input.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <wayland-client.h>
-
-#define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
-#define NORETURN __attribute__((noreturn))
-
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#define ALIGN(v, a) (((v) + (a) - 1) & ~((a) - 1))
 
 struct wl_init_params {
     void *data;
@@ -82,26 +77,11 @@ struct wl_swapchain {
     } *images;
 };
 
-static inline void
-wl_logv(const char *format, va_list ap)
-{
-    printf("VK: ");
-    vprintf(format, ap);
-    printf("\n");
-}
-
-static inline void NORETURN
-wl_diev(const char *format, va_list ap)
-{
-    wl_logv(format, ap);
-    abort();
-}
-
 static inline void PRINTFLIKE(1, 2) wl_log(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    wl_logv(format, ap);
+    u_logv("WL", format, ap);
     va_end(ap);
 }
 
@@ -109,7 +89,7 @@ static inline void PRINTFLIKE(1, 2) NORETURN wl_die(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    wl_diev(format, ap);
+    u_diev("WL", format, ap);
     va_end(ap);
 }
 
@@ -545,13 +525,19 @@ wl_init_surface_dmabuf(struct wl *wl)
 }
 
 static inline void
+wl_log_handler(const char *format, va_list ap)
+{
+    u_logv("WL", format, ap);
+}
+
+static inline void
 wl_init(struct wl *wl, const struct wl_init_params *params)
 {
     memset(wl, 0, sizeof(*wl));
     if (params)
         wl->params = *params;
 
-    wl_log_set_handler_client(wl_logv);
+    wl_log_set_handler_client(wl_log_handler);
 
     wl_init_display(wl);
     wl_init_globals(wl);

@@ -6,15 +6,9 @@
 #ifndef VAUTIL_H
 #define VAUTIL_H
 
-#include <assert.h>
+#include "util.h"
+
 #include <fcntl.h>
-#include <math.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <va/va.h>
@@ -22,10 +16,6 @@
 #include <va/va_drmcommon.h>
 #include <va/va_str.h>
 #include <xf86drm.h>
-
-#define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
-#define NORETURN __attribute__((noreturn))
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 struct va_init_params {
     int unused;
@@ -62,26 +52,11 @@ struct va {
     unsigned int subpic_count;
 };
 
-static inline void
-va_logv(const char *format, va_list ap)
-{
-    printf("VA: ");
-    vprintf(format, ap);
-    printf("\n");
-}
-
-static inline void NORETURN
-va_diev(const char *format, va_list ap)
-{
-    va_logv(format, ap);
-    abort();
-}
-
 static inline void PRINTFLIKE(1, 2) va_log(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    va_logv(format, ap);
+    u_logv("VA", format, ap);
     va_end(ap);
 }
 
@@ -89,7 +64,7 @@ static inline void PRINTFLIKE(1, 2) NORETURN va_die(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    va_diev(format, ap);
+    u_diev("VA", format, ap);
     va_end(ap);
 }
 
@@ -100,7 +75,7 @@ static inline void PRINTFLIKE(2, 3) va_check(const struct va *va, const char *fo
 
     va_list ap;
     va_start(ap, format);
-    va_diev(format, ap);
+    u_diev("VA", format, ap);
     va_end(ap);
 }
 

@@ -3,15 +3,12 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "util.h"
+
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_vaapi.h>
-#include <stdbool.h>
-
-#define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
-#define NORETURN __attribute__((noreturn))
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 struct ff {
     AVFormatContext *input_ctx;
@@ -27,26 +24,11 @@ struct ff {
     AVFrame *frame;
 };
 
-static inline void
-ff_logv(const char *format, va_list ap)
-{
-    printf("FF: ");
-    vprintf(format, ap);
-    printf("\n");
-}
-
-static inline void NORETURN
-ff_diev(const char *format, va_list ap)
-{
-    ff_logv(format, ap);
-    abort();
-}
-
 static inline void PRINTFLIKE(1, 2) ff_log(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    ff_logv(format, ap);
+    u_logv("FF", format, ap);
     va_end(ap);
 }
 
@@ -54,7 +36,7 @@ static inline void PRINTFLIKE(1, 2) NORETURN ff_die(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    ff_diev(format, ap);
+    u_diev("FF", format, ap);
     va_end(ap);
 }
 

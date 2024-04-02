@@ -6,23 +6,13 @@
 #ifndef VKUTIL_H
 #define VKUTIL_H
 
-#include <assert.h>
+#include "util.h"
+
 #include <ctype.h>
 #include <dlfcn.h>
-#include <drm_fourcc.h>
-#include <inttypes.h>
-#include <math.h>
-#include <stdalign.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-#include <time.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_android.h>
 
@@ -33,13 +23,6 @@
 #endif
 
 #define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_1
-
-#define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
-#define NORETURN __attribute__((noreturn))
-
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#define ALIGN(v, a) (((v) + (a) - 1) & ~((a) - 1))
-#define DIV_ROUND_UP(v, d) (((v) + (d) - 1) / (d))
 
 struct vk_init_params {
     const char *render_node;
@@ -205,26 +188,11 @@ struct vk_swapchain {
     uint32_t img_cur;
 };
 
-static inline void
-vk_logv(const char *format, va_list ap)
-{
-    printf("VK: ");
-    vprintf(format, ap);
-    printf("\n");
-}
-
-static inline void NORETURN
-vk_diev(const char *format, va_list ap)
-{
-    vk_logv(format, ap);
-    abort();
-}
-
 static inline void PRINTFLIKE(1, 2) vk_log(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    vk_logv(format, ap);
+    u_logv("VK", format, ap);
     va_end(ap);
 }
 
@@ -232,7 +200,7 @@ static inline void PRINTFLIKE(1, 2) NORETURN vk_die(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    vk_diev(format, ap);
+    u_diev("VK", format, ap);
     va_end(ap);
 }
 
@@ -244,42 +212,10 @@ static inline void PRINTFLIKE(2, 3) vk_check(const struct vk *vk, const char *fo
     va_list ap;
     va_start(ap, format);
     if (vk->result > VK_SUCCESS)
-        vk_logv(format, ap);
+        u_logv("VK", format, ap);
     else
-        vk_diev(format, ap);
+        u_diev("VK", format, ap);
     va_end(ap);
-}
-
-static inline uint32_t
-vk_minify(uint32_t base, uint32_t level)
-{
-    const uint32_t val = base >> level;
-    return val ? val : 1;
-}
-
-static inline uint64_t
-vk_now(void)
-{
-    struct timespec ts;
-
-    if (clock_gettime(CLOCK_MONOTONIC, &ts))
-        return 0;
-
-    const uint64_t ns = 1000000000ull;
-    return ns * ts.tv_sec + ts.tv_nsec;
-}
-
-static inline void
-vk_sleep(uint32_t ms)
-{
-    const struct timespec ts = {
-        .tv_sec = ms / 1000,
-        .tv_nsec = (ms % 1000) * 1000000,
-    };
-
-    const int ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, NULL);
-    if (ret)
-        vk_die("failed to sleep");
 }
 
 static inline void

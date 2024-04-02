@@ -423,9 +423,9 @@ ktx_test_draw_prep_texture(struct ktx_test *test, VkCommandBuffer cmd)
                 .layerCount = tex->numLayers * tex->numFaces,
             },
             .imageExtent = {
-                .width = vk_minify(tex->baseWidth, i),
-                .height = vk_minify(tex->baseHeight, i),
-                .depth = vk_minify(tex->baseDepth, i),
+                .width = u_minify(tex->baseWidth, i),
+                .height = u_minify(tex->baseHeight, i),
+                .depth = u_minify(tex->baseDepth, i),
 	    },
         };
     }

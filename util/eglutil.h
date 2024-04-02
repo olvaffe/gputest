@@ -9,24 +9,16 @@
 #define EGL_EGL_PROTOTYPES 0
 #define GL_GLES_PROTOTYPES 0
 
+#include "util.h"
+
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #include <GLES3/gl32.h>
-#include <assert.h>
 #include <ctype.h>
 #include <dlfcn.h>
-#include <drm_fourcc.h>
 #include <fcntl.h>
-#include <inttypes.h>
-#include <math.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <strings.h>
 #include <unistd.h>
 
@@ -159,26 +151,11 @@ struct egl_image {
     EGLImage img;
 };
 
-static inline void
-egl_logv(const char *format, va_list ap)
-{
-    printf("EGL: ");
-    vprintf(format, ap);
-    printf("\n");
-}
-
-static inline void NORETURN
-egl_diev(const char *format, va_list ap)
-{
-    egl_logv(format, ap);
-    abort();
-}
-
 static inline void PRINTFLIKE(1, 2) egl_log(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    egl_logv(format, ap);
+    u_logv("EGL", format, ap);
     va_end(ap);
 }
 
@@ -186,7 +163,7 @@ static inline void PRINTFLIKE(1, 2) NORETURN egl_die(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    egl_diev(format, ap);
+    u_diev("EGL", format, ap);
     va_end(ap);
 }
 

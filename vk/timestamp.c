@@ -98,7 +98,7 @@ timestamp_test_draw_same_cmd(struct timestamp_test *test)
 
     vk_end_cmd(vk);
 
-    vk_sleep(test->sleep);
+    u_sleep(test->sleep);
     vk->SetEvent(vk->dev, test->event->event);
 
     vk_wait(vk);
@@ -120,7 +120,7 @@ timestamp_test_draw_two_cmds(struct timestamp_test *test)
     vk_end_cmd(vk);
     vk_wait(vk);
 
-    vk_sleep(test->sleep);
+    u_sleep(test->sleep);
 
     cmd = vk_begin_cmd(vk, false);
     vk->CmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, test->query->pool, 1);
@@ -144,7 +144,7 @@ timestamp_test_draw_calibrated(struct timestamp_test *test)
     uint64_t deviation;
 
     vk->result = vk->GetCalibratedTimestampsEXT(vk->dev, 1, &info, &ts[0], &deviation);
-    vk_sleep(test->sleep);
+    u_sleep(test->sleep);
     vk->result = vk->GetCalibratedTimestampsEXT(vk->dev, 1, &info, &ts[1], &deviation);
 
     timestamp_test_dump_delta(test, __func__, ts);
@@ -165,7 +165,7 @@ timestamp_test_draw_mixed(struct timestamp_test *test)
 
     vk->result = vk->GetCalibratedTimestampsEXT(vk->dev, 1, &info, &ts[0], &deviation);
 
-    vk_sleep(test->sleep / 2);
+    u_sleep(test->sleep / 2);
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
     vk->CmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, test->query->pool, 0);
@@ -173,7 +173,7 @@ timestamp_test_draw_mixed(struct timestamp_test *test)
     vk_wait(vk);
     timestamp_test_get_query_result(test, &ts[1], 1);
 
-    vk_sleep(test->sleep / 2);
+    u_sleep(test->sleep / 2);
 
     vk->result = vk->GetCalibratedTimestampsEXT(vk->dev, 1, &info, &ts[2], &deviation);
 
@@ -197,7 +197,7 @@ timestamp_test_draw_loop(struct timestamp_test *test)
         const uint64_t ns = (uint64_t)(ts * vk->props.properties.limits.timestampPeriod);
         const uint64_t ms = ns / 1000000;
         vk_log("%" PRIu64 ".%03" PRIu64, ms / 1000, ms % 1000);
-        vk_sleep(1000);
+        u_sleep(1000);
     }
 }
 

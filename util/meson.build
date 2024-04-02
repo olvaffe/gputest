@@ -3,12 +3,17 @@
 
 util_summary = {}
 
+idep_util = declare_dependency(
+  sources: ['util.h'],
+  dependencies: [dep_m, dep_rt],
+  include_directories: ['.', inc_include],
+)
+
 idep_drmutil = dep_not_found
 if dep_drm.found()
   idep_drmutil = declare_dependency(
     sources: ['drmutil.h'],
-    dependencies: [dep_drm],
-    include_directories: ['.', inc_include],
+    dependencies: [idep_util, dep_drm],
   )
 endif
 util_summary += {'drmutil': idep_drmutil}
@@ -17,8 +22,7 @@ idep_eglutil = dep_not_found
 if dep_gbm.found() or dep_nativewindow.found()
   idep_eglutil = declare_dependency(
     sources: ['eglutil.h'],
-    dependencies: [dep_dl, dep_m, dep_gbm, dep_nativewindow],
-    include_directories: ['.', inc_include],
+    dependencies: [idep_util, dep_dl, dep_gbm, dep_nativewindow],
   )
 endif
 util_summary += {'eglutil': idep_eglutil}
@@ -27,8 +31,7 @@ idep_ffutil = dep_not_found
 if dep_libavcodec.found() and dep_libavformat.found() and dep_libavutil.found()
   idep_ffutil = declare_dependency(
     sources: ['ffutil.h'],
-    dependencies: [dep_libavcodec, dep_libavformat, dep_libavutil],
-    include_directories: ['.', inc_include],
+    dependencies: [idep_util, dep_libavcodec, dep_libavformat, dep_libavutil],
   )
 endif
 util_summary += {'ffutil': idep_ffutil}
@@ -39,8 +42,8 @@ if dep_skia.found()
     sources: ['skutil.h'],
     compile_args: ['-L' + skia_path / 'out', '-fno-rtti',
                    '-DSK_DEBUG', '-DSK_GANESH', '-DSK_GL', '-DSK_VULKAN'],
-    dependencies: [dep_dl, dep_m, dep_skia, dep_egl, dep_glesv2],
-    include_directories: ['.', skia_path],
+    dependencies: [idep_util, dep_dl, dep_skia, dep_egl, dep_glesv2],
+    include_directories: [skia_path],
   )
 endif
 util_summary += {'skutil': idep_skutil}
@@ -49,8 +52,7 @@ idep_vautil = dep_not_found
 if dep_drm.found() and dep_libva.found() and dep_libva_drm.found()
   idep_vautil = declare_dependency(
     sources: ['vautil.h'],
-    dependencies: [dep_drm, dep_libva, dep_libva_drm],
-    include_directories: ['.', inc_include],
+    dependencies: [idep_util, dep_drm, dep_libva, dep_libva_drm],
   )
 endif
 util_summary += {'vautil': idep_vautil}
@@ -59,8 +61,7 @@ idep_vkutil = dep_not_found
 if cc.has_header('vulkan/vulkan.h')
   idep_vkutil = declare_dependency(
     sources: ['vkutil.h'],
-    dependencies: [dep_dl, dep_m, dep_rt],
-    include_directories: ['.', inc_include],
+    dependencies: [idep_util, dep_dl],
   )
 endif
 util_summary += {'vkutil': idep_vkutil}
@@ -93,8 +94,7 @@ if dep_wl_client.found() and dep_wl_protocols.found() and dep_wl_scanner.found()
 
   idep_wlutil = declare_dependency(
     sources: ['wlutil.h', wl_protocols_files],
-    dependencies: [dep_wl_client],
-    include_directories: ['.', inc_include],
+    dependencies: [idep_util, dep_wl_client],
   )
 endif
 util_summary += {'wlutil': idep_wlutil}

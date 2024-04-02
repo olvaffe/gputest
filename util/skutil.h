@@ -18,21 +18,10 @@
 #include "include/gpu/ganesh/SkSurfaceGanesh.h"
 #include "include/gpu/ganesh/gl/GrGLDirectContext.h"
 #include "include/gpu/ganesh/vk/GrVkDirectContext.h"
+#include "util.h"
 
-#include <assert.h>
 #include <fcntl.h>
-#include <math.h>
 #include <memory>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
-#define NORETURN __attribute__((noreturn))
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 struct sk_init_params {
     int unused;
@@ -42,26 +31,11 @@ struct sk {
     struct sk_init_params params;
 };
 
-static inline void
-sk_logv(const char *format, va_list ap)
-{
-    printf("SK: ");
-    vprintf(format, ap);
-    printf("\n");
-}
-
-static inline void NORETURN
-sk_diev(const char *format, va_list ap)
-{
-    sk_logv(format, ap);
-    abort();
-}
-
 static inline void PRINTFLIKE(1, 2) sk_log(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    sk_logv(format, ap);
+    u_logv("SK", format, ap);
     va_end(ap);
 }
 
@@ -69,7 +43,7 @@ static inline void PRINTFLIKE(1, 2) NORETURN sk_die(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    sk_diev(format, ap);
+    u_diev("SK", format, ap);
     va_end(ap);
 }
 

@@ -43,23 +43,23 @@ memory_test_timed_memcpy(struct memory_test *test,
 
     if (test->bench_mt == -1) {
         for (int i = 0; i < test->loop; i++) {
-            const uint64_t begin = vk_now();
+            const uint64_t begin = u_now();
             if (invalidate)
                 vk->InvalidateMappedMemoryRanges(vk->dev, 1, invalidate);
             memcpy(dst, src, size);
-            const uint64_t end = vk_now();
+            const uint64_t end = u_now();
 
             const int us = (end - begin) / 1000;
             vk_log("%s iter %d took %d.%dms", what, i, us / 1000, us % 1000);
         }
     } else {
-        const uint64_t begin = vk_now();
+        const uint64_t begin = u_now();
         for (int i = 0; i < test->loop; i++) {
             if (invalidate)
                 vk->InvalidateMappedMemoryRanges(vk->dev, 1, invalidate);
             memcpy(dst, src, size);
         }
-        const uint64_t end = vk_now();
+        const uint64_t end = u_now();
 
         const uint64_t us = (end - begin) / 1000;
         const int avg = us / test->loop;

@@ -99,7 +99,7 @@ ktxSupercompressionSchemeString(ktxSupercmpScheme scheme)
 static inline uint32_t
 ktxTexture_GetRowPitch(ktxTexture *tex, uint32_t level)
 {
-    const uint32_t mip_width = vk_minify(tex->baseWidth, level);
+    const uint32_t mip_width = u_minify(tex->baseWidth, level);
     const uint32_t block_count_x = DIV_ROUND_UP(mip_width, tex->_protected->blockWidth);
     return block_count_x * tex->_protected->blockSize;
 }
@@ -107,10 +107,10 @@ ktxTexture_GetRowPitch(ktxTexture *tex, uint32_t level)
 static inline size_t
 ktxTexture_GetImageSize(ktxTexture *tex, uint32_t level)
 {
-    const uint32_t mip_height = vk_minify(tex->baseHeight, level);
+    const uint32_t mip_height = u_minify(tex->baseHeight, level);
     const uint32_t block_count_y = DIV_ROUND_UP(mip_height, tex->_protected->blockHeight);
 
-    const uint32_t mip_depth = vk_minify(tex->baseDepth, level);
+    const uint32_t mip_depth = u_minify(tex->baseDepth, level);
     const uint32_t block_count_z = mip_depth;
 
     return ktxTexture_GetRowPitch(tex, level) * block_count_y * block_count_z * tex->numFaces *
@@ -145,13 +145,13 @@ ktxTexture_generate_data(ktxTexture *tex)
 
     void *block = tex->pData;
     for (uint32_t lv = 0; lv < tex->numLevels; lv++) {
-        const uint32_t mip_width = vk_minify(tex->baseWidth, lv);
+        const uint32_t mip_width = u_minify(tex->baseWidth, lv);
         const uint32_t block_count_x = DIV_ROUND_UP(mip_width, tex->_protected->blockWidth);
 
-        const uint32_t mip_height = vk_minify(tex->baseHeight, lv);
+        const uint32_t mip_height = u_minify(tex->baseHeight, lv);
         const uint32_t block_count_y = DIV_ROUND_UP(mip_height, tex->_protected->blockHeight);
 
-        const uint32_t mip_depth = vk_minify(tex->baseDepth, lv);
+        const uint32_t mip_depth = u_minify(tex->baseDepth, lv);
         const uint32_t block_count_z = mip_depth;
 
         for (uint32_t layer = 0; layer < tex->numLayers; layer++) {

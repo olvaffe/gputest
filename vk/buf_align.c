@@ -160,7 +160,7 @@ buf_align_test_draw(struct buf_align_test *test)
                       VK_PIPELINE_STAGE_HOST_BIT, 0, NULL, 1, &barrier, 0, NULL);
     vk_end_cmd(vk);
     while (vk->GetEventStatus(vk->dev, test->gpu_done->event) != VK_EVENT_SET)
-        vk_sleep(1);
+        u_sleep(1);
 
     vk_log("disturb: after CmdFillBuffer but before VkBufferMemoryBarrier");
     vk_log("disturb = %u", *test->disturb_ptr);
