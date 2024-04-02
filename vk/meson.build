@@ -1,10 +1,6 @@
 # Copyright 2022 Google LLC
 # SPDX-License-Identifier: MIT
 
-if not cc.has_header('vulkan/vulkan.h')
-  error('failed to find vulkan/vulkan.h')
-endif
-
 wl_protocols_files = []
 if dep_wl_client.found()
   protocols = [
@@ -33,12 +29,6 @@ if dep_wl_client.found()
     )
   endforeach
 endif
-
-idep_vkutil = declare_dependency(
-  sources: ['vkutil.h'],
-  dependencies: [dep_dl, dep_m, dep_rt],
-  include_directories: [inc_include],
-)
 
 tests = [
   'buf_align',

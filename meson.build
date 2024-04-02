@@ -78,9 +78,11 @@ endif
 
 with_va = dep_libva.found() and dep_libva_drm.found()
 
+with_vk = cc.has_header('vulkan/vulkan.h')
+
 inc_include = include_directories('include')
 
-subdir('vk')
+subdir('util')
 
 if with_egl
   subdir('egl')
@@ -92,4 +94,8 @@ endif
 
 if with_va
   subdir('va')
+endif
+
+if with_vk
+  subdir('vk')
 endif
