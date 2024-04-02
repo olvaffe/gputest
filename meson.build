@@ -11,7 +11,9 @@ project(
 )
 
 fs = import('fs')
+
 prog_glslang = find_program('glslangValidator')
+prog_python = import('python').find_installation('python3')
 prog_xxd = find_program('xxd')
 
 cc = meson.get_compiler('c')
@@ -33,6 +35,19 @@ dep_ktx = dependency('Ktx', method: 'cmake', required: false)
 dep_sdl2 = dependency('sdl2', required: false)
 dep_wl_client = dependency('wayland-client', required: false)
 
+dep_nativewindow = cc.find_library('nativewindow', required: false)
+dep_gbm = dependency('gbm', required: false)
+
+with_egl = false
+if host_machine.system() == 'android'
+  with_egl = dep_nativewindow.found()
+else
+  with_egl = dep_gbm.found()
+endif
+
 inc_include = include_directories('include')
 
 subdir('vk')
+if with_egl
+  subdir('egl')
+endif
