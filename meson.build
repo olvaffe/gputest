@@ -51,6 +51,8 @@ dep_libavformat = dependency('libavformat', required: false)
 dep_libavutil = dependency('libavutil', required: false)
 
 dep_skia = dep_not_found
+dep_egl = dep_not_found
+dep_glesv2 = dep_not_found
 skia_path = get_option('skia-path')
 skia_path = fs.expanduser(skia_path)
 if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
@@ -60,7 +62,11 @@ if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
     has_headers: ['include/core/SkGraphics.h'],
     header_include_directories: include_directories(skia_path),
   )
+
+  dep_egl = dependency('egl')
+  dep_glesv2 = dependency('glesv2')
 endif
+
 
 inc_include = include_directories('include')
 

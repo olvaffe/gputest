@@ -39,7 +39,7 @@ if dep_skia.found()
     sources: ['skutil.h'],
     compile_args: ['-L' + skia_path / 'out', '-fno-rtti',
                    '-DSK_DEBUG', '-DSK_GANESH', '-DSK_GL', '-DSK_VULKAN'],
-    dependencies: [dep_dl, dep_m, dep_skia],
+    dependencies: [dep_dl, dep_m, dep_skia, dep_egl, dep_glesv2],
     include_directories: ['.', skia_path],
   )
 endif
