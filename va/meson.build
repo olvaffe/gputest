@@ -7,20 +7,19 @@ idep_vautil = declare_dependency(
 )
 
 tests = [
-  'ffdec',
   'info',
   'jpegdec',
 ]
+
+if idep_ffutil.found()
+  tests += ['ffdec']
+endif
 
 foreach t : tests
   test_deps = [idep_vautil]
 
   if t == 'ffdec'
-    if dep_libavcodec.found() and dep_libavformat.found() and dep_libavutil.found()
-      test_deps += [dep_libavcodec, dep_libavformat, dep_libavutil]
-    else
-      continue
-    endif
+    test_deps += [idep_ffutil]
   endif
 
   executable(
