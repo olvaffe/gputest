@@ -1,6 +1,8 @@
 # Copyright 2024 Google LLC
 # SPDX-License-Identifier: MIT
 
+util_summary = {}
+
 idep_drmutil = dep_not_found
 if dep_drm.found()
   idep_drmutil = declare_dependency(
@@ -9,6 +11,7 @@ if dep_drm.found()
     include_directories: ['.', inc_include],
   )
 endif
+util_summary += {'drmutil': idep_drmutil}
 
 idep_eglutil = dep_not_found
 if dep_gbm.found() or dep_nativewindow.found()
@@ -18,6 +21,7 @@ if dep_gbm.found() or dep_nativewindow.found()
     include_directories: ['.', inc_include],
   )
 endif
+util_summary += {'eglutil': idep_eglutil}
 
 idep_ffutil = dep_not_found
 if dep_libavcodec.found() and dep_libavformat.found() and dep_libavutil.found()
@@ -27,6 +31,7 @@ if dep_libavcodec.found() and dep_libavformat.found() and dep_libavutil.found()
     include_directories: ['.', inc_include],
   )
 endif
+util_summary += {'ffutil': idep_ffutil}
 
 idep_skutil = dep_not_found
 if dep_skia.found()
@@ -38,6 +43,7 @@ if dep_skia.found()
     include_directories: ['.', skia_path],
   )
 endif
+util_summary += {'skutil': idep_skutil}
 
 idep_vautil = dep_not_found
 if dep_drm.found() and dep_libva.found() and dep_libva_drm.found()
@@ -47,6 +53,7 @@ if dep_drm.found() and dep_libva.found() and dep_libva_drm.found()
     include_directories: ['.', inc_include],
   )
 endif
+util_summary += {'vautil': idep_vautil}
 
 idep_vkutil = dep_not_found
 if cc.has_header('vulkan/vulkan.h')
@@ -56,6 +63,7 @@ if cc.has_header('vulkan/vulkan.h')
     include_directories: ['.', inc_include],
   )
 endif
+util_summary += {'vkutil': idep_vkutil}
 
 idep_wlutil = dep_not_found
 if dep_wl_client.found() and dep_wl_protocols.found() and dep_wl_scanner.found()
@@ -89,3 +97,4 @@ if dep_wl_client.found() and dep_wl_protocols.found() and dep_wl_scanner.found()
     include_directories: ['.', inc_include],
   )
 endif
+util_summary += {'wlutil': idep_wlutil}

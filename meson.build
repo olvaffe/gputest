@@ -81,3 +81,5 @@ endif
 if idep_vkutil.found()
   subdir('vk')
 endif
+
+summary(util_summary, section: 'Enabled utils')
