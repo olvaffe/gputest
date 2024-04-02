@@ -1,11 +1,6 @@
 # Copyright 2022 Google LLC
 # SPDX-License-Identifier: MIT
 
-idep_vautil = declare_dependency(
-  sources: ['vautil.h'],
-  dependencies: [dep_dl, dep_m, dep_drm, dep_libva, dep_libva_drm],
-)
-
 tests = [
   'info',
   'jpegdec',

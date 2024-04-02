@@ -91,7 +91,7 @@ if with_sk
   subdir('sk')
 endif
 
-if with_va
+if idep_vautil.found()
   subdir('va')
 endif
 
