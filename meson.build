@@ -62,8 +62,6 @@ if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
   )
 endif
 
-with_vk = cc.has_header('vulkan/vulkan.h')
-
 inc_include = include_directories('include')
 
 subdir('util')
@@ -80,6 +78,6 @@ if idep_vautil.found()
   subdir('va')
 endif
 
-if with_vk
+if idep_vkutil.found()
   subdir('vk')
 endif

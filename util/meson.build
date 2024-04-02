@@ -48,11 +48,14 @@ if dep_drm.found() and dep_libva.found() and dep_libva_drm.found()
   )
 endif
 
-idep_vkutil = declare_dependency(
-  sources: ['vkutil.h'],
-  dependencies: [dep_dl, dep_m, dep_rt],
-  include_directories: ['.', inc_include],
-)
+idep_vkutil = dep_not_found
+if cc.has_header('vulkan/vulkan.h')
+  idep_vkutil = declare_dependency(
+    sources: ['vkutil.h'],
+    dependencies: [dep_dl, dep_m, dep_rt],
+    include_directories: ['.', inc_include],
+  )
+endif
 
 idep_wlutil = dep_not_found
 if dep_wl_client.found() and dep_wl_protocols.found() and dep_wl_scanner.found()
