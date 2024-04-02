@@ -36,6 +36,15 @@ if dep_libavcodec.found() and dep_libavformat.found() and dep_libavutil.found()
 endif
 util_summary += {'ffutil': idep_ffutil}
 
+idep_sdlutil = dep_not_found
+if dep_sdl2.found()
+  idep_sdlutil = declare_dependency(
+    sources: ['sdlutil.h'],
+    dependencies: [idep_util, dep_sdl2],
+  )
+endif
+util_summary += {'sdlutil': idep_sdlutil}
+
 idep_skutil = dep_not_found
 if dep_skia.found()
   idep_skutil = declare_dependency(
