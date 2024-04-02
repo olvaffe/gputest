@@ -64,7 +64,7 @@ ffdec_test_decode(struct ffdec_test *test)
             }
         }
 
-	close(desc.objects[0].fd);
+        close(desc.objects[0].fd);
 
         frame_idx++;
     }

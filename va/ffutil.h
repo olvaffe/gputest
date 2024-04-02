@@ -129,7 +129,7 @@ ff_get_hwdev_format(AVCodecContext *ctx, const enum AVPixelFormat *pix_fmts)
     if (*pix_fmts != pix_fmt)
         return AV_PIX_FMT_NONE;
 
-    /* customization? */
+        /* customization? */
 #if 0
     struct ff *ff = ctx->opaque;
     int ret;
