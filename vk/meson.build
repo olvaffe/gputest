@@ -69,7 +69,7 @@ endif
 if dep_sdl2.found()
   tests += ['sdl']
 endif
-if dep_drm.found()
+if idep_drmutil.found()
   tests += ['drm']
 endif
 
@@ -112,7 +112,7 @@ foreach t : tests
   elif t == 'sdl'
     test_deps += [dep_sdl2]
   elif t == 'drm'
-    test_deps += [dep_drm]
+    test_deps += [idep_drmutil]
   elif t == 'ktx'
     if dep_ktx.found()
       test_deps += [dep_ktx]

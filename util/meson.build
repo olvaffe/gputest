@@ -1,6 +1,15 @@
 # Copyright 2024 Google LLC
 # SPDX-License-Identifier: MIT
 
+idep_drmutil = dep_not_found
+if dep_drm.found()
+  idep_drmutil = declare_dependency(
+    sources: ['drmutil.h'],
+    dependencies: [dep_drm],
+    include_directories: ['.', inc_include],
+  )
+endif
+
 idep_eglutil = dep_not_found
 if dep_gbm.found() or dep_nativewindow.found()
   idep_eglutil = declare_dependency(
