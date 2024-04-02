@@ -12,10 +12,6 @@ project(
 
 fs = import('fs')
 
-prog_glslang = find_program('glslangValidator')
-prog_python = import('python').find_installation('python3')
-prog_xxd = find_program('xxd')
-
 cc = meson.get_compiler('c')
 cpp = meson.get_compiler('cpp')
 
@@ -24,8 +20,13 @@ warning_args = cc.get_supported_arguments([
   '-Wno-missing-field-initializers',
   '-Wno-unused-parameter',
 ])
-
 add_project_arguments(['-D_GNU_SOURCE', warning_args], language: ['c', 'cpp'])
+
+prog_glslang = find_program('glslangValidator')
+prog_python = import('python').find_installation('python3')
+prog_xxd = find_program('xxd')
+
+dep_not_found = dependency('', required : false)
 
 dep_dl = cc.find_library('dl')
 dep_m = cc.find_library('m', required: false)
@@ -46,7 +47,7 @@ dep_libavcodec = dependency('libavcodec', required: false)
 dep_libavformat = dependency('libavformat', required: false)
 dep_libavutil = dependency('libavutil', required: false)
 
-with_sk = false
+dep_skia = dep_not_found
 skia_path = get_option('skia-path')
 skia_path = fs.expanduser(skia_path)
 if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
@@ -63,10 +64,6 @@ if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
     dependencies: dep_libskia,
     include_directories: [skia_path],
   )
-
-  with_sk = true
-else
-  message('skia-path ' + skia_path + ' is not an absolute directory')
 endif
 
 with_egl = false
@@ -75,6 +72,8 @@ if host_machine.system() == 'android'
 else
   with_egl = dep_gbm.found()
 endif
+
+with_sk = dep_skia.found()
 
 with_va = dep_libva.found() and dep_libva_drm.found()
 
