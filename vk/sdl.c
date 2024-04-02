@@ -3,10 +3,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "sdlutil.h"
 #include "vkutil.h"
-
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_vulkan.h>
 
 enum win_op {
     WIN_OP_NONE,
@@ -20,7 +18,7 @@ struct sdl_test {
     uint32_t win_height;
     uint32_t win_flags;
 
-    SDL_Window *win;
+    struct sdl sdl;
     struct vk vk;
     VkSurfaceKHR surf;
 
@@ -32,148 +30,23 @@ struct sdl_test {
 };
 
 static void
-sdl_log_event_windowevent(const SDL_Event *ev)
-{
-    switch (ev->window.event) {
-#define CASE(ty)                                                                                 \
-    case ty:                                                                                     \
-        vk_log("  " #ty);                                                                        \
-        break
-        CASE(SDL_WINDOWEVENT_SHOWN);
-        CASE(SDL_WINDOWEVENT_HIDDEN);
-        CASE(SDL_WINDOWEVENT_EXPOSED);
-        CASE(SDL_WINDOWEVENT_MOVED);
-        CASE(SDL_WINDOWEVENT_RESIZED);
-        CASE(SDL_WINDOWEVENT_SIZE_CHANGED);
-        CASE(SDL_WINDOWEVENT_MINIMIZED);
-        CASE(SDL_WINDOWEVENT_MAXIMIZED);
-        CASE(SDL_WINDOWEVENT_RESTORED);
-        CASE(SDL_WINDOWEVENT_ENTER);
-        CASE(SDL_WINDOWEVENT_LEAVE);
-        CASE(SDL_WINDOWEVENT_FOCUS_GAINED);
-        CASE(SDL_WINDOWEVENT_FOCUS_LOST);
-        CASE(SDL_WINDOWEVENT_CLOSE);
-        CASE(SDL_WINDOWEVENT_TAKE_FOCUS);
-        CASE(SDL_WINDOWEVENT_HIT_TEST);
-        CASE(SDL_WINDOWEVENT_ICCPROF_CHANGED);
-        CASE(SDL_WINDOWEVENT_DISPLAY_CHANGED);
-#undef CASE
-    default:
-        vk_log("unknown windowe vent 0x%x", ev->window.event);
-        break;
-    }
-
-    switch (ev->window.event) {
-    case SDL_WINDOWEVENT_RESIZED:
-    case SDL_WINDOWEVENT_SIZE_CHANGED:
-        vk_log("  data1 %d data2 %d", ev->window.data1, ev->window.data2);
-        break;
-    default:
-        break;
-    }
-}
-
-static void
-sdl_log_event(const SDL_Event *ev)
-{
-    switch (ev->type) {
-#define CASE(ty)                                                                                 \
-    case ty:                                                                                     \
-        vk_log(#ty);                                                                             \
-        break
-        CASE(SDL_QUIT);
-        CASE(SDL_APP_TERMINATING);
-        CASE(SDL_APP_LOWMEMORY);
-        CASE(SDL_APP_WILLENTERBACKGROUND);
-        CASE(SDL_APP_DIDENTERBACKGROUND);
-        CASE(SDL_APP_WILLENTERFOREGROUND);
-        CASE(SDL_APP_DIDENTERFOREGROUND);
-        CASE(SDL_LOCALECHANGED);
-        CASE(SDL_DISPLAYEVENT);
-        CASE(SDL_WINDOWEVENT);
-        CASE(SDL_SYSWMEVENT);
-        CASE(SDL_KEYDOWN);
-        CASE(SDL_KEYUP);
-        CASE(SDL_TEXTEDITING);
-        CASE(SDL_TEXTINPUT);
-        CASE(SDL_KEYMAPCHANGED);
-        CASE(SDL_TEXTEDITING_EXT);
-        CASE(SDL_MOUSEMOTION);
-        CASE(SDL_MOUSEBUTTONDOWN);
-        CASE(SDL_MOUSEBUTTONUP);
-        CASE(SDL_MOUSEWHEEL);
-        CASE(SDL_JOYAXISMOTION);
-        CASE(SDL_JOYBALLMOTION);
-        CASE(SDL_JOYHATMOTION);
-        CASE(SDL_JOYBUTTONDOWN);
-        CASE(SDL_JOYBUTTONUP);
-        CASE(SDL_JOYDEVICEADDED);
-        CASE(SDL_JOYDEVICEREMOVED);
-        CASE(SDL_JOYBATTERYUPDATED);
-        CASE(SDL_CONTROLLERAXISMOTION);
-        CASE(SDL_CONTROLLERBUTTONDOWN);
-        CASE(SDL_CONTROLLERBUTTONUP);
-        CASE(SDL_CONTROLLERDEVICEADDED);
-        CASE(SDL_CONTROLLERDEVICEREMOVED);
-        CASE(SDL_CONTROLLERDEVICEREMAPPED);
-        CASE(SDL_CONTROLLERTOUCHPADDOWN);
-        CASE(SDL_CONTROLLERTOUCHPADMOTION);
-        CASE(SDL_CONTROLLERTOUCHPADUP);
-        CASE(SDL_CONTROLLERSENSORUPDATE);
-        CASE(SDL_FINGERDOWN);
-        CASE(SDL_FINGERUP);
-        CASE(SDL_FINGERMOTION);
-        CASE(SDL_DOLLARGESTURE);
-        CASE(SDL_DOLLARRECORD);
-        CASE(SDL_MULTIGESTURE);
-        CASE(SDL_CLIPBOARDUPDATE);
-        CASE(SDL_DROPFILE);
-        CASE(SDL_DROPTEXT);
-        CASE(SDL_DROPBEGIN);
-        CASE(SDL_DROPCOMPLETE);
-        CASE(SDL_AUDIODEVICEADDED);
-        CASE(SDL_AUDIODEVICEREMOVED);
-        CASE(SDL_SENSORUPDATE);
-        CASE(SDL_RENDER_TARGETS_RESET);
-        CASE(SDL_RENDER_DEVICE_RESET);
-        CASE(SDL_POLLSENTINEL);
-        CASE(SDL_USEREVENT);
-#undef CASE
-    default:
-        vk_log("unknown event 0x%x", ev->type);
-        break;
-    }
-
-    switch (ev->type) {
-    case SDL_WINDOWEVENT:
-        sdl_log_event_windowevent(ev);
-        break;
-    default:
-        break;
-    }
-}
-
-static void
 sdl_test_init(struct sdl_test *test)
 {
+    struct sdl *sdl = &test->sdl;
     struct vk *vk = &test->vk;
 
-    SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "1");
-
-    if (SDL_Init(SDL_INIT_VIDEO))
-        vk_die("failed to init sdl");
-
-    if (SDL_Vulkan_LoadLibrary(LIBVULKAN_NAME))
-        vk_die("failed to load vulkan into sdl");
-
-    test->win = SDL_CreateWindow("test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                 test->win_width, test->win_height, test->win_flags);
-    if (!test->win)
-        vk_die("failed to create win");
+    const struct sdl_init_params sdl_params = {
+        .vk = true,
+        .libvulkan_path = LIBVULKAN_NAME,
+        .width = test->win_width,
+        .height = test->win_height,
+        .flags = test->win_flags,
+    };
+    sdl_init(sdl, &sdl_params);
 
     const char *wsi_exts[8];
     uint32_t wsi_ext_count = ARRAY_SIZE(wsi_exts);
-    if (!SDL_Vulkan_GetInstanceExtensions(test->win, &wsi_ext_count, wsi_exts))
+    if (!SDL_Vulkan_GetInstanceExtensions(sdl->win, &wsi_ext_count, wsi_exts))
         vk_die("failed to get wsi exts");
 
     const char *dev_exts[] = {
@@ -188,13 +61,14 @@ sdl_test_init(struct sdl_test *test)
     };
     vk_init(vk, &params);
 
-    if (!SDL_Vulkan_CreateSurface(test->win, vk->instance, &test->surf))
+    if (!SDL_Vulkan_CreateSurface(sdl->win, vk->instance, &test->surf))
         vk_die("failed to create surface");
 }
 
 static void
 sdl_test_cleanup(struct sdl_test *test)
 {
+    struct sdl *sdl = &test->sdl;
     struct vk *vk = &test->vk;
 
     if (test->swapchain)
@@ -203,9 +77,7 @@ sdl_test_cleanup(struct sdl_test *test)
     vk->DestroySurfaceKHR(vk->instance, test->surf, NULL);
     vk_cleanup(vk);
 
-    SDL_DestroyWindow(test->win);
-    SDL_Vulkan_UnloadLibrary();
-    SDL_Quit();
+    sdl_cleanup(sdl);
 }
 
 static void
@@ -259,6 +131,7 @@ sdl_test_draw(struct sdl_test *test, struct vk_image *img)
 static void
 sdl_test_wait_events(struct sdl_test *test)
 {
+    struct sdl *sdl = &test->sdl;
     SDL_Event ev;
     int timeout = -1;
     while (SDL_WaitEventTimeout(&ev, timeout)) {
@@ -308,7 +181,7 @@ sdl_test_wait_events(struct sdl_test *test)
     /* update win size */
     int win_width;
     int win_height;
-    SDL_GetWindowSize(test->win, &win_width, &win_height);
+    SDL_GetWindowSize(sdl->win, &win_width, &win_height);
     if (test->win_width != (unsigned)win_width || test->win_height != (unsigned)win_height) {
         vk_log("win resized: %dx%d -> %dx%d", test->win_width, test->win_height, win_width,
                win_height);
@@ -318,7 +191,7 @@ sdl_test_wait_events(struct sdl_test *test)
     }
 
     /* update win flags */
-    test->win_flags = SDL_GetWindowFlags(test->win);
+    test->win_flags = SDL_GetWindowFlags(sdl->win);
 
     if ((test->win_flags & SDL_WINDOW_HIDDEN) || !test->win_width || !test->win_height)
         test->redraw = false;
@@ -336,13 +209,13 @@ sdl_test_redraw_window(struct sdl_test *test)
     test->redraw = false;
 
 #if 0
-    SDL_Surface *surf = SDL_GetWindowSurface(test->win);
+    SDL_Surface *surf = SDL_GetWindowSurface(sdl->win);
     if (!surf)
         vk_die("no window surface");
 
     const uint32_t color = SDL_MapRGB(surf->format, 0xff, 0x80, 0x80);
     SDL_FillRect(surf, NULL, color);
-    SDL_UpdateWindowSurface(test->win);
+    SDL_UpdateWindowSurface(sdl->win);
 #else
     struct vk_image *img;
 
@@ -371,23 +244,25 @@ sdl_test_redraw_window(struct sdl_test *test)
 static void
 sdl_test_configure_window(struct sdl_test *test)
 {
+    struct sdl *sdl = &test->sdl;
+
     switch (test->win_op) {
     case WIN_OP_TOGGLE_MINIMIZED:
         if (test->win_flags & SDL_WINDOW_MINIMIZED)
-            SDL_RestoreWindow(test->win);
+            SDL_RestoreWindow(sdl->win);
         else
-            SDL_MinimizeWindow(test->win);
+            SDL_MinimizeWindow(sdl->win);
         break;
     case WIN_OP_TOGGLE_MAXIMIZED:
         if (test->win_flags & SDL_WINDOW_MAXIMIZED)
-            SDL_RestoreWindow(test->win);
+            SDL_RestoreWindow(sdl->win);
         else
-            SDL_MaximizeWindow(test->win);
+            SDL_MaximizeWindow(sdl->win);
         break;
     case WIN_OP_TOGGLE_FULLSCREEN:
-        SDL_SetWindowFullscreen(test->win, test->win_flags & SDL_WINDOW_FULLSCREEN
-                                               ? 0
-                                               : SDL_WINDOW_FULLSCREEN_DESKTOP);
+        SDL_SetWindowFullscreen(sdl->win, test->win_flags & SDL_WINDOW_FULLSCREEN
+                                              ? 0
+                                              : SDL_WINDOW_FULLSCREEN_DESKTOP);
         break;
     default:
         break;

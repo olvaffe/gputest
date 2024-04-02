@@ -6,9 +6,12 @@
 #include "util.h"
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_vulkan.h>
 
 struct sdl_init_params {
     bool gl;
+    bool vk;
+    const char *libvulkan_path;
 
     int width;
     int height;
@@ -42,6 +45,8 @@ static inline void PRINTFLIKE(1, 2) NORETURN sdl_die(const char *format, ...)
 static inline void
 sdl_init_video(struct sdl *sdl)
 {
+    SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "1");
+
     if (SDL_Init(SDL_INIT_VIDEO))
         sdl_die("failed to init sdl");
 
@@ -52,6 +57,11 @@ sdl_init_video(struct sdl *sdl)
         SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    }
+
+    if (sdl->params.vk && sdl->params.libvulkan_path) {
+        if (SDL_Vulkan_LoadLibrary(sdl->params.libvulkan_path))
+            sdl_die("failed to load vulkan into sdl");
     }
 }
 
@@ -88,6 +98,10 @@ sdl_cleanup(struct sdl *sdl)
         SDL_GL_DeleteContext(sdl->ctx);
 
     SDL_DestroyWindow(sdl->win);
+
+    if (sdl->params.vk)
+        SDL_Vulkan_UnloadLibrary();
+
     SDL_Quit();
 }
 
@@ -120,6 +134,15 @@ sdl_log_event_windowevent(const SDL_Event *ev)
 #undef CASE
     default:
         sdl_log("unknown windowe vent 0x%x", ev->window.event);
+        break;
+    }
+
+    switch (ev->window.event) {
+    case SDL_WINDOWEVENT_RESIZED:
+    case SDL_WINDOWEVENT_SIZE_CHANGED:
+        sdl_log("  data1 %d data2 %d", ev->window.data1, ev->window.data2);
+        break;
+    default:
         break;
     }
 }
