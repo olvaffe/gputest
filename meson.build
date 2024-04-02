@@ -54,22 +54,13 @@ dep_skia = dep_not_found
 skia_path = get_option('skia-path')
 skia_path = fs.expanduser(skia_path)
 if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
-  dep_libskia = cpp.find_library(
+  dep_skia = cpp.find_library(
     'skia',
     dirs: [skia_path / 'out'],
     has_headers: ['include/core/SkGraphics.h'],
     header_include_directories: include_directories(skia_path),
   )
-
-  dep_skia = declare_dependency(
-    compile_args: ['-L' + skia_path / 'out', '-fno-rtti',
-                   '-DSK_DEBUG', '-DSK_GANESH', '-DSK_GL', '-DSK_VULKAN'],
-    dependencies: dep_libskia,
-    include_directories: [skia_path],
-  )
 endif
-
-with_sk = dep_skia.found()
 
 with_vk = cc.has_header('vulkan/vulkan.h')
 
@@ -81,7 +72,7 @@ if idep_eglutil.found()
   subdir('egl')
 endif
 
-if with_sk
+if idep_skutil.found()
   subdir('sk')
 endif
 

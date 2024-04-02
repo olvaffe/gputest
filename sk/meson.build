@@ -1,11 +1,6 @@
 # Copyright 2023 Google LLC
 # SPDX-License-Identifier: MIT
 
-idep_skutil = declare_dependency(
-  sources: ['skutil.h'],
-  dependencies: [dep_dl, dep_m, dep_skia],
-)
-
 tests = [
   'canvas-ganesh-gl',
   'canvas-ganesh-vk',
