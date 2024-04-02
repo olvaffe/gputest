@@ -39,7 +39,7 @@ util_summary += {'ffutil': idep_ffutil}
 idep_skutil = dep_not_found
 if dep_skia.found()
   idep_skutil = declare_dependency(
-    sources: ['skutil.h'],
+    sources: ['skutil.h', 'skutil_egl.h', 'skutil_vk.h'],
     compile_args: ['-L' + skia_path / 'out', '-fno-rtti',
                    '-DSK_DEBUG', '-DSK_GANESH', '-DSK_GL', '-DSK_VULKAN'],
     dependencies: [idep_util, dep_dl, dep_skia, dep_egl, dep_glesv2],
