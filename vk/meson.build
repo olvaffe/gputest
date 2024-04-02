@@ -34,14 +34,14 @@ tests = [
   'ycbcr',
 ]
 
-if idep_wlutil.found()
-  tests += ['wl']
+if idep_drmutil.found()
+  tests += ['drm']
 endif
 if dep_sdl2.found()
   tests += ['sdl']
 endif
-if idep_drmutil.found()
-  tests += ['drm']
+if idep_wlutil.found()
+  tests += ['wl']
 endif
 
 foreach t : tests
@@ -77,11 +77,8 @@ foreach t : tests
 
   test_deps = [idep_vkutil]
   test_args = []
-  if t == 'wl'
-    test_deps += [idep_wlutil]
-  elif t == 'sdl'
-    test_deps += [dep_sdl2]
-  elif t == 'drm'
+
+  if t == 'drm'
     test_deps += [idep_drmutil]
   elif t == 'ktx'
     if dep_ktx.found()
@@ -89,6 +86,10 @@ foreach t : tests
     else
       test_args += ['-DFAKEKTX']
     endif
+  elif t == 'sdl'
+    test_deps += [dep_sdl2]
+  elif t == 'wl'
+    test_deps += [idep_wlutil]
   endif
 
   executable(
