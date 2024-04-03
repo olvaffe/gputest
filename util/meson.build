@@ -66,6 +66,15 @@ if dep_skia.found()
 endif
 util_summary += {'skutil': idep_skutil}
 
+idep_v4l2util = dep_not_found
+if cc.has_header('linux/videodev2.h')
+  idep_v4l2util = declare_dependency(
+    sources: ['v4l2util.h'],
+    dependencies: [idep_util],
+  )
+endif
+util_summary += {'v4l2util': idep_v4l2util}
+
 idep_vautil = dep_not_found
 if dep_drm.found() and dep_libva.found() and dep_libva_drm.found()
   idep_vautil = declare_dependency(
