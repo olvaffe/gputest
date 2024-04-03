@@ -153,4 +153,109 @@ v4l2_enumerate_formats(struct v4l2 *v4l2, enum v4l2_buf_type type, uint32_t *cou
     return descs;
 }
 
+static inline struct v4l2_frmsizeenum *
+v4l2_enumerate_frame_sizes(struct v4l2 *v4l2, uint32_t format, uint32_t *count)
+{
+    *count = 0;
+    while (true) {
+        struct v4l2_frmsizeenum size = {
+            .index = *count,
+            .pixel_format = format,
+        };
+        if (ioctl(v4l2->fd, VIDIOC_ENUM_FRAMESIZES, &size))
+            break;
+        (*count)++;
+    }
+
+    struct v4l2_frmsizeenum *sizes = calloc(*count, sizeof(*sizes));
+    if (!sizes)
+        v4l2_die("failed to alloc frame sizes");
+
+    for (uint32_t i = 0; i < *count; i++) {
+        struct v4l2_frmsizeenum *size = &sizes[i];
+        size->index = i;
+        size->pixel_format = format;
+        v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUM_FRAMESIZES, size);
+        v4l2_check(v4l2, "VIDIOC_ENUM_FRAMESIZES");
+    }
+
+    return sizes;
+}
+
+static inline struct v4l2_frmivalenum *
+v4l2_enumerate_frame_intervals(
+    struct v4l2 *v4l2, uint32_t width, uint32_t height, uint32_t format, uint32_t *count)
+{
+    *count = 0;
+    while (true) {
+        struct v4l2_frmivalenum data = {
+            .index = *count,
+            .pixel_format = format,
+            .width = width,
+            .height = height,
+        };
+        if (ioctl(v4l2->fd, VIDIOC_ENUM_FRAMEINTERVALS, &data))
+            break;
+        (*count)++;
+    }
+
+    struct v4l2_frmivalenum *intervals = calloc(*count, sizeof(*intervals));
+    if (!intervals)
+        v4l2_die("failed to alloc frame intervals");
+
+    for (uint32_t i = 0; i < *count; i++) {
+        struct v4l2_frmivalenum *interval = &intervals[i];
+        interval->index = i;
+        interval->pixel_format = format;
+        interval->width = width;
+        interval->height = height;
+        v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUM_FRAMEINTERVALS, interval);
+        v4l2_check(v4l2, "VIDIOC_ENUM_FRAMEINTERVALS");
+    }
+
+    return intervals;
+}
+
+static inline struct v4l2_input *
+v4l2_enumerate_inputs(struct v4l2 *v4l2, uint32_t *count)
+{
+    *count = 0;
+    while (true) {
+        struct v4l2_input input = {
+            .index = *count,
+        };
+        if (ioctl(v4l2->fd, VIDIOC_ENUMINPUT, &input))
+            break;
+        (*count)++;
+    }
+
+    struct v4l2_input *inputs = calloc(*count, sizeof(*inputs));
+    if (!inputs)
+        v4l2_die("failed to alloc inputs");
+
+    for (uint32_t i = 0; i < *count; i++) {
+        struct v4l2_input *input = &inputs[i];
+        input->index = i;
+
+        v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUMINPUT, input);
+        v4l2_check(v4l2, "VIDIOC_ENUMINPUT");
+    }
+
+    return inputs;
+}
+
+/* FWIW, how capturing works is
+ *
+ *  - VIDIOC_REQBUFS to allcoate in-kernel buffers
+ *  - VIDIOC_QUERYBUF to get magic offsets and mmap buffers to userspace
+ *  - VIDIOC_QBUF to queue buffers
+ *  - VIDIOC_STREAMON to start streaming
+ *  - loop
+ *    - VIDIOC_DQBUF to dequeue a buffer
+ *    - save away the buffer data
+ *    - VIDIOC_QBUF to queue the buffer back
+ *  - VIDIOC_STREAMOFF to stop streaming
+ *  - VIDIOC_REQBUFS to free buffers
+ */
+
 #endif /* V4L2UTIL_H */

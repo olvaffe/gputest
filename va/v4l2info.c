@@ -221,6 +221,21 @@ v4l2_fmt_flag_to_str(uint32_t flags, char *str, size_t size)
     return bitmask_to_str(flags, fmt_flag_descs, ARRAY_SIZE(fmt_flag_descs), str, size);
 }
 
+static const char *
+v4l2_input_type_to_str(uint32_t type)
+{
+    /* clang-format off */
+    switch (type) {
+#define CASE(t) case V4L2_INPUT_TYPE_ ##t: return #t
+	CASE(TUNER);
+	CASE(CAMERA);
+	CASE(TOUCH);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
+}
+
 static void
 v4l2_dump_cap(struct v4l2 *v4l2)
 {
@@ -279,9 +294,58 @@ v4l2_dump_formats(struct v4l2 *v4l2)
             v4l2_log("  '%.*s': %s, flags %s, mbus %d", 4, (const char *)&desc->pixelformat,
                      desc->description, v4l2_fmt_flag_to_str(desc->flags, str, sizeof(str)),
                      desc->mbus_code);
+
+            uint32_t size_count;
+            struct v4l2_frmsizeenum *sizes =
+                v4l2_enumerate_frame_sizes(v4l2, desc->pixelformat, &size_count);
+            for (uint32_t k = 0; k < size_count; k++) {
+                struct v4l2_frmsizeenum *size = &sizes[k];
+                switch (size->type) {
+                case V4L2_FRMSIZE_TYPE_DISCRETE: {
+                    uint32_t interval_count;
+                    struct v4l2_frmivalenum *intervals = v4l2_enumerate_frame_intervals(
+                        v4l2, size->discrete.width, size->discrete.height, desc->pixelformat,
+                        &interval_count);
+                    for (uint32_t l = 0; l < interval_count; l++) {
+                        struct v4l2_frmivalenum *interval = &intervals[l];
+                        if (interval->type == V4L2_FRMIVAL_TYPE_DISCRETE)
+                            v4l2_log("    %dx%d, interval %d/%d", interval->width,
+                                     interval->height, interval->discrete.numerator,
+                                     interval->discrete.denominator);
+                        else
+                            v4l2_log("    %dx%d", interval->width, interval->height);
+                    }
+                    free(intervals);
+                } break;
+                case V4L2_FRMSIZE_TYPE_CONTINUOUS:
+                case V4L2_FRMSIZE_TYPE_STEPWISE:
+                default:
+                    v4l2_log("    type %d", size->type);
+                    break;
+                }
+            }
+            free(sizes);
         }
         free(descs);
     }
+}
+
+static void
+v4l2_dump_inputs(struct v4l2 *v4l2)
+{
+    uint32_t count;
+    struct v4l2_input *inputs = v4l2_enumerate_inputs(v4l2, &count);
+    if (!count)
+        return;
+
+    for (uint32_t i = 0; i < count; i++) {
+        struct v4l2_input *input = &inputs[i];
+
+        v4l2_log("input #%d: %s, type %s, audioset 0x%x, tuner %d, std %d, status %d, caps 0x%x",
+                 input->index, input->name, v4l2_input_type_to_str(input->type), input->audioset,
+                 input->tuner, (int)input->std, input->status, input->capabilities);
+    }
+    free(inputs);
 }
 
 static void
@@ -293,6 +357,7 @@ v4l2_dump(struct v4l2 *v4l2)
         v4l2_dump_ctrl(v4l2, i);
 
     v4l2_dump_formats(v4l2);
+    v4l2_dump_inputs(v4l2);
 }
 
 int
