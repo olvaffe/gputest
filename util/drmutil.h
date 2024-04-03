@@ -13,12 +13,6 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-#define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
-#define NORETURN __attribute__((noreturn))
-
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#define ALIGN(v, a) (((v) + (a) - 1) & ~((a) - 1))
-
 struct drm_init_params {
     int unused;
 };

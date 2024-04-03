@@ -36,6 +36,15 @@ if dep_libavcodec.found() and dep_libavformat.found() and dep_libavutil.found()
 endif
 util_summary += {'ffutil': idep_ffutil}
 
+idep_gbmutil = dep_not_found
+if dep_gbm.found()
+  idep_gbmutil = declare_dependency(
+    sources: ['gbmutil.h'],
+    dependencies: [idep_util, dep_gbm],
+  )
+endif
+util_summary += {'gbmutil': idep_gbmutil}
+
 idep_sdlutil = dep_not_found
 if dep_sdl2.found()
   idep_sdlutil = declare_dependency(

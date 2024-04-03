@@ -35,7 +35,7 @@ dep_rt = cc.find_library('rt', required: false)
 # for drmutil and vautil
 dep_drm = dependency('libdrm', required: false)
 
-# for eglutil
+# for eglutil and gbmutil
 dep_gbm = dependency('gbm', required: false)
 dep_nativewindow = cc.find_library('nativewindow', required: false)
 
