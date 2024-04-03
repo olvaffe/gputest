@@ -10,7 +10,7 @@ struct bitmask_desc {
     const char *str;
 };
 
-static void
+static const char *
 bitmask_to_str(
     uint64_t bitmask, const struct bitmask_desc *descs, uint32_t count, char *str, size_t size)
 {
@@ -29,9 +29,11 @@ bitmask_to_str(
         str[len - 1] = '\0';
     else
         snprintf(str + len, size - len, "none");
+
+    return str;
 }
 
-static void
+static const char *
 v4l2_cap_to_str(uint32_t caps, char *str, size_t size)
 {
     static const struct bitmask_desc cap_descs[] = {
@@ -68,7 +70,33 @@ v4l2_cap_to_str(uint32_t caps, char *str, size_t size)
         /* clang-format on */
     };
 
-    bitmask_to_str(caps, cap_descs, ARRAY_SIZE(cap_descs), str, size);
+    return bitmask_to_str(caps, cap_descs, ARRAY_SIZE(cap_descs), str, size);
+}
+
+static const char *
+v4l2_ctrl_class_to_str(uint32_t cls)
+{
+    /* clang-format off */
+    switch (cls) {
+#define CASE(c) case V4L2_CTRL_CLASS_ ##c: return #c
+    CASE(USER);
+    CASE(CODEC);
+    CASE(CAMERA);
+    CASE(FM_TX);
+    CASE(FLASH);
+    CASE(JPEG);
+    CASE(IMAGE_SOURCE);
+    CASE(IMAGE_PROC);
+    CASE(DV);
+    CASE(FM_RX);
+    CASE(RF_TUNER);
+    CASE(DETECT);
+    CASE(CODEC_STATELESS);
+    CASE(COLORIMETRY);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
 }
 
 static const char *
@@ -120,7 +148,7 @@ v4l2_ctrl_type_to_str(enum v4l2_ctrl_type type)
     /* clang-format on */
 }
 
-static void
+static const char *
 v4l2_ctrl_flag_to_str(uint32_t flags, char *str, size_t size)
 {
     static const struct bitmask_desc ctrl_flag_descs[] = {
@@ -142,7 +170,55 @@ v4l2_ctrl_flag_to_str(uint32_t flags, char *str, size_t size)
         /* clang-format on */
     };
 
-    bitmask_to_str(flags, ctrl_flag_descs, ARRAY_SIZE(ctrl_flag_descs), str, size);
+    return bitmask_to_str(flags, ctrl_flag_descs, ARRAY_SIZE(ctrl_flag_descs), str, size);
+}
+
+static const char *
+v4l2_buf_type_to_str(enum v4l2_buf_type type)
+{
+    /* clang-format off */
+    switch (type) {
+#define CASE(t) case V4L2_BUF_TYPE_ ##t: return #t
+	CASE(VIDEO_CAPTURE);
+	CASE(VIDEO_OUTPUT);
+	CASE(VIDEO_OVERLAY);
+	CASE(VBI_CAPTURE);
+	CASE(VBI_OUTPUT);
+	CASE(SLICED_VBI_CAPTURE);
+	CASE(SLICED_VBI_OUTPUT);
+	CASE(VIDEO_OUTPUT_OVERLAY);
+	CASE(VIDEO_CAPTURE_MPLANE);
+	CASE(VIDEO_OUTPUT_MPLANE);
+	CASE(SDR_CAPTURE);
+	CASE(SDR_OUTPUT);
+	CASE(META_CAPTURE);
+	CASE(META_OUTPUT);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
+}
+
+static const char *
+v4l2_fmt_flag_to_str(uint32_t flags, char *str, size_t size)
+{
+    static const struct bitmask_desc fmt_flag_descs[] = {
+    /* clang-format off */
+#define FLAG(f) { .bitmask = V4L2_FMT_FLAG_ ##f, .str = #f }
+        FLAG(COMPRESSED),
+        FLAG(EMULATED),
+        FLAG(CONTINUOUS_BYTESTREAM),
+        FLAG(DYN_RESOLUTION),
+        FLAG(ENC_CAP_FRAME_INTERVAL),
+        FLAG(CSC_COLORSPACE),
+        FLAG(CSC_XFER_FUNC),
+        FLAG(CSC_YCBCR_ENC),
+        FLAG(CSC_QUANTIZATION),
+#undef FLAG
+        /* clang-format on */
+    };
+
+    return bitmask_to_str(flags, fmt_flag_descs, ARRAY_SIZE(fmt_flag_descs), str, size);
 }
 
 static void
@@ -157,11 +233,8 @@ v4l2_dump_cap(struct v4l2 *v4l2)
     v4l2_log("  version: 0x%x", cap->version);
 
     char str[256];
-    v4l2_cap_to_str(cap->capabilities, str, sizeof(str));
-    v4l2_log("  caps: %s", str);
-
-    v4l2_cap_to_str(cap->device_caps, str, sizeof(str));
-    v4l2_log("  device caps: %s", str);
+    v4l2_log("  caps: %s", v4l2_cap_to_str(cap->capabilities, str, sizeof(str)));
+    v4l2_log("  device caps: %s", v4l2_cap_to_str(cap->device_caps, str, sizeof(str)));
 }
 
 static void
@@ -170,10 +243,45 @@ v4l2_dump_ctrl(struct v4l2 *v4l2, uint32_t idx)
     const struct v4l2_queryctrl *ctrl = &v4l2->ctrls[idx];
 
     char str[256];
-    v4l2_ctrl_flag_to_str(ctrl->flags, str, sizeof(str));
-    v4l2_log("ctrl: id 0x%x, name %s, flags %s", ctrl->id, ctrl->name, str);
-    v4l2_log("  min/max/step/default: %d/%d/%d/%d, type %s", ctrl->minimum, ctrl->maximum,
-             ctrl->step, ctrl->default_value, v4l2_ctrl_type_to_str(ctrl->type));
+    v4l2_log("'%s' %s ctrl: type %s, flags %s", ctrl->name,
+             v4l2_ctrl_class_to_str(V4L2_CTRL_ID2CLASS(ctrl->id)),
+             v4l2_ctrl_type_to_str(ctrl->type),
+             v4l2_ctrl_flag_to_str(ctrl->flags, str, sizeof(str)));
+    v4l2_log("  min/max/step/default: %d/%d/%d/%d", ctrl->minimum, ctrl->maximum, ctrl->step,
+             ctrl->default_value);
+}
+
+static void
+v4l2_dump_formats(struct v4l2 *v4l2)
+{
+    const enum v4l2_buf_type all_types[] = {
+        V4L2_BUF_TYPE_VIDEO_CAPTURE,        V4L2_BUF_TYPE_VIDEO_OUTPUT,
+        V4L2_BUF_TYPE_VIDEO_OVERLAY,        V4L2_BUF_TYPE_VBI_CAPTURE,
+        V4L2_BUF_TYPE_VBI_OUTPUT,           V4L2_BUF_TYPE_SLICED_VBI_CAPTURE,
+        V4L2_BUF_TYPE_SLICED_VBI_OUTPUT,    V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY,
+        V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE, V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE,
+        V4L2_BUF_TYPE_SDR_CAPTURE,          V4L2_BUF_TYPE_SDR_OUTPUT,
+        V4L2_BUF_TYPE_META_CAPTURE,         V4L2_BUF_TYPE_META_OUTPUT,
+    };
+
+    for (uint32_t i = 0; i < ARRAY_SIZE(all_types); i++) {
+        const enum v4l2_buf_type type = all_types[i];
+        uint32_t count;
+        struct v4l2_fmtdesc *descs = v4l2_enumerate_formats(v4l2, all_types[i], &count);
+        if (!count)
+            continue;
+
+        v4l2_log("%s buf type:", v4l2_buf_type_to_str(type));
+        for (uint32_t j = 0; j < count; j++) {
+            struct v4l2_fmtdesc *desc = &descs[j];
+
+            char str[256];
+            v4l2_log("  '%.*s': %s, flags %s, mbus %d", 4, (const char *)&desc->pixelformat,
+                     desc->description, v4l2_fmt_flag_to_str(desc->flags, str, sizeof(str)),
+                     desc->mbus_code);
+        }
+        free(descs);
+    }
 }
 
 static void
@@ -183,6 +291,8 @@ v4l2_dump(struct v4l2 *v4l2)
 
     for (uint32_t i = 0; i < v4l2->ctrl_count; i++)
         v4l2_dump_ctrl(v4l2, i);
+
+    v4l2_dump_formats(v4l2);
 }
 
 int

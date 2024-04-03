@@ -111,4 +111,46 @@ v4l2_cleanup(struct v4l2 *v4l2)
     close(v4l2->fd);
 }
 
+static inline int
+v4l2_get_ctrl(struct v4l2 *v4l2, uint32_t ctrl_id)
+{
+    struct v4l2_control data = {
+        .id = ctrl_id,
+    };
+    v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_CTRL, &data);
+    v4l2_check(v4l2, "VIDIOC_G_CTRL");
+
+    return data.value;
+}
+
+static inline struct v4l2_fmtdesc *
+v4l2_enumerate_formats(struct v4l2 *v4l2, enum v4l2_buf_type type, uint32_t *count)
+{
+    *count = 0;
+    while (true) {
+        struct v4l2_fmtdesc desc = {
+            .index = *count,
+            .type = type,
+        };
+        if (ioctl(v4l2->fd, VIDIOC_ENUM_FMT, &desc))
+            break;
+        (*count)++;
+    }
+
+    struct v4l2_fmtdesc *descs = calloc(*count, sizeof(*descs));
+    if (!descs)
+        v4l2_die("failed to alloc fmtdescs");
+
+    for (uint32_t i = 0; i < *count; i++) {
+        struct v4l2_fmtdesc *desc = &descs[i];
+        desc->index = i;
+        desc->type = type;
+
+        v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUM_FMT, desc);
+        v4l2_check(v4l2, "VIDIOC_ENUM_FMT");
+    }
+
+    return descs;
+}
+
 #endif /* V4L2UTIL_H */
