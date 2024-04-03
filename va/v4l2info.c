@@ -253,17 +253,24 @@ v4l2_dump_cap(struct v4l2 *v4l2)
 }
 
 static void
-v4l2_dump_ctrl(struct v4l2 *v4l2, uint32_t idx)
+v4l2_dump_ctrls(struct v4l2 *v4l2)
 {
-    const struct v4l2_queryctrl *ctrl = &v4l2->ctrls[idx];
+    uint32_t count;
+    struct v4l2_queryctrl *ctrls = v4l2_enumerate_controls(v4l2, &count);
 
-    char str[256];
-    v4l2_log("'%s' %s ctrl: type %s, flags %s", ctrl->name,
-             v4l2_ctrl_class_to_str(V4L2_CTRL_ID2CLASS(ctrl->id)),
-             v4l2_ctrl_type_to_str(ctrl->type),
-             v4l2_ctrl_flag_to_str(ctrl->flags, str, sizeof(str)));
-    v4l2_log("  min/max/step/default: %d/%d/%d/%d", ctrl->minimum, ctrl->maximum, ctrl->step,
-             ctrl->default_value);
+    for (uint32_t i = 0; i < count; i++) {
+        const struct v4l2_queryctrl *ctrl = &ctrls[i];
+
+        char str[256];
+        v4l2_log("'%s' %s ctrl: type %s, flags %s", ctrl->name,
+                 v4l2_ctrl_class_to_str(V4L2_CTRL_ID2CLASS(ctrl->id)),
+                 v4l2_ctrl_type_to_str(ctrl->type),
+                 v4l2_ctrl_flag_to_str(ctrl->flags, str, sizeof(str)));
+        v4l2_log("  min/max/step/default: %d/%d/%d/%d", ctrl->minimum, ctrl->maximum, ctrl->step,
+                 ctrl->default_value);
+    }
+
+    free(ctrls);
 }
 
 static void
@@ -352,10 +359,7 @@ static void
 v4l2_dump(struct v4l2 *v4l2)
 {
     v4l2_dump_cap(v4l2);
-
-    for (uint32_t i = 0; i < v4l2->ctrl_count; i++)
-        v4l2_dump_ctrl(v4l2, i);
-
+    v4l2_dump_ctrls(v4l2);
     v4l2_dump_formats(v4l2);
     v4l2_dump_inputs(v4l2);
 }
