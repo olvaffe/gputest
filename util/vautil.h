@@ -125,15 +125,6 @@ va_init_display(struct va *va)
         va_die("failed to alloc display attrs");
     va->status = vaQueryDisplayAttributes(va->display, va->attrs, &va->attr_count);
     va_check(va, "failed to query display attrs");
-
-    for (int i = 0; i < va->attr_count; i++) {
-        VADisplayAttribute *attr = &va->attrs[i];
-        if (!(attr->flags & VA_DISPLAY_ATTRIB_GETTABLE))
-            continue;
-
-        va->status = vaGetDisplayAttributes(va->display, attr, 1);
-        va_check(va, "failed to get display attr value");
-    }
 }
 
 static inline void
