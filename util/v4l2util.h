@@ -52,6 +52,277 @@ static inline void PRINTFLIKE(2, 3) v4l2_check(struct v4l2 *v4l2, const char *fo
     va_end(ap);
 }
 
+static const char *
+v4l2_cap_to_str(uint32_t val, char *str, size_t size)
+{
+    /* clang-format off */
+    static const struct u_bitmask_desc descs[] = {
+#define DESC(v) { .bitmask = V4L2_CAP_ ##v, .str = #v }
+        DESC(VIDEO_CAPTURE),
+        DESC(VIDEO_OUTPUT),
+        DESC(VIDEO_OVERLAY),
+        DESC(VBI_CAPTURE),
+        DESC(VBI_OUTPUT),
+        DESC(SLICED_VBI_CAPTURE),
+        DESC(SLICED_VBI_OUTPUT),
+        DESC(RDS_CAPTURE),
+        DESC(VIDEO_OUTPUT_OVERLAY),
+        DESC(HW_FREQ_SEEK),
+        DESC(RDS_OUTPUT),
+        DESC(VIDEO_CAPTURE_MPLANE),
+        DESC(VIDEO_OUTPUT_MPLANE),
+        DESC(VIDEO_M2M_MPLANE),
+        DESC(VIDEO_M2M),
+        DESC(TUNER),
+        DESC(AUDIO),
+        DESC(RADIO),
+        DESC(MODULATOR),
+        DESC(SDR_CAPTURE),
+        DESC(EXT_PIX_FORMAT),
+        DESC(SDR_OUTPUT),
+        DESC(META_CAPTURE),
+        DESC(READWRITE),
+        DESC(STREAMING),
+        DESC(META_OUTPUT),
+        DESC(TOUCH),
+        DESC(IO_MC),
+        DESC(DEVICE_CAPS),
+#undef DESC
+    };
+    /* clang-format on */
+
+    return u_bitmask_to_str(val, descs, ARRAY_SIZE(descs), str, size);
+}
+
+static const char *
+v4l2_ctrl_class_to_str(uint32_t val)
+{
+    /* clang-format off */
+    switch (val) {
+#define CASE(v) case V4L2_CTRL_CLASS_ ##v: return #v
+    CASE(USER);
+    CASE(CODEC);
+    CASE(CAMERA);
+    CASE(FM_TX);
+    CASE(FLASH);
+    CASE(JPEG);
+    CASE(IMAGE_SOURCE);
+    CASE(IMAGE_PROC);
+    CASE(DV);
+    CASE(FM_RX);
+    CASE(RF_TUNER);
+    CASE(DETECT);
+    CASE(CODEC_STATELESS);
+    CASE(COLORIMETRY);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
+}
+
+static const char *
+v4l2_ctrl_type_to_str(enum v4l2_ctrl_type val)
+{
+    /* clang-format off */
+    switch (val) {
+#define CASE(v) case V4L2_CTRL_TYPE_ ##v: return #v
+    CASE(INTEGER);
+    CASE(BOOLEAN);
+    CASE(MENU);
+    CASE(BUTTON);
+    CASE(INTEGER64);
+    CASE(CTRL_CLASS);
+    CASE(STRING);
+    CASE(BITMASK);
+    CASE(INTEGER_MENU);
+    CASE(U8);
+    CASE(U16);
+    CASE(U32);
+    CASE(AREA);
+    CASE(HDR10_CLL_INFO);
+    CASE(HDR10_MASTERING_DISPLAY);
+    CASE(H264_SPS);
+    CASE(H264_PPS);
+    CASE(H264_SCALING_MATRIX);
+    CASE(H264_SLICE_PARAMS);
+    CASE(H264_DECODE_PARAMS);
+    CASE(H264_PRED_WEIGHTS);
+    CASE(FWHT_PARAMS);
+    CASE(VP8_FRAME);
+    CASE(MPEG2_QUANTISATION);
+    CASE(MPEG2_SEQUENCE);
+    CASE(MPEG2_PICTURE);
+    CASE(VP9_COMPRESSED_HDR);
+    CASE(VP9_FRAME);
+    CASE(HEVC_SPS);
+    CASE(HEVC_PPS);
+    CASE(HEVC_SLICE_PARAMS);
+    CASE(HEVC_SCALING_MATRIX);
+    CASE(HEVC_DECODE_PARAMS);
+    CASE(AV1_SEQUENCE);
+    CASE(AV1_TILE_GROUP_ENTRY);
+    CASE(AV1_FRAME);
+    CASE(AV1_FILM_GRAIN);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
+}
+
+static const char *
+v4l2_ctrl_flag_to_str(uint32_t val, char *str, size_t size)
+{
+    /* clang-format off */
+    static const struct u_bitmask_desc descs[] = {
+#define DESC(v) { .bitmask = V4L2_CTRL_FLAG_ ##v, .str = #v }
+        DESC(DISABLED),
+        DESC(GRABBED),
+        DESC(READ_ONLY),
+        DESC(UPDATE),
+        DESC(INACTIVE),
+        DESC(SLIDER),
+        DESC(WRITE_ONLY),
+        DESC(VOLATILE),
+        DESC(HAS_PAYLOAD),
+        DESC(EXECUTE_ON_WRITE),
+        DESC(MODIFY_LAYOUT),
+        DESC(DYNAMIC_ARRAY),
+#undef DESC
+    };
+    /* clang-format on */
+
+    return u_bitmask_to_str(val, descs, ARRAY_SIZE(descs), str, size);
+}
+
+static const char *
+v4l2_buf_type_to_str(enum v4l2_buf_type val)
+{
+    /* clang-format off */
+    switch (val) {
+#define CASE(v) case V4L2_BUF_TYPE_ ##v: return #v
+	CASE(VIDEO_CAPTURE);
+	CASE(VIDEO_OUTPUT);
+	CASE(VIDEO_OVERLAY);
+	CASE(VBI_CAPTURE);
+	CASE(VBI_OUTPUT);
+	CASE(SLICED_VBI_CAPTURE);
+	CASE(SLICED_VBI_OUTPUT);
+	CASE(VIDEO_OUTPUT_OVERLAY);
+	CASE(VIDEO_CAPTURE_MPLANE);
+	CASE(VIDEO_OUTPUT_MPLANE);
+	CASE(SDR_CAPTURE);
+	CASE(SDR_OUTPUT);
+	CASE(META_CAPTURE);
+	CASE(META_OUTPUT);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
+}
+
+static const char *
+v4l2_fmt_flag_to_str(uint32_t val, char *str, size_t size)
+{
+    /* clang-format off */
+    static const struct u_bitmask_desc descs[] = {
+#define DESC(v) { .bitmask = V4L2_FMT_FLAG_ ##v, .str = #v }
+        DESC(COMPRESSED),
+        DESC(EMULATED),
+        DESC(CONTINUOUS_BYTESTREAM),
+        DESC(DYN_RESOLUTION),
+        DESC(ENC_CAP_FRAME_INTERVAL),
+        DESC(CSC_COLORSPACE),
+        DESC(CSC_XFER_FUNC),
+        DESC(CSC_YCBCR_ENC),
+        DESC(CSC_QUANTIZATION),
+#undef DESC
+    };
+    /* clang-format on */
+
+    return u_bitmask_to_str(val, descs, ARRAY_SIZE(descs), str, size);
+}
+
+static const char *
+v4l2_input_type_to_str(uint32_t val)
+{
+    /* clang-format off */
+    switch (val) {
+#define CASE(v) case V4L2_INPUT_TYPE_ ##v: return #v
+	CASE(TUNER);
+	CASE(CAMERA);
+	CASE(TOUCH);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
+}
+
+static const char *
+v4l2_colorspace_to_str(enum v4l2_colorspace val)
+{
+    /* clang-format off */
+    switch (val) {
+#define CASE(v) case V4L2_COLORSPACE_ ##v: return #v
+	CASE(DEFAULT);
+    CASE(SMPTE170M);
+    CASE(SMPTE240M);
+    CASE(REC709);
+    CASE(BT878);
+    CASE(470_SYSTEM_M);
+    CASE(470_SYSTEM_BG);
+    CASE(JPEG);
+    CASE(SRGB);
+    CASE(OPRGB);
+    CASE(BT2020);
+    CASE(RAW);
+    CASE(DCI_P3);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
+};
+
+static const char *
+v4l2_ycbcr_enc_to_str(enum v4l2_ycbcr_encoding val)
+{
+    /* clang-format off */
+    switch (val) {
+#define CASE(v) case V4L2_YCBCR_ENC_ ##v: return #v
+    CASE(DEFAULT);
+    CASE(601);
+    CASE(709);
+    CASE(XV601);
+    CASE(XV709);
+    CASE(SYCC);
+    CASE(BT2020);
+    CASE(BT2020_CONST_LUM);
+    CASE(SMPTE240M);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
+}
+
+static const char *
+v4l2_xfer_func_to_str(enum v4l2_xfer_func val)
+{
+    /* clang-format off */
+    switch (val) {
+#define CASE(v) case V4L2_XFER_FUNC_ ##v: return #v
+    CASE(DEFAULT);
+    CASE(709);
+    CASE(SRGB);
+    CASE(OPRGB);
+    CASE(SMPTE240M);
+    CASE(NONE);
+    CASE(DCI_P3);
+    CASE(SMPTE2084);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
+}
+
 static inline void
 v4l2_vidioc_querycap(struct v4l2 *v4l2, struct v4l2_capability *args)
 {
@@ -114,8 +385,10 @@ v4l2_vidioc_enum_framesizes(struct v4l2 *v4l2,
 }
 
 static inline uint32_t
-v4l2_vidioc_enum_frameintervals_count(struct v4l2 *v4l2, uint32_t format, uint32_t width, uint32_t
-        height)
+v4l2_vidioc_enum_frameintervals_count(struct v4l2 *v4l2,
+                                      uint32_t format,
+                                      uint32_t width,
+                                      uint32_t height)
 {
     for (uint32_t i = 0;; i++) {
         struct v4l2_frmivalenum args = {
@@ -131,11 +404,11 @@ v4l2_vidioc_enum_frameintervals_count(struct v4l2 *v4l2, uint32_t format, uint32
 
 static inline void
 v4l2_vidioc_enum_frameintervals(struct v4l2 *v4l2,
-                            uint32_t format,
-                            uint32_t width,
-                            uint32_t height,
-                            uint32_t index,
-                            struct v4l2_frmivalenum *args)
+                                uint32_t format,
+                                uint32_t width,
+                                uint32_t height,
+                                uint32_t index,
+                                struct v4l2_frmivalenum *args)
 {
     *args = (struct v4l2_frmivalenum){
         .index = index,
@@ -145,6 +418,16 @@ v4l2_vidioc_enum_frameintervals(struct v4l2 *v4l2,
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUM_FRAMEINTERVALS, args);
     v4l2_check(v4l2, "VIDIOC_ENUM_FRAMEINTERVALS");
+}
+
+static inline void
+v4l2_vidioc_g_fmt(struct v4l2 *v4l2, enum v4l2_buf_type type, struct v4l2_format *args)
+{
+    *args = (struct v4l2_format){
+        .type = type,
+    };
+    v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_FMT, args);
+    v4l2_check(v4l2, "failed to VIDIOC_G_FMT");
 }
 
 static inline uint32_t

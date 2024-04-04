@@ -24,8 +24,8 @@
 #define NORETURN __attribute__((noreturn))
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#define ALIGN(v, a) (((v) + (a) - 1) & ~((a) - 1))
-#define DIV_ROUND_UP(v, d) (((v) + (d) - 1) / (d))
+#define ALIGN(v, a) (((v) + (a)-1) & ~((a)-1))
+#define DIV_ROUND_UP(v, d) (((v) + (d)-1) / (d))
 
 static inline void
 u_logv(const char *tag, const char *format, va_list ap)
@@ -56,6 +56,34 @@ static inline void PRINTFLIKE(2, 3) NORETURN u_die(const char *tag, const char *
     va_start(ap, format);
     u_diev(tag, format, ap);
     va_end(ap);
+}
+
+struct u_bitmask_desc {
+    uint64_t bitmask;
+    const char *str;
+};
+
+static inline const char *
+u_bitmask_to_str(
+    uint64_t bitmask, const struct u_bitmask_desc *descs, uint32_t count, char *str, size_t size)
+{
+    int len = 0;
+    for (uint32_t i = 0; i < count; i++) {
+        const struct u_bitmask_desc *desc = &descs[i];
+        if (bitmask & desc->bitmask) {
+            len += snprintf(str + len, size - len, "%s|", desc->str);
+            bitmask &= ~desc->bitmask;
+        }
+    }
+
+    if (bitmask)
+        snprintf(str + len, size - len, "0x%" PRIx64, bitmask);
+    else if (len)
+        str[len - 1] = '\0';
+    else
+        snprintf(str + len, size - len, "none");
+
+    return str;
 }
 
 static inline uint32_t
