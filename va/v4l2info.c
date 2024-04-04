@@ -141,6 +141,16 @@ v4l2_dump_current_format(struct v4l2 *v4l2)
                  v4l2_ycbcr_enc_to_str(pix->ycbcr_enc), pix->quantization,
                  v4l2_xfer_func_to_str(pix->xfer_func));
     }
+
+    if (!(v4l2->cap.capabilities & V4L2_CAP_STREAMING))
+        return;
+
+    struct v4l2_create_buffers buf;
+    v4l2_vidioc_create_bufs(v4l2, V4L2_MEMORY_MMAP, &fmt, &buf);
+
+    char str[256];
+    v4l2_log("current bufs: count %d, caps %s", buf.index,
+             v4l2_buf_cap_to_str(buf.capabilities, str, sizeof(str)));
 }
 
 static void

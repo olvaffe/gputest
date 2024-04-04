@@ -52,7 +52,7 @@ static inline void PRINTFLIKE(2, 3) v4l2_check(struct v4l2 *v4l2, const char *fo
     va_end(ap);
 }
 
-static const char *
+static inline const char *
 v4l2_cap_to_str(uint32_t val, char *str, size_t size)
 {
     /* clang-format off */
@@ -94,7 +94,7 @@ v4l2_cap_to_str(uint32_t val, char *str, size_t size)
     return u_bitmask_to_str(val, descs, ARRAY_SIZE(descs), str, size);
 }
 
-static const char *
+static inline const char *
 v4l2_ctrl_class_to_str(uint32_t val)
 {
     /* clang-format off */
@@ -120,7 +120,7 @@ v4l2_ctrl_class_to_str(uint32_t val)
     /* clang-format on */
 }
 
-static const char *
+static inline const char *
 v4l2_ctrl_type_to_str(enum v4l2_ctrl_type val)
 {
     /* clang-format off */
@@ -169,7 +169,7 @@ v4l2_ctrl_type_to_str(enum v4l2_ctrl_type val)
     /* clang-format on */
 }
 
-static const char *
+static inline const char *
 v4l2_ctrl_flag_to_str(uint32_t val, char *str, size_t size)
 {
     /* clang-format off */
@@ -194,7 +194,7 @@ v4l2_ctrl_flag_to_str(uint32_t val, char *str, size_t size)
     return u_bitmask_to_str(val, descs, ARRAY_SIZE(descs), str, size);
 }
 
-static const char *
+static inline const char *
 v4l2_buf_type_to_str(enum v4l2_buf_type val)
 {
     /* clang-format off */
@@ -220,7 +220,27 @@ v4l2_buf_type_to_str(enum v4l2_buf_type val)
     /* clang-format on */
 }
 
-static const char *
+static inline const char *
+v4l2_buf_cap_to_str(uint32_t val, char *str, size_t size)
+{
+    /* clang-format off */
+    static const struct u_bitmask_desc descs[] = {
+#define DESC(v) { .bitmask = V4L2_BUF_CAP_SUPPORTS_ ##v, .str = #v }
+        DESC(MMAP),
+        DESC(USERPTR),
+        DESC(DMABUF),
+        DESC(REQUESTS),
+        DESC(ORPHANED_BUFS),
+        DESC(M2M_HOLD_CAPTURE_BUF),
+        DESC(MMAP_CACHE_HINTS),
+#undef DESC
+    };
+    /* clang-format on */
+
+    return u_bitmask_to_str(val, descs, ARRAY_SIZE(descs), str, size);
+}
+
+static inline const char *
 v4l2_fmt_flag_to_str(uint32_t val, char *str, size_t size)
 {
     /* clang-format off */
@@ -242,7 +262,7 @@ v4l2_fmt_flag_to_str(uint32_t val, char *str, size_t size)
     return u_bitmask_to_str(val, descs, ARRAY_SIZE(descs), str, size);
 }
 
-static const char *
+static inline const char *
 v4l2_input_type_to_str(uint32_t val)
 {
     /* clang-format off */
@@ -257,7 +277,7 @@ v4l2_input_type_to_str(uint32_t val)
     /* clang-format on */
 }
 
-static const char *
+static inline const char *
 v4l2_colorspace_to_str(enum v4l2_colorspace val)
 {
     /* clang-format off */
@@ -282,7 +302,7 @@ v4l2_colorspace_to_str(enum v4l2_colorspace val)
     /* clang-format on */
 };
 
-static const char *
+static inline const char *
 v4l2_ycbcr_enc_to_str(enum v4l2_ycbcr_encoding val)
 {
     /* clang-format off */
@@ -303,7 +323,7 @@ v4l2_ycbcr_enc_to_str(enum v4l2_ycbcr_encoding val)
     /* clang-format on */
 }
 
-static const char *
+static inline const char *
 v4l2_xfer_func_to_str(enum v4l2_xfer_func val)
 {
     /* clang-format off */
@@ -428,6 +448,20 @@ v4l2_vidioc_g_fmt(struct v4l2 *v4l2, enum v4l2_buf_type type, struct v4l2_format
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_FMT, args);
     v4l2_check(v4l2, "failed to VIDIOC_G_FMT");
+}
+
+static inline void
+v4l2_vidioc_create_bufs(struct v4l2 *v4l2,
+                        enum v4l2_memory memory,
+                        const struct v4l2_format *format,
+                        struct v4l2_create_buffers *args)
+{
+    *args = (struct v4l2_create_buffers){
+        .memory = V4L2_MEMORY_MMAP,
+        .format = *format,
+    };
+    v4l2->ret = ioctl(v4l2->fd, VIDIOC_CREATE_BUFS, args);
+    v4l2_check(v4l2, "failed to VIDIOC_CREATE_BUFS");
 }
 
 static inline uint32_t
