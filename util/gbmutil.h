@@ -78,6 +78,19 @@ gbm_flags_to_str(uint32_t val, char *str, size_t size)
         DESC(LINEAR),
         DESC(PROTECTED),
         DESC(FRONT_RENDERING),
+#ifdef MINIGBM
+        DESC(TEXTURING),
+        DESC(CAMERA_WRITE),
+        DESC(CAMERA_READ),
+        DESC(SW_READ_OFTEN),
+        DESC(SW_READ_RARELY),
+        DESC(SW_WRITE_OFTEN),
+        DESC(SW_WRITE_RARELY),
+        DESC(HW_VIDEO_DECODER),
+        DESC(HW_VIDEO_ENCODER),
+        DESC(GPU_DATA_BUFFER),
+        DESC(SENSOR_DIRECT_DATA),
+#endif
 #undef DESC
     };
     /* clang-format on */
@@ -117,8 +130,26 @@ gbm_init_formats(struct gbm *gbm)
         DRM_FORMAT_YVU420,        DRM_FORMAT_P010,        DRM_FORMAT_P016,
     };
     const uint32_t all_flags[] = {
-        GBM_BO_USE_SCANOUT, GBM_BO_USE_CURSOR,    GBM_BO_USE_RENDERING,       GBM_BO_USE_WRITE,
-        GBM_BO_USE_LINEAR,  GBM_BO_USE_PROTECTED, GBM_BO_USE_FRONT_RENDERING,
+        GBM_BO_USE_SCANOUT,
+        GBM_BO_USE_CURSOR,
+        GBM_BO_USE_RENDERING,
+        GBM_BO_USE_WRITE,
+        GBM_BO_USE_LINEAR,
+        GBM_BO_USE_PROTECTED,
+        GBM_BO_USE_FRONT_RENDERING,
+#ifdef MINIGBM
+        GBM_BO_USE_TEXTURING,
+        GBM_BO_USE_CAMERA_WRITE,
+        GBM_BO_USE_CAMERA_READ,
+        GBM_BO_USE_SW_READ_OFTEN,
+        GBM_BO_USE_SW_READ_RARELY,
+        GBM_BO_USE_SW_WRITE_OFTEN,
+        GBM_BO_USE_SW_WRITE_RARELY,
+        GBM_BO_USE_HW_VIDEO_DECODER,
+        GBM_BO_USE_HW_VIDEO_ENCODER,
+        GBM_BO_USE_GPU_DATA_BUFFER,
+        GBM_BO_USE_SENSOR_DIRECT_DATA,
+#endif
     };
     const uint64_t all_modifiers[] = {
         /* DRM_FORMAT_MOD_VENDOR_NONE */
@@ -186,6 +217,15 @@ gbm_init_formats(struct gbm *gbm)
 
         for (uint32_t j = 0; j < ARRAY_SIZE(all_modifiers); j++) {
             const uint64_t mod = all_modifiers[j];
+#ifdef MINIGBM
+            struct gbm_bo *bo =
+                gbm_bo_create_with_modifiers2(gbm->dev, 8, 8, info->format, &mod, 1, 0);
+            if (bo) {
+                if (gbm_bo_get_modifier(bo) == mod)
+                    info->modifiers[info->modifier_count++] = mod;
+                gbm_bo_destroy(bo);
+            }
+#else
             const int count =
                 gbm_device_get_format_modifier_plane_count(gbm->dev, info->format, mod);
             if (count >= 0) {
@@ -193,6 +233,7 @@ gbm_init_formats(struct gbm *gbm)
                     gbm_die("unexpected plane count 0");
                 info->modifiers[info->modifier_count++] = mod;
             }
+#endif
         }
     }
 }
@@ -296,9 +337,12 @@ gbm_init_bo_info(struct gbm *gbm, struct gbm_bo *bo)
         gbm_die("unexpceted stride change");
     if (gbm_bo_get_handle(bo).s32 != gbm_bo_get_handle_for_plane(bo, 0).s32)
         gbm_die("unexpceted handle change");
+#ifndef MINIGBM
+    /* minigbm always returns 0 for gbm_device_get_format_modifier_plane_count */
     if (info->plane_count != (uint32_t)gbm_device_get_format_modifier_plane_count(
                                  gbm->dev, info->format, info->modifier))
         gbm_die("unexpceted plane count change");
+#endif
 
     gbm_bo_set_user_data(bo, info, gbm_free_bo_info);
 }
@@ -315,8 +359,25 @@ gbm_create_bo(struct gbm *gbm,
 #ifdef MINIGBM
     struct gbm_bo *bo;
     if (modifier_count) {
-        bo = gbm_bo_create_with_modifiers(gbm->dev, width, height, format, modifiers,
-                                          modifier_count);
+        /* minigbm does not allow flags to be specified */
+        bo = gbm_bo_create_with_modifiers2(gbm->dev, width, height, format, modifiers,
+                                           modifier_count, 0);
+
+        /* minigbm falls back to DRM_FORMAT_MOD_LINEAR automatically */
+        if (bo) {
+            bool found = false;
+            const uint64_t mod = gbm_bo_get_modifier(bo);
+            for (uint32_t i = 0; i < modifier_count; i++) {
+                if (modifiers[i] == mod) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                gbm_bo_destroy(bo);
+                bo = NULL;
+            }
+        }
     } else {
         bo = gbm_bo_create(gbm->dev, width, height, format, flags);
     }

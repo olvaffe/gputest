@@ -8,7 +8,7 @@
 static void
 gbm_test_bo(struct gbm *gbm)
 {
-    const uint32_t flags = 0;
+    const uint32_t flags = GBM_BO_USE_RENDERING;
 
     struct gbm_import_fd_modifier_data data = {
         .width = 64,
