@@ -133,11 +133,16 @@ v4l2_dump_current(struct v4l2 *v4l2)
 
     v4l2_log("  input: %d", v4l2_vidioc_g_input(v4l2));
 
-    if (!(v4l2->cap.capabilities & V4L2_CAP_VIDEO_CAPTURE))
+    enum v4l2_buf_type buf_type;
+    if (v4l2->cap.capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE)
+        buf_type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+    else if (v4l2->cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)
+        buf_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    else
         return;
 
     struct v4l2_format fmt;
-    v4l2_vidioc_g_fmt(v4l2, V4L2_BUF_TYPE_VIDEO_CAPTURE, &fmt);
+    v4l2_vidioc_g_fmt(v4l2, buf_type, &fmt);
     const struct v4l2_pix_format *pix = &fmt.fmt.pix;
     v4l2_log("  format: '%.*s', %dx%d, field %d, pitch %d, size %d, colorspace %s", 4,
              (const char *)&pix->pixelformat, pix->width, pix->height, pix->field,
@@ -149,7 +154,7 @@ v4l2_dump_current(struct v4l2 *v4l2)
     }
 
     struct v4l2_streamparm parm;
-    v4l2_vidioc_g_parm(v4l2, V4L2_BUF_TYPE_VIDEO_CAPTURE, &parm);
+    v4l2_vidioc_g_parm(v4l2, buf_type, &parm);
     const struct v4l2_captureparm *capture = &parm.parm.capture;
     v4l2_log("  capture parameters: cap 0x%x, mode 0x%x, interval %d/%d, ext %d, readbuf %d",
              capture->capability, capture->capturemode, capture->timeperframe.numerator,

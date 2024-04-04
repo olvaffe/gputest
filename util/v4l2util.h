@@ -487,7 +487,6 @@ v4l2_vidioc_g_parm(struct v4l2 *v4l2, enum v4l2_buf_type type, struct v4l2_strea
         .type = type,
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_PARM, args);
-    v4l2_check(v4l2, "VIDIOC_G_PARM");
 }
 
 static inline uint32_t
