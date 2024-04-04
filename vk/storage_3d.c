@@ -151,7 +151,7 @@ storage_3d_test_init_image(struct storage_3d_test *test)
 
     const VkImageCreateInfo img_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
+        .flags = flags,
         .imageType = VK_IMAGE_TYPE_3D,
         .format = test->img_format,
         .extent = {

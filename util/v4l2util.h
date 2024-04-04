@@ -13,6 +13,10 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#ifdef V4L2_FMT_FLAG_CONTINUOUS_BYTESTREAM
+#define V4L2_NEW_ENOUGH
+#endif
+
 struct v4l2_init_params {
     const char *path;
 };
@@ -85,7 +89,9 @@ v4l2_cap_to_str(uint32_t val, char *str, size_t size)
         DESC(STREAMING),
         DESC(META_OUTPUT),
         DESC(TOUCH),
+#ifdef V4L2_NEW_ENOUGH
         DESC(IO_MC),
+#endif
         DESC(DEVICE_CAPS),
 #undef DESC
     };
@@ -113,7 +119,9 @@ v4l2_ctrl_class_to_str(uint32_t val)
     CASE(RF_TUNER);
     CASE(DETECT);
     CASE(CODEC_STATELESS);
+#ifdef V4L2_NEW_ENOUGH
     CASE(COLORIMETRY);
+#endif
     default: return "UNKNOWN";
 #undef CASE
     }
@@ -138,6 +146,7 @@ v4l2_ctrl_type_to_str(enum v4l2_ctrl_type val)
     CASE(U8);
     CASE(U16);
     CASE(U32);
+#ifdef V4L2_NEW_ENOUGH
     CASE(AREA);
     CASE(HDR10_CLL_INFO);
     CASE(HDR10_MASTERING_DISPLAY);
@@ -163,6 +172,7 @@ v4l2_ctrl_type_to_str(enum v4l2_ctrl_type val)
     CASE(AV1_TILE_GROUP_ENTRY);
     CASE(AV1_FRAME);
     CASE(AV1_FILM_GRAIN);
+#endif
     default: return "UNKNOWN";
 #undef CASE
     }
@@ -248,6 +258,7 @@ v4l2_fmt_flag_to_str(uint32_t val, char *str, size_t size)
 #define DESC(v) { .bitmask = V4L2_FMT_FLAG_ ##v, .str = #v }
         DESC(COMPRESSED),
         DESC(EMULATED),
+#ifdef V4L2_NEW_ENOUGH
         DESC(CONTINUOUS_BYTESTREAM),
         DESC(DYN_RESOLUTION),
         DESC(ENC_CAP_FRAME_INTERVAL),
@@ -255,6 +266,7 @@ v4l2_fmt_flag_to_str(uint32_t val, char *str, size_t size)
         DESC(CSC_XFER_FUNC),
         DESC(CSC_YCBCR_ENC),
         DESC(CSC_QUANTIZATION),
+#endif
 #undef DESC
     };
     /* clang-format on */
@@ -292,10 +304,12 @@ v4l2_colorspace_to_str(enum v4l2_colorspace val)
     CASE(470_SYSTEM_BG);
     CASE(JPEG);
     CASE(SRGB);
+#ifdef V4L2_NEW_ENOUGH
     CASE(OPRGB);
     CASE(BT2020);
     CASE(RAW);
     CASE(DCI_P3);
+#endif
     default: return "UNKNOWN";
 #undef CASE
     }
@@ -332,11 +346,13 @@ v4l2_xfer_func_to_str(enum v4l2_xfer_func val)
     CASE(DEFAULT);
     CASE(709);
     CASE(SRGB);
+#ifdef V4L2_NEW_ENOUGH
     CASE(OPRGB);
     CASE(SMPTE240M);
     CASE(NONE);
     CASE(DCI_P3);
     CASE(SMPTE2084);
+#endif
     default: return "UNKNOWN";
 #undef CASE
     }

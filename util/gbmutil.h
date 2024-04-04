@@ -277,11 +277,21 @@ gbm_create_bo(struct gbm *gbm,
               uint32_t modifier_count,
               uint32_t flags)
 {
+#ifdef MINIGBM
+    struct gbm_bo *bo;
+    if (modifier_count) {
+        bo = gbm_bo_create_with_modifiers(gbm->dev, width, height, format, modifiers,
+                                          modifier_count);
+    } else {
+        bo = gbm_bo_create(gbm->dev, width, height, format, flags);
+    }
+#else
     /* when there is no modifier, this is the same as gbm_bo_create; when flags is
      * GBM_BO_USE_SCANOUT, this is the same as gbm_bo_create_with_modifiers
      */
     struct gbm_bo *bo = gbm_bo_create_with_modifiers2(gbm->dev, width, height, format, modifiers,
                                                       modifier_count, flags);
+#endif
     if (!bo) {
         gbm_die("failed to alloc bo: size %dx%d, format %.*s, modifier count %d, flags 0x%x",
                 width, height, 4, (const char *)&format, modifier_count, flags);

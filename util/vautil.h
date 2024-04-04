@@ -192,7 +192,7 @@ va_init_images(struct va *va)
     if (!va->img_formats)
         va_die("failed to alloc img formats");
 
-    va->status = vaQueryImageFormats(va->display, va->img_formats, &va->img_count);
+    va->status = vaQueryImageFormats(va->display, va->img_formats, (int *)&va->img_count);
     va_check(va, "failed to query img formats");
 }
 

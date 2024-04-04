@@ -68,9 +68,8 @@ v4l2_dump_formats(struct v4l2 *v4l2)
             struct v4l2_fmtdesc *desc = &descs[j];
 
             char str[256];
-            v4l2_log("  '%.*s': %s, flags %s, mbus %d", 4, (const char *)&desc->pixelformat,
-                     desc->description, v4l2_fmt_flag_to_str(desc->flags, str, sizeof(str)),
-                     desc->mbus_code);
+            v4l2_log("  '%.*s': %s, flags %s", 4, (const char *)&desc->pixelformat,
+                     desc->description, v4l2_fmt_flag_to_str(desc->flags, str, sizeof(str)));
 
             uint32_t size_count;
             struct v4l2_frmsizeenum *sizes =
