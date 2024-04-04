@@ -15,6 +15,7 @@
 
 struct gbm_format_info {
     uint32_t format;
+    uint32_t flags;
     uint64_t *modifiers;
     uint32_t modifier_count;
 };
@@ -64,6 +65,26 @@ static inline void PRINTFLIKE(1, 2) NORETURN gbm_die(const char *format, ...)
     va_end(ap);
 }
 
+static inline const char *
+gbm_flags_to_str(uint32_t val, char *str, size_t size)
+{
+    /* clang-format off */
+    static const struct u_bitmask_desc descs[] = {
+#define DESC(v) { .bitmask = GBM_BO_USE_ ##v, .str = #v }
+        DESC(SCANOUT),
+        DESC(CURSOR),
+        DESC(RENDERING),
+        DESC(WRITE),
+        DESC(LINEAR),
+        DESC(PROTECTED),
+        DESC(FRONT_RENDERING),
+#undef DESC
+    };
+    /* clang-format on */
+
+    return u_bitmask_to_str(val, descs, ARRAY_SIZE(descs), str, size);
+}
+
 static inline void
 gbm_init_device(struct gbm *gbm)
 {
@@ -94,6 +115,10 @@ gbm_init_formats(struct gbm *gbm)
         DRM_FORMAT_ABGR16161616F, DRM_FORMAT_YUYV,        DRM_FORMAT_UYVY,
         DRM_FORMAT_NV12,          DRM_FORMAT_NV21,        DRM_FORMAT_YUV420,
         DRM_FORMAT_YVU420,        DRM_FORMAT_P010,        DRM_FORMAT_P016,
+    };
+    const uint32_t all_flags[] = {
+        GBM_BO_USE_SCANOUT, GBM_BO_USE_CURSOR,    GBM_BO_USE_RENDERING,       GBM_BO_USE_WRITE,
+        GBM_BO_USE_LINEAR,  GBM_BO_USE_PROTECTED, GBM_BO_USE_FRONT_RENDERING,
     };
     const uint64_t all_modifiers[] = {
         /* DRM_FORMAT_MOD_VENDOR_NONE */
@@ -137,9 +162,19 @@ gbm_init_formats(struct gbm *gbm)
 
     for (uint32_t i = 0; i < ARRAY_SIZE(all_formats); i++) {
         const uint32_t fmt = all_formats[i];
-        const uint32_t flags = 0;
-        if (gbm_device_is_format_supported(gbm->dev, fmt, flags))
-            gbm->formats[gbm->format_count++].format = fmt;
+        uint32_t flags = 0;
+
+        for (uint32_t j = 0; j < ARRAY_SIZE(all_flags); j++) {
+            const uint32_t f = all_flags[j];
+            if (gbm_device_is_format_supported(gbm->dev, fmt, f))
+                flags |= f;
+        }
+
+        if (flags) {
+            struct gbm_format_info *info = &gbm->formats[gbm->format_count++];
+            info->format = fmt;
+            info->flags = flags;
+        }
     }
 
     for (uint32_t i = 0; i < gbm->format_count; i++) {

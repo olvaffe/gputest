@@ -48,7 +48,9 @@ gbm_dump(struct gbm *gbm)
     gbm_log("backend: %s", gbm->backend_name);
     for (uint32_t i = 0; i < gbm->format_count; i++) {
         const struct gbm_format_info *info = &gbm->formats[i];
-        gbm_log("format: %.*s", 4, (const char *)&info->format);
+        char str[256];
+        gbm_log("format: %.*s, %s", 4, (const char *)&info->format,
+                gbm_flags_to_str(info->flags, str, sizeof(str)));
         for (uint32_t j = 0; j < info->modifier_count; j++)
             gbm_log("  mod: %" PRIx64, info->modifiers[j]);
     }
