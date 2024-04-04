@@ -464,6 +464,16 @@ v4l2_vidioc_create_bufs(struct v4l2 *v4l2,
     v4l2_check(v4l2, "failed to VIDIOC_CREATE_BUFS");
 }
 
+static inline void
+v4l2_vidioc_g_parm(struct v4l2 *v4l2, enum v4l2_buf_type type, struct v4l2_streamparm *args)
+{
+    *args = (struct v4l2_streamparm){
+        .type = type,
+    };
+    v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_PARM, args);
+    v4l2_check(v4l2, "VIDIOC_G_PARM");
+}
+
 static inline uint32_t
 v4l2_vidioc_enuminput_count(struct v4l2 *v4l2)
 {
@@ -484,6 +494,15 @@ v4l2_vidioc_enuminput(struct v4l2 *v4l2, uint32_t index, struct v4l2_input *args
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUMINPUT, args);
     v4l2_check(v4l2, "VIDIOC_ENUMINPUT");
+}
+
+static inline uint32_t
+v4l2_vidioc_g_input(struct v4l2 *v4l2)
+{
+    int args;
+    v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_INPUT, &args);
+    v4l2_check(v4l2, "VIDIOC_G_INPUT");
+    return args;
 }
 
 static inline uint32_t
