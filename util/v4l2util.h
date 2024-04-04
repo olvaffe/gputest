@@ -290,6 +290,21 @@ v4l2_input_type_to_str(uint32_t val)
 }
 
 static inline const char *
+v4l2_output_type_to_str(uint32_t val)
+{
+    /* clang-format off */
+    switch (val) {
+#define CASE(v) case V4L2_OUTPUT_TYPE_ ##v: return #v
+	CASE(MODULATOR);
+	CASE(ANALOG);
+	CASE(ANALOGVGAOVERLAY);
+    default: return "UNKNOWN";
+#undef CASE
+    }
+    /* clang-format on */
+}
+
+static inline const char *
 v4l2_colorspace_to_str(enum v4l2_colorspace val)
 {
     /* clang-format off */
@@ -390,7 +405,7 @@ v4l2_vidioc_enum_fmt(struct v4l2 *v4l2,
         .type = type,
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUM_FMT, args);
-    v4l2_check(v4l2, "VIDIOC_ENUM_FMT");
+    v4l2_check(v4l2, "failed to VIDIOC_ENUM_FMT");
 }
 
 static inline uint32_t
@@ -417,7 +432,7 @@ v4l2_vidioc_enum_framesizes(struct v4l2 *v4l2,
         .pixel_format = format,
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUM_FRAMESIZES, args);
-    v4l2_check(v4l2, "VIDIOC_ENUM_FRAMESIZES");
+    v4l2_check(v4l2, "failed to VIDIOC_ENUM_FRAMESIZES");
 }
 
 static inline uint32_t
@@ -453,7 +468,7 @@ v4l2_vidioc_enum_frameintervals(struct v4l2 *v4l2,
         .height = height,
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUM_FRAMEINTERVALS, args);
-    v4l2_check(v4l2, "VIDIOC_ENUM_FRAMEINTERVALS");
+    v4l2_check(v4l2, "failed to VIDIOC_ENUM_FRAMEINTERVALS");
 }
 
 static inline void
@@ -508,7 +523,7 @@ v4l2_vidioc_enuminput(struct v4l2 *v4l2, uint32_t index, struct v4l2_input *args
         .index = index,
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUMINPUT, args);
-    v4l2_check(v4l2, "VIDIOC_ENUMINPUT");
+    v4l2_check(v4l2, "failed to VIDIOC_ENUMINPUT");
 }
 
 static inline uint32_t
@@ -516,7 +531,38 @@ v4l2_vidioc_g_input(struct v4l2 *v4l2)
 {
     int args;
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_INPUT, &args);
-    v4l2_check(v4l2, "VIDIOC_G_INPUT");
+    v4l2_check(v4l2, "failed to VIDIOC_G_INPUT");
+    return args;
+}
+
+static inline uint32_t
+v4l2_vidioc_enumoutput_count(struct v4l2 *v4l2)
+{
+    for (uint32_t i = 0;; i++) {
+        struct v4l2_output args = {
+            .index = i,
+        };
+        if (ioctl(v4l2->fd, VIDIOC_ENUMOUTPUT, &args))
+            return i;
+    }
+}
+
+static inline void
+v4l2_vidioc_enumoutput(struct v4l2 *v4l2, uint32_t index, struct v4l2_output *args)
+{
+    *args = (struct v4l2_output){
+        .index = index,
+    };
+    v4l2->ret = ioctl(v4l2->fd, VIDIOC_ENUMOUTPUT, args);
+    v4l2_check(v4l2, "failed to VIDIOC_ENUMOUTPUT");
+}
+
+static inline uint32_t
+v4l2_vidioc_g_output(struct v4l2 *v4l2)
+{
+    int args;
+    v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_OUTPUT, &args);
+    v4l2_check(v4l2, "failed to VIDIOC_G_OUTPUT");
     return args;
 }
 
@@ -542,7 +588,7 @@ v4l2_vidioc_queryctrl_next(struct v4l2 *v4l2, uint32_t id, struct v4l2_queryctrl
         .id = id | next_flags,
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_QUERYCTRL, args);
-    v4l2_check(v4l2, "VIDIOC_QUERYCTRL");
+    v4l2_check(v4l2, "failed to VIDIOC_QUERYCTRL");
 }
 
 static inline int
@@ -552,7 +598,7 @@ v4l2_vidioc_g_ctrl(struct v4l2 *v4l2, uint32_t id)
         .id = id,
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_CTRL, &args);
-    v4l2_check(v4l2, "VIDIOC_G_CTRL");
+    v4l2_check(v4l2, "failed to VIDIOC_G_CTRL");
 
     return args.value;
 }
@@ -667,6 +713,23 @@ v4l2_enumerate_inputs(struct v4l2 *v4l2, uint32_t *count)
     }
 
     return inputs;
+}
+
+static inline struct v4l2_output *
+v4l2_enumerate_outputs(struct v4l2 *v4l2, uint32_t *count)
+{
+    *count = v4l2_vidioc_enumoutput_count(v4l2);
+
+    struct v4l2_output *outputs = calloc(*count, sizeof(*outputs));
+    if (!outputs)
+        v4l2_die("failed to alloc outputs");
+
+    for (uint32_t i = 0; i < *count; i++) {
+        struct v4l2_output *output = &outputs[i];
+        v4l2_vidioc_enumoutput(v4l2, i, output);
+    }
+
+    return outputs;
 }
 
 /* FWIW, how capturing works is

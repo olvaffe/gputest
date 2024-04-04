@@ -127,48 +127,127 @@ v4l2_dump_inputs(struct v4l2 *v4l2)
 }
 
 static void
-v4l2_dump_current(struct v4l2 *v4l2)
+v4l2_dump_outputs(struct v4l2 *v4l2)
 {
+    uint32_t count;
+    struct v4l2_output *outputs = v4l2_enumerate_outputs(v4l2, &count);
+    if (!count)
+        return;
+
+    v4l2_log("output count: %d", count);
+    for (uint32_t i = 0; i < count; i++) {
+        struct v4l2_output *output = &outputs[i];
+
+        v4l2_log("  output #%d: %s, type %s, audioset 0x%x, modulator %d, std %d, caps 0x%x",
+                 output->index, output->name, v4l2_output_type_to_str(output->type),
+                 output->audioset, output->modulator, (int)output->std, output->capabilities);
+    }
+    free(outputs);
+}
+
+static void
+v4l2_dump_current_states(struct v4l2 *v4l2)
+{
+    const struct {
+        uint32_t caps;
+        enum v4l2_buf_type type;
+    } all_types[] = {
+        {
+            .caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_VIDEO_M2M,
+            .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+        },
+        {
+            .caps = V4L2_CAP_VIDEO_CAPTURE_MPLANE | V4L2_CAP_VIDEO_M2M_MPLANE,
+            .type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE,
+        },
+        {
+            .caps = V4L2_CAP_VIDEO_OUTPUT | V4L2_CAP_VIDEO_M2M,
+            .type = V4L2_BUF_TYPE_VIDEO_OUTPUT,
+        },
+        {
+            .caps = V4L2_CAP_VIDEO_OUTPUT_MPLANE | V4L2_CAP_VIDEO_M2M_MPLANE,
+            .type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE,
+        },
+    };
+
     v4l2_log("current states:");
 
-    v4l2_log("  input: %d", v4l2_vidioc_g_input(v4l2));
+    if (v4l2_vidioc_enuminput_count(v4l2) > 0)
+        v4l2_log("  input: %d", v4l2_vidioc_g_input(v4l2));
+    if (v4l2_vidioc_enumoutput_count(v4l2) > 0)
+        v4l2_log("  output: %d", v4l2_vidioc_g_output(v4l2));
 
-    enum v4l2_buf_type buf_type;
-    if (v4l2->cap.capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE)
-        buf_type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    else if (v4l2->cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)
-        buf_type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    else
-        return;
+    for (uint32_t i = 0; i < ARRAY_SIZE(all_types); i++) {
+        if (!(v4l2->cap.device_caps & all_types[i].caps))
+            continue;
+        const enum v4l2_buf_type type = all_types[i].type;
+        v4l2_log("  %s:", v4l2_buf_type_to_str(type));
 
-    struct v4l2_format fmt;
-    v4l2_vidioc_g_fmt(v4l2, buf_type, &fmt);
-    const struct v4l2_pix_format *pix = &fmt.fmt.pix;
-    v4l2_log("  format: '%.*s', %dx%d, field %d, pitch %d, size %d, colorspace %s", 4,
-             (const char *)&pix->pixelformat, pix->width, pix->height, pix->field,
-             pix->bytesperline, pix->sizeimage, v4l2_colorspace_to_str(pix->colorspace));
-    if (pix->priv == V4L2_PIX_FMT_PRIV_MAGIC) {
-        v4l2_log("    flags 0x%x, ycbcr enc %s quant %d, xfer %s", pix->flags,
-                 v4l2_ycbcr_enc_to_str(pix->ycbcr_enc), pix->quantization,
-                 v4l2_xfer_func_to_str(pix->xfer_func));
+        bool is_capture = false;
+        bool is_mplane = false;
+        switch (type) {
+        case V4L2_BUF_TYPE_VIDEO_CAPTURE:
+            is_capture = true;
+            break;
+        case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
+            is_capture = true;
+            is_mplane = true;
+            break;
+        case V4L2_BUF_TYPE_VIDEO_OUTPUT:
+            break;
+        case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+            is_mplane = true;
+            break;
+        default:
+            v4l2_die("unexpected buf type");
+            break;
+        }
+
+        struct v4l2_format fmt;
+        v4l2_vidioc_g_fmt(v4l2, type, &fmt);
+        if (is_mplane) {
+            const struct v4l2_pix_format_mplane *mp = &fmt.fmt.pix_mp;
+            v4l2_log("    format: '%.*s', %dx%d, field %d, colorspace %s", 4,
+                     (const char *)&mp->pixelformat, mp->width, mp->height, mp->field,
+                     v4l2_colorspace_to_str(mp->colorspace));
+        } else {
+            const struct v4l2_pix_format *pix = &fmt.fmt.pix;
+            v4l2_log("    format: '%.*s', %dx%d, field %d, pitch %d, size %d, colorspace %s", 4,
+                     (const char *)&pix->pixelformat, pix->width, pix->height, pix->field,
+                     pix->bytesperline, pix->sizeimage, v4l2_colorspace_to_str(pix->colorspace));
+            if (pix->priv == V4L2_PIX_FMT_PRIV_MAGIC) {
+                v4l2_log("      flags 0x%x, ycbcr enc %s quant %d, xfer %s", pix->flags,
+                         v4l2_ycbcr_enc_to_str(pix->ycbcr_enc), pix->quantization,
+                         v4l2_xfer_func_to_str(pix->xfer_func));
+            }
+        }
+
+        struct v4l2_streamparm parm;
+        v4l2_vidioc_g_parm(v4l2, type, &parm);
+        if (is_capture) {
+            const struct v4l2_captureparm *capture = &parm.parm.capture;
+            v4l2_log(
+                "    capture parameters: cap 0x%x, mode 0x%x, interval %d/%d, ext %d, readbuf %d",
+                capture->capability, capture->capturemode, capture->timeperframe.numerator,
+                capture->timeperframe.denominator, capture->extendedmode, capture->readbuffers);
+        } else {
+            const struct v4l2_outputparm *output = &parm.parm.output;
+            v4l2_log(
+                "    output parameters: cap 0x%x, mode 0x%x, interval %d/%d, ext %d, writebuf %d",
+                output->capability, output->outputmode, output->timeperframe.numerator,
+                output->timeperframe.denominator, output->extendedmode, output->writebuffers);
+        }
+
+        if (!(v4l2->cap.device_caps & V4L2_CAP_STREAMING))
+            return;
+
+        struct v4l2_create_buffers buf;
+        v4l2_vidioc_create_bufs(v4l2, V4L2_MEMORY_MMAP, &fmt, &buf);
+
+        char str[256];
+        v4l2_log("    bufs: count %d, caps %s", buf.index,
+                 v4l2_buf_cap_to_str(buf.capabilities, str, sizeof(str)));
     }
-
-    struct v4l2_streamparm parm;
-    v4l2_vidioc_g_parm(v4l2, buf_type, &parm);
-    const struct v4l2_captureparm *capture = &parm.parm.capture;
-    v4l2_log("  capture parameters: cap 0x%x, mode 0x%x, interval %d/%d, ext %d, readbuf %d",
-             capture->capability, capture->capturemode, capture->timeperframe.numerator,
-             capture->timeperframe.denominator, capture->extendedmode, capture->readbuffers);
-
-    if (!(v4l2->cap.capabilities & V4L2_CAP_STREAMING))
-        return;
-
-    struct v4l2_create_buffers buf;
-    v4l2_vidioc_create_bufs(v4l2, V4L2_MEMORY_MMAP, &fmt, &buf);
-
-    char str[256];
-    v4l2_log("  bufs: count %d, caps %s", buf.index,
-             v4l2_buf_cap_to_str(buf.capabilities, str, sizeof(str)));
 }
 
 static void
@@ -178,8 +257,9 @@ v4l2_dump(struct v4l2 *v4l2)
     v4l2_dump_ctrls(v4l2);
     v4l2_dump_formats(v4l2);
     v4l2_dump_inputs(v4l2);
+    v4l2_dump_outputs(v4l2);
 
-    v4l2_dump_current(v4l2);
+    v4l2_dump_current_states(v4l2);
 }
 
 int
