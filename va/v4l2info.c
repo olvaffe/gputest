@@ -210,13 +210,21 @@ v4l2_dump_current_states(struct v4l2 *v4l2)
             v4l2_log("    format: '%.*s', %dx%d, field %d, colorspace %s", 4,
                      (const char *)&mp->pixelformat, mp->width, mp->height, mp->field,
                      v4l2_colorspace_to_str(mp->colorspace));
+            v4l2_log("      flags 0x%x, ycbcr enc %s quant %d, xfer %s", mp->flags,
+                     v4l2_ycbcr_enc_to_str(mp->ycbcr_enc), mp->quantization,
+                     v4l2_xfer_func_to_str(mp->xfer_func));
+            for (uint32_t j = 0; j < mp->num_planes; j++) {
+                const struct v4l2_plane_pix_format *plane = &mp->plane_fmt[j];
+                v4l2_log("      plane %d: pitch %d, size %d", j, plane->bytesperline,
+                         plane->sizeimage);
+            }
         } else {
             const struct v4l2_pix_format *pix = &fmt.fmt.pix;
             v4l2_log("    format: '%.*s', %dx%d, field %d, pitch %d, size %d, colorspace %s", 4,
                      (const char *)&pix->pixelformat, pix->width, pix->height, pix->field,
                      pix->bytesperline, pix->sizeimage, v4l2_colorspace_to_str(pix->colorspace));
             if (pix->priv == V4L2_PIX_FMT_PRIV_MAGIC) {
-                v4l2_log("      flags 0x%x, ycbcr enc %s quant %d, xfer %s", pix->flags,
+                v4l2_log("      flags 0x%x, ycbcr enc %s, quant %d, xfer %s", pix->flags,
                          v4l2_ycbcr_enc_to_str(pix->ycbcr_enc), pix->quantization,
                          v4l2_xfer_func_to_str(pix->xfer_func));
             }
