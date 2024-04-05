@@ -79,6 +79,10 @@ inc_include = include_directories('include')
 subdir('util')
 subdir('misc')
 
+if idep_clutil.found()
+  subdir('cl')
+endif
+
 if idep_eglutil.found()
   subdir('egl')
 endif

@@ -9,6 +9,15 @@ idep_util = declare_dependency(
   include_directories: ['.', inc_include],
 )
 
+idep_clutil = dep_not_found
+if cc.has_header('CL/cl.h')
+  idep_clutil = declare_dependency(
+    sources: ['clutil.h'],
+    dependencies: [idep_util, dep_dl],
+  )
+endif
+util_summary += {'clutil': idep_clutil}
+
 idep_drmutil = dep_not_found
 if dep_drm.found()
   idep_drmutil = declare_dependency(
