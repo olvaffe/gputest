@@ -46,18 +46,11 @@ v4l2_dump_ctrls(struct v4l2 *v4l2)
 static void
 v4l2_dump_formats(struct v4l2 *v4l2)
 {
-    const enum v4l2_buf_type all_types[] = {
-        V4L2_BUF_TYPE_VIDEO_CAPTURE,        V4L2_BUF_TYPE_VIDEO_OUTPUT,
-        V4L2_BUF_TYPE_VIDEO_OVERLAY,        V4L2_BUF_TYPE_VBI_CAPTURE,
-        V4L2_BUF_TYPE_VBI_OUTPUT,           V4L2_BUF_TYPE_SLICED_VBI_CAPTURE,
-        V4L2_BUF_TYPE_SLICED_VBI_OUTPUT,    V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY,
-        V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE, V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE,
-        V4L2_BUF_TYPE_SDR_CAPTURE,          V4L2_BUF_TYPE_SDR_OUTPUT,
-        V4L2_BUF_TYPE_META_CAPTURE,         V4L2_BUF_TYPE_META_OUTPUT,
-    };
+    uint32_t count;
+    enum v4l2_buf_type *types = v4l2_enumerate_buf_types(v4l2, &count);
 
-    for (uint32_t i = 0; i < ARRAY_SIZE(all_types); i++) {
-        const enum v4l2_buf_type type = all_types[i];
+    for (uint32_t i = 0; i < count; i++) {
+        const enum v4l2_buf_type type = types[i];
         uint32_t count;
         struct v4l2_fmtdesc *descs = v4l2_enumerate_formats(v4l2, type, &count);
         if (!count)
@@ -104,6 +97,8 @@ v4l2_dump_formats(struct v4l2 *v4l2)
         }
         free(descs);
     }
+
+    free(types);
 }
 
 static void
@@ -148,28 +143,6 @@ v4l2_dump_outputs(struct v4l2 *v4l2)
 static void
 v4l2_dump_current_states(struct v4l2 *v4l2)
 {
-    const struct {
-        uint32_t caps;
-        enum v4l2_buf_type type;
-    } all_types[] = {
-        {
-            .caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_VIDEO_M2M,
-            .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
-        },
-        {
-            .caps = V4L2_CAP_VIDEO_CAPTURE_MPLANE | V4L2_CAP_VIDEO_M2M_MPLANE,
-            .type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE,
-        },
-        {
-            .caps = V4L2_CAP_VIDEO_OUTPUT | V4L2_CAP_VIDEO_M2M,
-            .type = V4L2_BUF_TYPE_VIDEO_OUTPUT,
-        },
-        {
-            .caps = V4L2_CAP_VIDEO_OUTPUT_MPLANE | V4L2_CAP_VIDEO_M2M_MPLANE,
-            .type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE,
-        },
-    };
-
     v4l2_log("current states:");
 
     if (v4l2_vidioc_enuminput_count(v4l2) > 0)
@@ -177,10 +150,11 @@ v4l2_dump_current_states(struct v4l2 *v4l2)
     if (v4l2_vidioc_enumoutput_count(v4l2) > 0)
         v4l2_log("  output: %d", v4l2_vidioc_g_output(v4l2));
 
-    for (uint32_t i = 0; i < ARRAY_SIZE(all_types); i++) {
-        if (!(v4l2->cap.device_caps & all_types[i].caps))
-            continue;
-        const enum v4l2_buf_type type = all_types[i].type;
+    uint32_t count;
+    enum v4l2_buf_type *types = v4l2_enumerate_buf_types(v4l2, &count);
+
+    for (uint32_t i = 0; i < count; i++) {
+        const enum v4l2_buf_type type = types[i];
         v4l2_log("  %s:", v4l2_buf_type_to_str(type));
 
         bool is_capture = false;
@@ -247,7 +221,7 @@ v4l2_dump_current_states(struct v4l2 *v4l2)
         }
 
         if (!(v4l2->cap.device_caps & V4L2_CAP_STREAMING))
-            return;
+            continue;
 
         struct v4l2_create_buffers buf;
         v4l2_vidioc_create_bufs(v4l2, V4L2_MEMORY_MMAP, &fmt, &buf);
@@ -256,6 +230,8 @@ v4l2_dump_current_states(struct v4l2 *v4l2)
         v4l2_log("    bufs: count %d, caps %s", buf.index,
                  v4l2_buf_cap_to_str(buf.capabilities, str, sizeof(str)));
     }
+
+    free(types);
 }
 
 static void

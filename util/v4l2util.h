@@ -628,6 +628,60 @@ v4l2_cleanup(struct v4l2 *v4l2)
     close(v4l2->fd);
 }
 
+static inline enum v4l2_buf_type *
+v4l2_enumerate_buf_types(struct v4l2 *v4l2, uint32_t *count)
+{
+    enum v4l2_buf_type types[64];
+    uint32_t c = 0;
+
+    if (v4l2->cap.device_caps & V4L2_CAP_VIDEO_CAPTURE)
+        types[c++] = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (v4l2->cap.device_caps & V4L2_CAP_VIDEO_OUTPUT)
+        types[c++] = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+    if (v4l2->cap.device_caps & V4L2_CAP_VIDEO_OVERLAY)
+        types[c++] = V4L2_BUF_TYPE_VIDEO_OVERLAY;
+    if (v4l2->cap.device_caps & V4L2_CAP_VBI_CAPTURE)
+        types[c++] = V4L2_BUF_TYPE_VBI_CAPTURE;
+    if (v4l2->cap.device_caps & V4L2_CAP_VBI_OUTPUT)
+        types[c++] = V4L2_BUF_TYPE_VBI_OUTPUT;
+    if (v4l2->cap.device_caps & V4L2_CAP_SLICED_VBI_CAPTURE)
+        types[c++] = V4L2_BUF_TYPE_VBI_CAPTURE;
+    if (v4l2->cap.device_caps & V4L2_CAP_SLICED_VBI_OUTPUT)
+        types[c++] = V4L2_BUF_TYPE_VBI_OUTPUT;
+    if (v4l2->cap.device_caps & V4L2_CAP_VIDEO_OUTPUT_OVERLAY)
+        types[c++] = V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY;
+    if (v4l2->cap.device_caps & V4L2_CAP_VIDEO_CAPTURE_MPLANE)
+        types[c++] = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+    if (v4l2->cap.device_caps & V4L2_CAP_VIDEO_OUTPUT_MPLANE)
+        types[c++] = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+    if (v4l2->cap.device_caps & V4L2_CAP_VIDEO_M2M) {
+        types[c++] = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        types[c++] = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+    }
+    if (v4l2->cap.device_caps & V4L2_CAP_VIDEO_M2M_MPLANE) {
+        types[c++] = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+        types[c++] = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+    }
+    if (v4l2->cap.device_caps & V4L2_CAP_SDR_CAPTURE)
+        types[c++] = V4L2_BUF_TYPE_SDR_CAPTURE;
+    if (v4l2->cap.device_caps & V4L2_CAP_SDR_OUTPUT)
+        types[c++] = V4L2_BUF_TYPE_SDR_OUTPUT;
+    if (v4l2->cap.device_caps & V4L2_CAP_META_CAPTURE)
+        types[c++] = V4L2_BUF_TYPE_META_CAPTURE;
+    if (v4l2->cap.device_caps & V4L2_CAP_META_OUTPUT)
+        types[c++] = V4L2_BUF_TYPE_META_OUTPUT;
+
+    assert(c < ARRAY_SIZE(types));
+
+    enum v4l2_buf_type *out = malloc(sizeof(*out) * c);
+    if (!out)
+        v4l2_die("failed to alloc types");
+    memcpy(out, types, sizeof(*out) * c);
+    *count = c;
+
+    return out;
+}
+
 static inline struct v4l2_queryctrl *
 v4l2_enumerate_controls(struct v4l2 *v4l2, uint32_t *count)
 {
