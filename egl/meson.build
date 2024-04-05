@@ -13,9 +13,6 @@ tests = [
   'tri',
 ]
 
-if idep_gbmutil.found()
-  tests += ['gbminfo']
-endif
 if dep_sdl2.found()
   tests += ['sdl']
 endif
@@ -41,9 +38,7 @@ foreach t : tests
   endforeach
 
   test_deps = [idep_eglutil]
-  if t == 'gbminfo'
-    test_deps += [idep_gbmutil]
-  elif t == 'sdl'
+  if t == 'sdl'
     test_deps += [dep_sdl2]
   endif
 

@@ -5,12 +5,26 @@ drm_tests = [
   'drminfo',
 ]
 
+gbm_tests = [
+  'gbminfo',
+]
+
 if idep_drmutil.found()
   foreach t : drm_tests
     executable(
       t,
       sources: [t + '.c'],
       dependencies: [idep_drmutil],
+    )
+  endforeach
+endif
+
+if idep_gbmutil.found()
+  foreach t : gbm_tests
+    executable(
+      t,
+      sources: [t + '.c'],
+      dependencies: [idep_gbmutil],
     )
   endforeach
 endif
