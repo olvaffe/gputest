@@ -78,20 +78,7 @@ struct drm_connector {
     struct drm_properties *properties;
 };
 
-struct drm {
-    struct drm_init_params params;
-    int ret;
-
-    drmDevicePtr *devices;
-    uint32_t device_count;
-
-    int fd;
-    int node_type;
-    bool master;
-    drmVersionPtr version;
-    uint64_t caps[64];
-    uint64_t client_caps[64];
-
+struct drm_modeset {
     uint32_t max_width;
     uint32_t max_height;
     uint32_t min_width;
@@ -108,6 +95,26 @@ struct drm {
 
     struct drm_connector *connectors;
     uint32_t connector_count;
+};
+
+struct drm_file {
+    int node_type;
+    bool master;
+    drmVersionPtr version;
+    uint64_t caps[64];
+    uint64_t client_caps[64];
+};
+
+struct drm {
+    struct drm_init_params params;
+    int ret;
+
+    drmDevicePtr *devices;
+    uint32_t device_count;
+
+    int fd;
+    struct drm_file file;
+    struct drm_modeset modeset;
 };
 
 static inline void PRINTFLIKE(1, 2) drm_log(const char *format, ...)
@@ -175,6 +182,8 @@ drm_cleanup(struct drm *drm)
 static inline void
 drm_open(struct drm *drm, uint32_t idx, int node_type)
 {
+    struct drm_file *file = &drm->file;
+
     drmDevicePtr dev = drm->devices[idx];
     if (!(dev->available_nodes & (1 << node_type)))
         drm_die("bad node type");
@@ -183,11 +192,11 @@ drm_open(struct drm *drm, uint32_t idx, int node_type)
     if (drm->fd < 0)
         drm_die("failed to open %s", dev->nodes[node_type]);
 
-    drm->node_type = node_type;
-    drm->master = drmIsMaster(drm->fd);
+    file->node_type = node_type;
+    file->master = drmIsMaster(drm->fd);
 
-    drm->version = drmGetVersion(drm->fd);
-    if (!drm->version)
+    file->version = drmGetVersion(drm->fd);
+    if (!file->version)
         drm_die("failed to get version");
 
     const uint64_t cap_keys[] = {
@@ -209,10 +218,10 @@ drm_open(struct drm *drm, uint32_t idx, int node_type)
     };
     for (uint32_t i = 0; i < ARRAY_SIZE(cap_keys); i++) {
         const uint64_t key = cap_keys[i];
-        assert(key < ARRAY_SIZE(drm->caps));
-        drm->ret = drmGetCap(drm->fd, key, &drm->caps[key]);
+        assert(key < ARRAY_SIZE(file->caps));
+        drm->ret = drmGetCap(drm->fd, key, &file->caps[key]);
         if (drm->ret < 0)
-            drm->caps[key] = 0;
+            file->caps[key] = 0;
     }
 
     if (node_type == DRM_NODE_PRIMARY) {
@@ -225,10 +234,10 @@ drm_open(struct drm *drm, uint32_t idx, int node_type)
         for (uint32_t i = 0; i < ARRAY_SIZE(client_cap_keys); i++) {
             const uint64_t key = client_cap_keys[i];
             const uint64_t val = 1;
-            assert(key < ARRAY_SIZE(drm->client_caps));
+            assert(key < ARRAY_SIZE(file->client_caps));
             drm->ret = drmSetClientCap(drm->fd, key, val);
             if (!drm->ret)
-                drm->client_caps[key] = val;
+                file->client_caps[key] = val;
         }
     }
 }
@@ -236,49 +245,54 @@ drm_open(struct drm *drm, uint32_t idx, int node_type)
 static inline void
 drm_close(struct drm *drm)
 {
-    for (uint32_t i = 0; i < drm->connector_count; i++)
-        free(drm->connectors[i].properties);
-    free(drm->connectors);
-
-    for (uint32_t i = 0; i < drm->crtc_count; i++)
-        free(drm->crtcs[i].properties);
-    free(drm->crtcs);
-
-    for (uint32_t i = 0; i < drm->plane_count; i++) {
-        free(drm->planes[i].formats);
-        free(drm->planes[i].properties);
-    }
-    free(drm->planes);
-
-    for (uint32_t i = 0; i < drm->active_fb_count; i++) {
-        struct drm_fb *fb = &drm->active_fbs[i];
-
-        for (uint32_t j = 0; j < fb->plane_count; j++) {
-            if (!fb->handles[j])
-                continue;
-
-            drmCloseBufferHandle(drm->fd, fb->handles[j]);
-            for (uint32_t k = j + 1; k < fb->plane_count; k++) {
-                if (fb->handles[k] == fb->handles[j])
-                    fb->handles[k] = 0;
-            }
-        }
-
-        free(fb->properties);
-    }
-    free(drm->active_fbs);
-
-    memset(drm->client_caps, 0, sizeof(drm->client_caps));
-    memset(drm->caps, 0, sizeof(drm->caps));
-
-    drmFreeVersion(drm->version);
-    drm->version = NULL;
-
-    drm->master = false;
-    drm->node_type = DRM_NODE_MAX;
+    drmFreeVersion(drm->file.version);
+    memset(&drm->file, 0, sizeof(drm->file));
 
     close(drm->fd);
     drm->fd = -1;
+}
+
+static inline void
+drm_dump_file(struct drm *drm)
+{
+    const struct drm_file *file = &drm->file;
+
+    drm_log("  fd node type: %s", file->node_type == DRM_NODE_PRIMARY ? "primary" : "render");
+    drm_log("  fd master: %d", file->master);
+    drm_log("  version: %d.%d.%d", file->version->version_major, file->version->version_minor,
+            file->version->version_patchlevel);
+    drm_log("    name: %s", file->version->name);
+    drm_log("    date: %s", file->version->date);
+    drm_log("    desc: %s", file->version->desc);
+    drm_log("  caps:");
+    drm_log("    dumb_buffer: %" PRIu64, file->caps[DRM_CAP_DUMB_BUFFER]);
+    drm_log("    vblank_high_crtc: %" PRIu64, file->caps[DRM_CAP_VBLANK_HIGH_CRTC]);
+    drm_log("    dumb_preferred_depth: %" PRIu64, file->caps[DRM_CAP_DUMB_PREFERRED_DEPTH]);
+    drm_log("    dumb_prefer_shadow: %" PRIu64, file->caps[DRM_CAP_DUMB_PREFER_SHADOW]);
+    drm_log("    prime: %" PRIu64, file->caps[DRM_CAP_PRIME]);
+    drm_log("    timestamp_monotonic: %" PRIu64, file->caps[DRM_CAP_TIMESTAMP_MONOTONIC]);
+    drm_log("    async_page_flip: %" PRIu64, file->caps[DRM_CAP_ASYNC_PAGE_FLIP]);
+    drm_log("    cursor_width: %" PRIu64, file->caps[DRM_CAP_CURSOR_WIDTH]);
+    drm_log("    cursor_height: %" PRIu64, file->caps[DRM_CAP_CURSOR_HEIGHT]);
+    drm_log("    addfb2_modifiers: %" PRIu64, file->caps[DRM_CAP_ADDFB2_MODIFIERS]);
+    drm_log("    page_flip_target: %" PRIu64, file->caps[DRM_CAP_PAGE_FLIP_TARGET]);
+    drm_log("    crtc_in_vblank_event: %" PRIu64, file->caps[DRM_CAP_CRTC_IN_VBLANK_EVENT]);
+    drm_log("    syncobj: %" PRIu64, file->caps[DRM_CAP_SYNCOBJ]);
+    drm_log("    syncobj_timeline: %" PRIu64, file->caps[DRM_CAP_SYNCOBJ_TIMELINE]);
+    drm_log("    atomic_async_page_flip: %" PRIu64, file->caps[DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP]);
+
+    if (file->node_type == DRM_NODE_PRIMARY) {
+        drm_log("  client caps:");
+        drm_log("    stereo_3d: %" PRIu64, file->client_caps[DRM_CLIENT_CAP_STEREO_3D]);
+        drm_log("    universal_planes: %" PRIu64,
+                file->client_caps[DRM_CLIENT_CAP_UNIVERSAL_PLANES]);
+        drm_log("    atomic: %" PRIu64, file->client_caps[DRM_CLIENT_CAP_ATOMIC]);
+        drm_log("    aspect_ratio: %" PRIu64, file->client_caps[DRM_CLIENT_CAP_ASPECT_RATIO]);
+        drm_log("    writeback_connectors: %" PRIu64,
+                file->client_caps[DRM_CLIENT_CAP_WRITEBACK_CONNECTORS]);
+        drm_log("    cursor_plane_hotspot: %" PRIu64,
+                file->client_caps[DRM_CLIENT_CAP_CURSOR_PLANE_HOTSPOT]);
+    }
 }
 
 static inline struct drm_properties *
@@ -310,29 +324,31 @@ drm_scan_resource_properties(struct drm *drm, uint32_t res_id)
 static inline void
 drm_scan_resources(struct drm *drm)
 {
+    struct drm_modeset *modeset = &drm->modeset;
+
     drmModeResPtr res = drmModeGetResources(drm->fd);
     drmModePlaneResPtr plane_res = drmModeGetPlaneResources(drm->fd);
     if (!res || !plane_res)
         drm_die("failed to get resources");
 
-    drm->max_width = res->max_width;
-    drm->max_height = res->max_height;
-    drm->min_width = res->min_width;
-    drm->min_height = res->min_height;
+    modeset->max_width = res->max_width;
+    modeset->max_height = res->max_height;
+    modeset->min_width = res->min_width;
+    modeset->min_height = res->min_height;
 
     if (res->count_fbs)
         drm_die("unexpected fb count");
-    drm->active_fbs = calloc(plane_res->count_planes, sizeof(*drm->active_fbs));
-    if (!drm->active_fbs)
+    modeset->active_fbs = calloc(plane_res->count_planes, sizeof(*modeset->active_fbs));
+    if (!modeset->active_fbs)
         drm_die("failed to alloc fbs");
 
-    drm->plane_count = plane_res->count_planes;
-    drm->planes = calloc(plane_res->count_planes, sizeof(*drm->planes));
-    if (!drm->planes)
+    modeset->plane_count = plane_res->count_planes;
+    modeset->planes = calloc(plane_res->count_planes, sizeof(*modeset->planes));
+    if (!modeset->planes)
         drm_die("failed to alloc planes");
     for (uint32_t i = 0; i < plane_res->count_planes; i++) {
         const uint32_t res_id = plane_res->planes[i];
-        struct drm_plane *dst = &drm->planes[i];
+        struct drm_plane *dst = &modeset->planes[i];
         drmModePlanePtr src = drmModeGetPlane(drm->fd, res_id);
 
         dst->id = src->plane_id;
@@ -359,19 +375,19 @@ drm_scan_resources(struct drm *drm)
         /* count unique fb ids */
         if (dst->fb_id) {
             bool found = false;
-            for (uint32_t i = 0; i < drm->active_fb_count; i++) {
-                if (drm->active_fbs[i].id == dst->fb_id) {
+            for (uint32_t i = 0; i < modeset->active_fb_count; i++) {
+                if (modeset->active_fbs[i].id == dst->fb_id) {
                     found = true;
                     break;
                 }
             }
             if (!found)
-                drm->active_fbs[drm->active_fb_count++].id = dst->fb_id;
+                modeset->active_fbs[modeset->active_fb_count++].id = dst->fb_id;
         }
     }
 
-    for (uint32_t i = 0; i < drm->active_fb_count; i++) {
-        struct drm_fb *dst = &drm->active_fbs[i];
+    for (uint32_t i = 0; i < modeset->active_fb_count; i++) {
+        struct drm_fb *dst = &modeset->active_fbs[i];
         const uint32_t res_id = dst->id;
         drmModeFB2Ptr src = drmModeGetFB2(drm->fd, res_id);
 
@@ -397,13 +413,13 @@ drm_scan_resources(struct drm *drm)
         dst->properties = drm_scan_resource_properties(drm, res_id);
     }
 
-    drm->crtc_count = res->count_crtcs;
-    drm->crtcs = calloc(res->count_crtcs, sizeof(*drm->crtcs));
-    if (!drm->crtcs)
+    modeset->crtc_count = res->count_crtcs;
+    modeset->crtcs = calloc(res->count_crtcs, sizeof(*modeset->crtcs));
+    if (!modeset->crtcs)
         drm_die("failed to alloc crtcs");
     for (int i = 0; i < res->count_crtcs; i++) {
         const uint32_t res_id = res->crtcs[i];
-        struct drm_crtc *dst = &drm->crtcs[i];
+        struct drm_crtc *dst = &modeset->crtcs[i];
         drmModeCrtcPtr src = drmModeGetCrtc(drm->fd, res_id);
 
         dst->id = src->crtc_id;
@@ -432,13 +448,13 @@ drm_scan_resources(struct drm *drm)
         encoders[i] = drmModeGetEncoder(drm->fd, res_id);
     }
 
-    drm->connector_count = res->count_connectors;
-    drm->connectors = calloc(res->count_connectors, sizeof(*drm->connectors));
-    if (!drm->connectors)
+    modeset->connector_count = res->count_connectors;
+    modeset->connectors = calloc(res->count_connectors, sizeof(*modeset->connectors));
+    if (!modeset->connectors)
         drm_die("failed to alloc connectors");
     for (int i = 0; i < res->count_connectors; i++) {
         const uint32_t res_id = res->connectors[i];
-        struct drm_connector *dst = &drm->connectors[i];
+        struct drm_connector *dst = &modeset->connectors[i];
         drmModeConnectorPtr src = drmModeGetConnector(drm->fd, res_id);
 
         dst->id = src->connector_id;
@@ -468,6 +484,74 @@ drm_scan_resources(struct drm *drm)
 
     drmModeFreeResources(res);
     drmModeFreePlaneResources(plane_res);
+}
+
+static inline void
+drm_release_resources(struct drm *drm)
+{
+    struct drm_modeset *modeset = &drm->modeset;
+
+    for (uint32_t i = 0; i < modeset->connector_count; i++)
+        free(modeset->connectors[i].properties);
+    free(modeset->connectors);
+
+    for (uint32_t i = 0; i < modeset->crtc_count; i++)
+        free(modeset->crtcs[i].properties);
+    free(modeset->crtcs);
+
+    for (uint32_t i = 0; i < modeset->plane_count; i++) {
+        free(modeset->planes[i].formats);
+        free(modeset->planes[i].properties);
+    }
+    free(modeset->planes);
+
+    for (uint32_t i = 0; i < modeset->active_fb_count; i++) {
+        struct drm_fb *fb = &modeset->active_fbs[i];
+
+        for (uint32_t j = 0; j < fb->plane_count; j++) {
+            if (!fb->handles[j])
+                continue;
+
+            drmCloseBufferHandle(drm->fd, fb->handles[j]);
+            for (uint32_t k = j + 1; k < fb->plane_count; k++) {
+                if (fb->handles[k] == fb->handles[j])
+                    fb->handles[k] = 0;
+            }
+        }
+
+        free(fb->properties);
+    }
+    free(modeset->active_fbs);
+
+    memset(modeset, 0, sizeof(*modeset));
+}
+
+static inline void
+drm_dump_device(struct drm *drm, uint32_t idx)
+{
+    const drmDevicePtr dev = drm->devices[idx];
+
+    drm_log("device %d", idx);
+    for (int i = 0; i < DRM_NODE_MAX; i++) {
+        if (!(dev->available_nodes & (1 << i)))
+            continue;
+        drm_log("  node type %d: %s", i, dev->nodes[i]);
+    }
+
+    switch (dev->bustype) {
+    case DRM_BUS_PCI:
+        drm_log("  bus type: pci");
+        drm_log("  bus info: %04x:%02x:%02x.%u", dev->businfo.pci->domain, dev->businfo.pci->bus,
+                dev->businfo.pci->dev, dev->businfo.pci->func);
+        drm_log("  dev info: %04x:%04x, revision %02x, subsystem %04x:%04x",
+                dev->deviceinfo.pci->vendor_id, dev->deviceinfo.pci->device_id,
+                dev->deviceinfo.pci->revision_id, dev->deviceinfo.pci->subvendor_id,
+                dev->deviceinfo.pci->subdevice_id);
+        break;
+    default:
+        drm_log("  bus type %d", dev->bustype);
+        break;
+    }
 }
 
 static inline void
@@ -558,6 +642,80 @@ drm_dump_plane_formats(struct drm *drm, const struct drm_plane *plane, const cha
     } else {
         for (uint32_t j = 0; j < plane->format_count; j++)
             drm_log("%sformat '%.*s'", indent, 4, (const char *)&plane->formats[j]);
+    }
+}
+
+static inline void
+drm_dump_modeset(struct drm *drm, bool dump_all)
+{
+    const struct drm_modeset *modeset = &drm->modeset;
+
+    drm_log("  min size: %dx%d", modeset->min_width, modeset->min_height);
+    drm_log("  max size: %dx%d", modeset->max_width, modeset->max_height);
+
+    drm_log("  active fb count: %d", modeset->active_fb_count);
+    for (uint32_t i = 0; i < modeset->active_fb_count; i++) {
+        const struct drm_fb *fb = &modeset->active_fbs[i];
+        drm_log("    active fb[%d]: id %d, size %dx%d, format '%.*s', modifier 0x%" PRIx64
+                ", plane count %d",
+                i, fb->id, fb->width, fb->height, 4, (const char *)&fb->format, fb->modifier,
+                fb->plane_count);
+
+        for (uint32_t j = 0; j < fb->plane_count; j++) {
+            drm_log("      plane[%d]: handle %d, offset %d, pitch %d", j, fb->handles[j],
+                    fb->offsets[j], fb->pitches[j]);
+        }
+
+        if (fb->properties)
+            drm_dump_properties(drm, fb->properties, "      ");
+    }
+
+    drm_log("  plane count: %d", modeset->plane_count);
+    for (uint32_t i = 0; i < modeset->plane_count; i++) {
+        const struct drm_plane *plane = &modeset->planes[i];
+        if (!plane->crtc_id && !dump_all)
+            continue;
+
+        drm_log("    plane[%d]: id %d, fb id %d, crtc id %d, mask 0x%x, format count %d", i,
+                plane->id, plane->fb_id, plane->crtc_id, plane->possible_crtcs,
+                plane->format_count);
+
+        if (dump_all)
+            drm_dump_plane_formats(drm, plane, "      ");
+
+        if (plane->properties)
+            drm_dump_properties(drm, plane->properties, "      ");
+    }
+
+    drm_log("  crtc count: %d", modeset->crtc_count);
+    for (uint32_t i = 0; i < modeset->crtc_count; i++) {
+        const struct drm_crtc *crtc = &modeset->crtcs[i];
+        if (!crtc->mode_valid && !dump_all)
+            continue;
+
+        drm_log("    crtc[%d]: id %d, mode %s, offset %dx%d, seq %" PRIu64 ", ns %" PRIu64
+                ", gamma %d",
+                i, crtc->id, crtc->mode.name[0] != '\0' ? crtc->mode.name : "invalid", crtc->x,
+                crtc->y, crtc->seq, crtc->ns, crtc->gamma_size);
+
+        if (crtc->properties)
+            drm_dump_properties(drm, crtc->properties, "      ");
+    }
+
+    drm_log("  connector count: %d", modeset->connector_count);
+    for (uint32_t i = 0; i < modeset->connector_count; i++) {
+        const struct drm_connector *connector = &modeset->connectors[i];
+        if (!connector->crtc_id && !dump_all)
+            continue;
+
+        drm_log("    connector[%d]: id %d, crtc id %d, connected %d, type %s-%d, size %dx%d, "
+                "mask 0x%x",
+                i, connector->id, connector->crtc_id, connector->connected,
+                drmModeGetConnectorTypeName(connector->type), connector->type_id,
+                connector->width_mm, connector->height_mm, connector->possible_crtcs);
+
+        if (connector->properties)
+            drm_dump_properties(drm, connector->properties, "      ");
     }
 }
 

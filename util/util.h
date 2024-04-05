@@ -24,8 +24,8 @@
 #define NORETURN __attribute__((noreturn))
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#define ALIGN(v, a) (((v) + (a)-1) & ~((a)-1))
-#define DIV_ROUND_UP(v, d) (((v) + (d)-1) / (d))
+#define ALIGN(v, a) (((v) + (a) - 1) & ~((a) - 1))
+#define DIV_ROUND_UP(v, d) (((v) + (d) - 1) / (d))
 
 static inline void
 u_logv(const char *tag, const char *format, va_list ap)

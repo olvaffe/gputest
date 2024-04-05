@@ -34,9 +34,6 @@ tests = [
   'ycbcr',
 ]
 
-if idep_drmutil.found()
-  tests += ['drm']
-endif
 if dep_sdl2.found()
   tests += ['sdl']
 endif
@@ -78,9 +75,7 @@ foreach t : tests
   test_deps = [idep_vkutil]
   test_args = []
 
-  if t == 'drm'
-    test_deps += [idep_drmutil]
-  elif t == 'ktx'
+  if t == 'ktx'
     if dep_ktx.found()
       test_deps += [dep_ktx]
     else
