@@ -8,7 +8,7 @@
 static const char copy_test_cs[] = "                     \n\
 kernel void memcpy32(global uint *dst, global uint *src) \n\
 {                                                        \n\
-    uint idx = get_global_id(0);                         \n\
+    size_t idx = get_global_id(0);                       \n\
     dst[idx] = src[idx];                                 \n\
 }";
 
