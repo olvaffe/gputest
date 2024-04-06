@@ -58,7 +58,7 @@ copy_test_dispatch(struct copy_test *test)
     cl_set_pipeline_arg(cl, test->pipeline, 0, &test->dst->mem, sizeof(test->dst->mem));
     cl_set_pipeline_arg(cl, test->pipeline, 1, &test->src->mem, sizeof(test->src->mem));
 
-    cl_enqueue_pipeline(cl, test->pipeline, 1, NULL, &count, NULL);
+    cl_enqueue_pipeline(cl, test->pipeline, count, 0, 0);
 
     ptr = cl_map_buffer(cl, test->dst, CL_MAP_READ);
     for (uint32_t i = 0; i < count; i++) {
@@ -66,8 +66,6 @@ copy_test_dispatch(struct copy_test *test)
             cl_die("ptr[%u] is %u, not %u", i, ptr[i], i);
     }
     cl_unmap_buffer(cl, test->dst);
-
-    cl_finish(cl);
 }
 
 int

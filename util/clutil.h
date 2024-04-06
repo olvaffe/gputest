@@ -825,6 +825,9 @@ cl_init(struct cl *cl, const struct cl_init_params *params)
 static inline void
 cl_cleanup(struct cl *cl)
 {
+    cl->err = cl->Finish(cl->cmdq);
+    cl_check(cl, "failed to finish cmdq");
+
     cl->err = cl->ReleaseCommandQueue(cl->cmdq);
     cl_check(cl, "failed to destroy cmdq");
 
@@ -987,15 +990,14 @@ cl_set_pipeline_arg(
 }
 
 static inline void
-cl_enqueue_pipeline(struct cl *cl,
-                    struct cl_pipeline *pipeline,
-                    uint32_t dim,
-                    const size_t *offsets,
-                    const size_t *sizes,
-                    const size_t *locals)
+cl_enqueue_pipeline(
+    struct cl *cl, struct cl_pipeline *pipeline, size_t width, size_t height, size_t depth)
 {
-    cl->err = cl->EnqueueNDRangeKernel(cl->cmdq, pipeline->kern, dim, offsets, sizes, locals, 0,
-                                       NULL, NULL);
+    const cl_uint dim = depth ? 3 : height ? 2 : 1;
+    const size_t global_work_size[] = { width, height, depth };
+
+    cl->err = cl->EnqueueNDRangeKernel(cl->cmdq, pipeline->kern, dim, NULL, global_work_size,
+                                       NULL, 0, NULL, NULL);
     cl_check(cl, "failed to enqueue kernel");
 }
 
