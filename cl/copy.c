@@ -16,8 +16,8 @@ struct copy_test {
     size_t size;
 
     struct cl cl;
-    cl_mem src;
-    cl_mem dst;
+    struct cl_buffer *src;
+    struct cl_buffer *dst;
     cl_program prog;
     cl_kernel kern;
 };
@@ -29,8 +29,8 @@ copy_test_init(struct copy_test *test)
 
     cl_init(cl, NULL);
 
-    test->src = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
-    test->dst = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
+    test->src = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size);
+    test->dst = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size);
 
     test->prog = cl_create_program(cl, copy_test_cs);
     test->kern = cl_create_kernel(cl, test->prog, "memcpy32");
@@ -43,8 +43,8 @@ copy_test_cleanup(struct copy_test *test)
 
     cl_destroy_kernel(cl, test->kern);
     cl_destroy_program(cl, test->prog);
-    cl_destroy_memory(cl, test->dst);
-    cl_destroy_memory(cl, test->src);
+    cl_destroy_buffer(cl, test->dst);
+    cl_destroy_buffer(cl, test->src);
     cl_cleanup(cl);
 }
 
@@ -54,22 +54,22 @@ copy_test_dispatch(struct copy_test *test)
     struct cl *cl = &test->cl;
     const size_t count = test->size / sizeof(cl_uint);
 
-    cl_uint *ptr = cl_map_buffer(cl, test->src, CL_MAP_WRITE_INVALIDATE_REGION, test->size);
+    cl_uint *ptr = cl_map_buffer(cl, test->src, CL_MAP_WRITE_INVALIDATE_REGION);
     for (uint32_t i = 0; i < count; i++)
         ptr[i] = i;
-    cl_unmap_memory(cl, test->src, ptr);
+    cl_unmap_buffer(cl, test->src);
 
-    cl_set_kernel_arg(cl, test->kern, 0, &test->dst, sizeof(test->dst));
-    cl_set_kernel_arg(cl, test->kern, 1, &test->src, sizeof(test->src));
+    cl_set_kernel_arg(cl, test->kern, 0, &test->dst->mem, sizeof(test->dst->mem));
+    cl_set_kernel_arg(cl, test->kern, 1, &test->src->mem, sizeof(test->src->mem));
 
     cl_enqueue_kernel(cl, test->kern, 1, NULL, &count, NULL);
 
-    ptr = cl_map_buffer(cl, test->dst, CL_MAP_READ, test->size);
+    ptr = cl_map_buffer(cl, test->dst, CL_MAP_READ);
     for (uint32_t i = 0; i < count; i++) {
         if (ptr[i] != i)
             cl_die("ptr[%u] is %u, not %u", i, ptr[i], i);
     }
-    cl_unmap_memory(cl, test->dst, ptr);
+    cl_unmap_buffer(cl, test->dst);
 
     cl_finish(cl);
 }

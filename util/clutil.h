@@ -176,6 +176,13 @@ struct cl {
     cl_command_queue cmdq;
 };
 
+struct cl_buffer {
+    cl_mem mem;
+    size_t size;
+
+    void *mem_ptr;
+};
+
 static inline void PRINTFLIKE(1, 2) cl_log(const char *format, ...)
 {
     va_list ap;
@@ -853,35 +860,47 @@ cl_cleanup(struct cl *cl)
     dlclose(cl->handle);
 }
 
-static inline cl_mem
-cl_create_buffer(struct cl *cl, cl_mem_flags flags, size_t size, const void *data)
+static inline struct cl_buffer *
+cl_create_buffer(struct cl *cl, cl_mem_flags flags, size_t size)
 {
-    cl_mem buf = cl->CreateBufferWithProperties(cl->ctx, NULL, flags, size, NULL, &cl->err);
+    struct cl_buffer *buf = calloc(1, sizeof(*buf));
+    if (!buf)
+        cl_die("failed to alloc buf");
+
+    buf->mem = cl->CreateBufferWithProperties(cl->ctx, NULL, flags, size, NULL, &cl->err);
     cl_check(cl, "failed to create buffer");
+
+    buf->size = size;
+
     return buf;
 }
 
-static inline void *
-cl_map_buffer(struct cl *cl, cl_mem buf, cl_map_flags flags, size_t size)
+static inline void
+cl_destroy_buffer(struct cl *cl, struct cl_buffer *buf)
 {
-    void *ptr =
-        cl->EnqueueMapBuffer(cl->cmdq, buf, true, flags, 0, size, 0, NULL, NULL, &cl->err);
+    cl->err = cl->ReleaseMemObject(buf->mem);
+    cl_check(cl, "failed to destroy memory");
+
+    free(buf);
+}
+
+static inline void *
+cl_map_buffer(struct cl *cl, struct cl_buffer *buf, cl_map_flags flags)
+{
+    void *ptr = cl->EnqueueMapBuffer(cl->cmdq, buf->mem, true, flags, 0, buf->size, 0, NULL, NULL,
+                                     &cl->err);
     cl_check(cl, "failed to map buffer");
+
+    buf->mem_ptr = ptr;
+
     return ptr;
 }
 
 static inline void
-cl_destroy_memory(struct cl *cl, cl_mem mem)
+cl_unmap_buffer(struct cl *cl, struct cl_buffer *buf)
 {
-    cl->err = cl->ReleaseMemObject(mem);
-    cl_check(cl, "failed to destroy memory");
-}
-
-static inline void
-cl_unmap_memory(struct cl *cl, cl_mem mem, void *ptr)
-{
-    cl->err = cl->EnqueueUnmapMemObject(cl->cmdq, mem, ptr, 0, NULL, NULL);
-    cl_check(cl, "failed to unmap memory");
+    cl->err = cl->EnqueueUnmapMemObject(cl->cmdq, buf->mem, buf->mem_ptr, 0, NULL, NULL);
+    cl_check(cl, "failed to unmap buffer");
 }
 
 static inline void
