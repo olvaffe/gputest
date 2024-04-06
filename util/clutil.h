@@ -169,6 +169,8 @@ struct cl {
 
     struct cl_platform *platforms;
     uint32_t platform_count;
+
+    cl_context context;
 };
 
 static inline void PRINTFLIKE(1, 2) cl_log(const char *format, ...)
@@ -750,6 +752,36 @@ cl_init_devices(struct cl *cl, uint32_t idx)
 }
 
 static inline void
+cl_context_notify(const char *errinfo, const void *private_info, size_t cb, void *user_data)
+{
+    cl_log(errinfo);
+}
+
+static inline void
+cl_init_context(struct cl *cl)
+{
+    const uint32_t plat_idx = 0;
+    const uint32_t dev_idx = 0;
+
+    if (plat_idx >= cl->platform_count)
+        cl_die("no platform %d", plat_idx);
+    const struct cl_platform *plat = &cl->platforms[plat_idx];
+
+    if (dev_idx >= plat->device_count)
+        cl_die("no device %d", dev_idx);
+    const struct cl_device *dev = &plat->devices[dev_idx];
+
+    const cl_context_properties props[] = {
+        CL_CONTEXT_PLATFORM,
+        (cl_context_properties)plat->id,
+        0,
+    };
+
+    cl->context = cl->CreateContext(props, 1, &dev->id, cl_context_notify, NULL, &cl->err);
+    cl_check(cl, "failed to init context");
+}
+
+static inline void
 cl_init(struct cl *cl, const struct cl_init_params *params)
 {
     memset(cl, 0, sizeof(*cl));
@@ -761,11 +793,16 @@ cl_init(struct cl *cl, const struct cl_init_params *params)
 
     for (uint32_t i = 0; i < cl->platform_count; i++)
         cl_init_devices(cl, i);
+
+    cl_init_context(cl);
 }
 
 static inline void
 cl_cleanup(struct cl *cl)
 {
+    cl->err = cl->ReleaseContext(cl->context);
+    cl_check(cl, "failed to destroy context");
+
     for (uint32_t i = 0; i < cl->platform_count; i++) {
         struct cl_platform *plat = &cl->platforms[i];
 
@@ -808,40 +845,6 @@ cl_get_context_info(struct cl *cl, cl_context ctx, cl_context_info param, void *
     cl_check(cl, "failed to get context info");
     if (size != real_size)
         cl_die("bad context info size");
-}
-
-static inline void
-cl_context_notify(const char *errinfo, const void *private_info, size_t cb, void *user_data)
-{
-    cl_log(errinfo);
-}
-
-static inline cl_context
-cl_create_context(struct cl *cl, uint32_t plat_idx, uint32_t dev_idx)
-{
-    if (plat_idx >= cl->platform_count)
-        cl_die("no platform %d", plat_idx);
-    const struct cl_platform *plat = &cl->platforms[plat_idx];
-    if (dev_idx >= plat->device_count)
-        cl_die("no device %d", dev_idx);
-    const struct cl_device *dev = &plat->devices[dev_idx];
-
-    const cl_context_properties props[] = {
-        CL_CONTEXT_PLATFORM,
-        (cl_context_properties)plat->id,
-        0,
-    };
-
-    cl_context ctx = cl->CreateContext(props, 1, &dev->id, cl_context_notify, NULL, &cl->err);
-    cl_check(cl, "failed to create context");
-    return ctx;
-}
-
-static inline void
-cl_destroy_context(struct cl *cl, cl_context ctx)
-{
-    cl->err = cl->ReleaseContext(ctx);
-    cl_check(cl, "failed to destroy context");
 }
 
 static inline cl_command_queue

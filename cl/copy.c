@@ -16,7 +16,6 @@ struct copy_test {
     size_t size;
 
     struct cl cl;
-    cl_context ctx;
     cl_command_queue cmdq;
     cl_mem src;
     cl_mem dst;
@@ -31,13 +30,12 @@ copy_test_init(struct copy_test *test)
 
     cl_init(cl, NULL);
 
-    test->ctx = cl_create_context(cl, 0, 0);
-    test->cmdq = cl_create_command_queue(cl, test->ctx);
+    test->cmdq = cl_create_command_queue(cl, cl->context);
 
-    test->src = cl_create_buffer(cl, test->ctx, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
-    test->dst = cl_create_buffer(cl, test->ctx, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
+    test->src = cl_create_buffer(cl, cl->context, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
+    test->dst = cl_create_buffer(cl, cl->context, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
 
-    test->prog = cl_create_program(cl, test->ctx, copy_test_cs);
+    test->prog = cl_create_program(cl, cl->context, copy_test_cs);
     test->kern = cl_create_kernel(cl, test->prog, "memcpy32");
 }
 
@@ -51,7 +49,6 @@ copy_test_cleanup(struct copy_test *test)
     cl_destroy_memory(cl, test->dst);
     cl_destroy_memory(cl, test->src);
     cl_destroy_command_queue(cl, test->cmdq);
-    cl_destroy_context(cl, test->ctx);
     cl_cleanup(cl);
 }
 
