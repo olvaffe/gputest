@@ -170,7 +170,7 @@ struct cl {
     struct cl_platform *platforms;
     uint32_t platform_count;
 
-    cl_context context;
+    cl_context ctx;
 };
 
 static inline void PRINTFLIKE(1, 2) cl_log(const char *format, ...)
@@ -777,7 +777,7 @@ cl_init_context(struct cl *cl)
         0,
     };
 
-    cl->context = cl->CreateContext(props, 1, &dev->id, cl_context_notify, NULL, &cl->err);
+    cl->ctx = cl->CreateContext(props, 1, &dev->id, cl_context_notify, NULL, &cl->err);
     cl_check(cl, "failed to init context");
 }
 
@@ -800,7 +800,7 @@ cl_init(struct cl *cl, const struct cl_init_params *params)
 static inline void
 cl_cleanup(struct cl *cl)
 {
-    cl->err = cl->ReleaseContext(cl->context);
+    cl->err = cl->ReleaseContext(cl->ctx);
     cl_check(cl, "failed to destroy context");
 
     for (uint32_t i = 0; i < cl->platform_count; i++) {

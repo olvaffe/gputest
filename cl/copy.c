@@ -30,12 +30,12 @@ copy_test_init(struct copy_test *test)
 
     cl_init(cl, NULL);
 
-    test->cmdq = cl_create_command_queue(cl, cl->context);
+    test->cmdq = cl_create_command_queue(cl, cl->ctx);
 
-    test->src = cl_create_buffer(cl, cl->context, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
-    test->dst = cl_create_buffer(cl, cl->context, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
+    test->src = cl_create_buffer(cl, cl->ctx, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
+    test->dst = cl_create_buffer(cl, cl->ctx, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
 
-    test->prog = cl_create_program(cl, cl->context, copy_test_cs);
+    test->prog = cl_create_program(cl, cl->ctx, copy_test_cs);
     test->kern = cl_create_kernel(cl, test->prog, "memcpy32");
 }
 
