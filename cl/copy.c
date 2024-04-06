@@ -18,8 +18,7 @@ struct copy_test {
     struct cl cl;
     struct cl_buffer *src;
     struct cl_buffer *dst;
-    cl_program prog;
-    cl_kernel kern;
+    struct cl_pipeline *pipeline;
 };
 
 static void
@@ -31,9 +30,7 @@ copy_test_init(struct copy_test *test)
 
     test->src = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size);
     test->dst = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size);
-
-    test->prog = cl_create_program(cl, copy_test_cs);
-    test->kern = cl_create_kernel(cl, test->prog, "memcpy32");
+    test->pipeline = cl_create_pipeline(cl, copy_test_cs, "memcpy32");
 }
 
 static void
@@ -41,8 +38,7 @@ copy_test_cleanup(struct copy_test *test)
 {
     struct cl *cl = &test->cl;
 
-    cl_destroy_kernel(cl, test->kern);
-    cl_destroy_program(cl, test->prog);
+    cl_destroy_pipeline(cl, test->pipeline);
     cl_destroy_buffer(cl, test->dst);
     cl_destroy_buffer(cl, test->src);
     cl_cleanup(cl);
@@ -59,10 +55,10 @@ copy_test_dispatch(struct copy_test *test)
         ptr[i] = i;
     cl_unmap_buffer(cl, test->src);
 
-    cl_set_kernel_arg(cl, test->kern, 0, &test->dst->mem, sizeof(test->dst->mem));
-    cl_set_kernel_arg(cl, test->kern, 1, &test->src->mem, sizeof(test->src->mem));
+    cl_set_pipeline_arg(cl, test->pipeline, 0, &test->dst->mem, sizeof(test->dst->mem));
+    cl_set_pipeline_arg(cl, test->pipeline, 1, &test->src->mem, sizeof(test->src->mem));
 
-    cl_enqueue_kernel(cl, test->kern, 1, NULL, &count, NULL);
+    cl_enqueue_pipeline(cl, test->pipeline, 1, NULL, &count, NULL);
 
     ptr = cl_map_buffer(cl, test->dst, CL_MAP_READ);
     for (uint32_t i = 0; i < count; i++) {

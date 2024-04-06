@@ -183,6 +183,11 @@ struct cl_buffer {
     void *mem_ptr;
 };
 
+struct cl_pipeline {
+    cl_program prog;
+    cl_kernel kern;
+};
+
 static inline void PRINTFLIKE(1, 2) cl_log(const char *format, ...)
 {
     va_list ap;
@@ -934,8 +939,8 @@ cl_get_program_build_info_alloc(struct cl *cl,
     return buf;
 }
 
-static inline cl_program
-cl_create_program(struct cl *cl, const char *code)
+static inline struct cl_pipeline *
+cl_create_pipeline(struct cl *cl, const char *code, const char *main)
 {
     cl_program prog = cl->CreateProgramWithSource(cl->ctx, 1, &code, NULL, &cl->err);
     cl_check(cl, "failed to create program");
@@ -948,48 +953,49 @@ cl_create_program(struct cl *cl, const char *code)
         cl_die("failed to build program: status %d, log %s", status, log);
     }
 
-    return prog;
-}
-
-static inline void
-cl_destroy_program(struct cl *cl, cl_program prog)
-{
-    cl->err = cl->ReleaseProgram(prog);
-    cl_check(cl, "failed to destroy program");
-}
-
-static inline cl_kernel
-cl_create_kernel(struct cl *cl, cl_program prog, const char *name)
-{
-    cl_kernel kern = cl->CreateKernel(prog, name, &cl->err);
+    cl_kernel kern = cl->CreateKernel(prog, main, &cl->err);
     cl_check(cl, "failed to create kernel");
-    return kern;
+
+    struct cl_pipeline *pipeline = calloc(1, sizeof(*pipeline));
+    if (!pipeline)
+        cl_die("failed to alloc pipeline");
+
+    pipeline->prog = prog;
+    pipeline->kern = kern;
+
+    return pipeline;
 }
 
 static inline void
-cl_destroy_kernel(struct cl *cl, cl_kernel kern)
+cl_destroy_pipeline(struct cl *cl, struct cl_pipeline *pipeline)
 {
-    cl->err = cl->ReleaseKernel(kern);
+    cl->err = cl->ReleaseKernel(pipeline->kern);
     cl_check(cl, "failed to destroy kernel");
+
+    cl->err = cl->ReleaseProgram(pipeline->prog);
+    cl_check(cl, "failed to destroy program");
+
+    free(pipeline);
 }
 
 static inline void
-cl_set_kernel_arg(struct cl *cl, cl_kernel kern, uint32_t idx, const void *val, size_t size)
+cl_set_pipeline_arg(
+    struct cl *cl, struct cl_pipeline *pipeline, uint32_t idx, const void *val, size_t size)
 {
-    cl->err = cl->SetKernelArg(kern, idx, size, val);
+    cl->err = cl->SetKernelArg(pipeline->kern, idx, size, val);
     cl_check(cl, "failed to set kernel arg");
 }
 
 static inline void
-cl_enqueue_kernel(struct cl *cl,
-                  cl_kernel kern,
-                  uint32_t dim,
-                  const size_t *offsets,
-                  const size_t *sizes,
-                  const size_t *locals)
+cl_enqueue_pipeline(struct cl *cl,
+                    struct cl_pipeline *pipeline,
+                    uint32_t dim,
+                    const size_t *offsets,
+                    const size_t *sizes,
+                    const size_t *locals)
 {
-    cl->err =
-        cl->EnqueueNDRangeKernel(cl->cmdq, kern, dim, offsets, sizes, locals, 0, NULL, NULL);
+    cl->err = cl->EnqueueNDRangeKernel(cl->cmdq, pipeline->kern, dim, offsets, sizes, locals, 0,
+                                       NULL, NULL);
     cl_check(cl, "failed to enqueue kernel");
 }
 
