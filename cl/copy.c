@@ -29,10 +29,10 @@ copy_test_init(struct copy_test *test)
 
     cl_init(cl, NULL);
 
-    test->src = cl_create_buffer(cl, cl->ctx, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
-    test->dst = cl_create_buffer(cl, cl->ctx, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
+    test->src = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
+    test->dst = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
 
-    test->prog = cl_create_program(cl, cl->ctx, copy_test_cs);
+    test->prog = cl_create_program(cl, copy_test_cs);
     test->kern = cl_create_kernel(cl, test->prog, "memcpy32");
 }
 
@@ -54,25 +54,24 @@ copy_test_dispatch(struct copy_test *test)
     struct cl *cl = &test->cl;
     const size_t count = test->size / sizeof(cl_uint);
 
-    cl_uint *ptr =
-        cl_map_buffer(cl, cl->cmdq, test->src, CL_MAP_WRITE_INVALIDATE_REGION, test->size);
+    cl_uint *ptr = cl_map_buffer(cl, test->src, CL_MAP_WRITE_INVALIDATE_REGION, test->size);
     for (uint32_t i = 0; i < count; i++)
         ptr[i] = i;
-    cl_unmap_memory(cl, cl->cmdq, test->src, ptr);
+    cl_unmap_memory(cl, test->src, ptr);
 
     cl_set_kernel_arg(cl, test->kern, 0, &test->dst, sizeof(test->dst));
     cl_set_kernel_arg(cl, test->kern, 1, &test->src, sizeof(test->src));
 
-    cl_enqueue_kernel(cl, cl->cmdq, test->kern, 1, NULL, &count, NULL);
+    cl_enqueue_kernel(cl, test->kern, 1, NULL, &count, NULL);
 
-    ptr = cl_map_buffer(cl, cl->cmdq, test->dst, CL_MAP_READ, test->size);
+    ptr = cl_map_buffer(cl, test->dst, CL_MAP_READ, test->size);
     for (uint32_t i = 0; i < count; i++) {
         if (ptr[i] != i)
             cl_die("ptr[%u] is %u, not %u", i, ptr[i], i);
     }
-    cl_unmap_memory(cl, cl->cmdq, test->dst, ptr);
+    cl_unmap_memory(cl, test->dst, ptr);
 
-    cl_finish(cl, cl->cmdq);
+    cl_finish(cl);
 }
 
 int

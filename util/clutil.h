@@ -853,28 +853,19 @@ cl_cleanup(struct cl *cl)
     dlclose(cl->handle);
 }
 
-static inline void
-cl_get_context_info(struct cl *cl, cl_context ctx, cl_context_info param, void *buf, size_t size)
-{
-    size_t real_size;
-    cl->err = cl->GetContextInfo(ctx, param, size, buf, &real_size);
-    cl_check(cl, "failed to get context info");
-    if (size != real_size)
-        cl_die("bad context info size");
-}
-
 static inline cl_mem
-cl_create_buffer(struct cl *cl, cl_context ctx, cl_mem_flags flags, size_t size, const void *data)
+cl_create_buffer(struct cl *cl, cl_mem_flags flags, size_t size, const void *data)
 {
-    cl_mem buf = cl->CreateBufferWithProperties(ctx, NULL, flags, size, NULL, &cl->err);
+    cl_mem buf = cl->CreateBufferWithProperties(cl->ctx, NULL, flags, size, NULL, &cl->err);
     cl_check(cl, "failed to create buffer");
     return buf;
 }
 
 static inline void *
-cl_map_buffer(struct cl *cl, cl_command_queue cmdq, cl_mem buf, cl_map_flags flags, size_t size)
+cl_map_buffer(struct cl *cl, cl_mem buf, cl_map_flags flags, size_t size)
 {
-    void *ptr = cl->EnqueueMapBuffer(cmdq, buf, true, flags, 0, size, 0, NULL, NULL, &cl->err);
+    void *ptr =
+        cl->EnqueueMapBuffer(cl->cmdq, buf, true, flags, 0, size, 0, NULL, NULL, &cl->err);
     cl_check(cl, "failed to map buffer");
     return ptr;
 }
@@ -887,22 +878,18 @@ cl_destroy_memory(struct cl *cl, cl_mem mem)
 }
 
 static inline void
-cl_unmap_memory(struct cl *cl, cl_command_queue cmdq, cl_mem mem, void *ptr)
+cl_unmap_memory(struct cl *cl, cl_mem mem, void *ptr)
 {
-    cl->err = cl->EnqueueUnmapMemObject(cmdq, mem, ptr, 0, NULL, NULL);
+    cl->err = cl->EnqueueUnmapMemObject(cl->cmdq, mem, ptr, 0, NULL, NULL);
     cl_check(cl, "failed to unmap memory");
 }
 
 static inline void
-cl_get_program_build_info(struct cl *cl,
-                          cl_program prog,
-                          cl_device_id dev_id,
-                          cl_program_build_info param,
-                          void *buf,
-                          size_t size)
+cl_get_program_build_info(
+    struct cl *cl, cl_program prog, cl_program_build_info param, void *buf, size_t size)
 {
     size_t real_size;
-    cl->err = cl->GetProgramBuildInfo(prog, dev_id, param, size, buf, &real_size);
+    cl->err = cl->GetProgramBuildInfo(prog, cl->dev, param, size, buf, &real_size);
     cl_check(cl, "failed to get program build info");
     if (size != real_size)
         cl_die("bad program build info size");
@@ -911,18 +898,17 @@ cl_get_program_build_info(struct cl *cl,
 static inline void *
 cl_get_program_build_info_alloc(struct cl *cl,
                                 cl_program prog,
-                                cl_device_id dev_id,
                                 cl_program_build_info param,
                                 size_t *size)
 {
     size_t real_size;
-    cl->err = cl->GetProgramBuildInfo(prog, dev_id, param, 0, NULL, &real_size);
+    cl->err = cl->GetProgramBuildInfo(prog, cl->dev, param, 0, NULL, &real_size);
     cl_check(cl, "failed to get program build info size");
 
     void *buf = malloc(real_size);
     if (!buf)
         cl_die("failed to alloc program build info buf");
-    cl_get_program_build_info(cl, prog, dev_id, param, buf, real_size);
+    cl_get_program_build_info(cl, prog, param, buf, real_size);
 
     if (size)
         *size = real_size;
@@ -930,20 +916,16 @@ cl_get_program_build_info_alloc(struct cl *cl,
 }
 
 static inline cl_program
-cl_create_program(struct cl *cl, cl_context ctx, const char *code)
+cl_create_program(struct cl *cl, const char *code)
 {
-    cl_program prog = cl->CreateProgramWithSource(ctx, 1, &code, NULL, &cl->err);
+    cl_program prog = cl->CreateProgramWithSource(cl->ctx, 1, &code, NULL, &cl->err);
     cl_check(cl, "failed to create program");
 
-    cl_device_id dev_id;
-    cl_get_context_info(cl, ctx, CL_CONTEXT_DEVICES, &dev_id, sizeof(dev_id));
-
-    cl->err = cl->BuildProgram(prog, 1, &dev_id, "-cl-std=CL3.0", NULL, NULL);
+    cl->err = cl->BuildProgram(prog, 1, &cl->dev, "-cl-std=CL3.0", NULL, NULL);
     if (cl->err != CL_SUCCESS) {
         cl_build_status status;
-        cl_get_program_build_info(cl, prog, dev_id, CL_PROGRAM_BUILD_STATUS, &status,
-                                  sizeof(status));
-        char *log = cl_get_program_build_info_alloc(cl, prog, dev_id, CL_PROGRAM_BUILD_LOG, NULL);
+        cl_get_program_build_info(cl, prog, CL_PROGRAM_BUILD_STATUS, &status, sizeof(status));
+        char *log = cl_get_program_build_info_alloc(cl, prog, CL_PROGRAM_BUILD_LOG, NULL);
         cl_die("failed to build program: status %d, log %s", status, log);
     }
 
@@ -981,28 +963,28 @@ cl_set_kernel_arg(struct cl *cl, cl_kernel kern, uint32_t idx, const void *val, 
 
 static inline void
 cl_enqueue_kernel(struct cl *cl,
-                  cl_command_queue cmdq,
                   cl_kernel kern,
                   uint32_t dim,
                   const size_t *offsets,
                   const size_t *sizes,
                   const size_t *locals)
 {
-    cl->err = cl->EnqueueNDRangeKernel(cmdq, kern, dim, offsets, sizes, locals, 0, NULL, NULL);
+    cl->err =
+        cl->EnqueueNDRangeKernel(cl->cmdq, kern, dim, offsets, sizes, locals, 0, NULL, NULL);
     cl_check(cl, "failed to enqueue kernel");
 }
 
 static inline void
-cl_flush(struct cl *cl, cl_command_queue cmdq)
+cl_flush(struct cl *cl)
 {
-    cl->err = cl->Flush(cmdq);
+    cl->err = cl->Flush(cl->cmdq);
     cl_check(cl, "failed to flush cmdq");
 }
 
 static inline void
-cl_finish(struct cl *cl, cl_command_queue cmdq)
+cl_finish(struct cl *cl)
 {
-    cl->err = cl->Finish(cmdq);
+    cl->err = cl->Finish(cl->cmdq);
     cl_check(cl, "failed to finish cmdq");
 }
 
