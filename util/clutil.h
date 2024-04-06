@@ -171,6 +171,9 @@ struct cl {
     uint32_t platform_count;
 
     cl_context ctx;
+    cl_device_id dev;
+
+    cl_command_queue cmdq;
 };
 
 static inline void PRINTFLIKE(1, 2) cl_log(const char *format, ...)
@@ -779,6 +782,15 @@ cl_init_context(struct cl *cl)
 
     cl->ctx = cl->CreateContext(props, 1, &dev->id, cl_context_notify, NULL, &cl->err);
     cl_check(cl, "failed to init context");
+
+    cl->dev = dev->id;
+}
+
+static inline void
+cl_init_command_queue(struct cl *cl)
+{
+    cl->cmdq = cl->CreateCommandQueueWithProperties(cl->ctx, cl->dev, NULL, &cl->err);
+    cl_check(cl, "failed to create cmdq");
 }
 
 static inline void
@@ -795,11 +807,15 @@ cl_init(struct cl *cl, const struct cl_init_params *params)
         cl_init_devices(cl, i);
 
     cl_init_context(cl);
+    cl_init_command_queue(cl);
 }
 
 static inline void
 cl_cleanup(struct cl *cl)
 {
+    cl->err = cl->ReleaseCommandQueue(cl->cmdq);
+    cl_check(cl, "failed to destroy cmdq");
+
     cl->err = cl->ReleaseContext(cl->ctx);
     cl_check(cl, "failed to destroy context");
 
@@ -845,25 +861,6 @@ cl_get_context_info(struct cl *cl, cl_context ctx, cl_context_info param, void *
     cl_check(cl, "failed to get context info");
     if (size != real_size)
         cl_die("bad context info size");
-}
-
-static inline cl_command_queue
-cl_create_command_queue(struct cl *cl, cl_context ctx)
-{
-    cl_device_id dev_id;
-    cl_get_context_info(cl, ctx, CL_CONTEXT_DEVICES, &dev_id, sizeof(dev_id));
-
-    cl_command_queue cmdq = cl->CreateCommandQueueWithProperties(ctx, dev_id, NULL, &cl->err);
-    cl_check(cl, "failed to create cmdq");
-
-    return cmdq;
-}
-
-static inline void
-cl_destroy_command_queue(struct cl *cl, cl_command_queue cmdq)
-{
-    cl->err = cl->ReleaseCommandQueue(cmdq);
-    cl_check(cl, "failed to destroy cmdq");
 }
 
 static inline cl_mem
