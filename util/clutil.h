@@ -800,4 +800,210 @@ cl_cleanup(struct cl *cl)
     dlclose(cl->handle);
 }
 
+static inline void
+cl_get_context_info(struct cl *cl, cl_context ctx, cl_context_info param, void *buf, size_t size)
+{
+    size_t real_size;
+    cl->err = cl->GetContextInfo(ctx, param, size, buf, &real_size);
+    cl_check(cl, "failed to get context info");
+    if (size != real_size)
+        cl_die("bad context info size");
+}
+
+static inline void
+cl_context_notify(const char *errinfo, const void *private_info, size_t cb, void *user_data)
+{
+    cl_log(errinfo);
+}
+
+static inline cl_context
+cl_create_context(struct cl *cl, uint32_t plat_idx, uint32_t dev_idx)
+{
+    if (plat_idx >= cl->platform_count)
+        cl_die("no platform %d", plat_idx);
+    const struct cl_platform *plat = &cl->platforms[plat_idx];
+    if (dev_idx >= plat->device_count)
+        cl_die("no device %d", dev_idx);
+    const struct cl_device *dev = &plat->devices[dev_idx];
+
+    const cl_context_properties props[] = {
+        CL_CONTEXT_PLATFORM,
+        (cl_context_properties)plat->id,
+        0,
+    };
+
+    cl_context ctx = cl->CreateContext(props, 1, &dev->id, cl_context_notify, NULL, &cl->err);
+    cl_check(cl, "failed to create context");
+    return ctx;
+}
+
+static inline void
+cl_destroy_context(struct cl *cl, cl_context ctx)
+{
+    cl->err = cl->ReleaseContext(ctx);
+    cl_check(cl, "failed to destroy context");
+}
+
+static inline cl_command_queue
+cl_create_command_queue(struct cl *cl, cl_context ctx)
+{
+    cl_device_id dev_id;
+    cl_get_context_info(cl, ctx, CL_CONTEXT_DEVICES, &dev_id, sizeof(dev_id));
+
+    cl_command_queue cmdq = cl->CreateCommandQueueWithProperties(ctx, dev_id, NULL, &cl->err);
+    cl_check(cl, "failed to create cmdq");
+
+    return cmdq;
+}
+
+static inline void
+cl_destroy_command_queue(struct cl *cl, cl_command_queue cmdq)
+{
+    cl->err = cl->ReleaseCommandQueue(cmdq);
+    cl_check(cl, "failed to destroy cmdq");
+}
+
+static inline cl_mem
+cl_create_buffer(struct cl *cl, cl_context ctx, cl_mem_flags flags, size_t size, const void *data)
+{
+    cl_mem buf = cl->CreateBufferWithProperties(ctx, NULL, flags, size, NULL, &cl->err);
+    cl_check(cl, "failed to create buffer");
+    return buf;
+}
+
+static inline void *
+cl_map_buffer(struct cl *cl, cl_command_queue cmdq, cl_mem buf, cl_map_flags flags, size_t size)
+{
+    void *ptr = cl->EnqueueMapBuffer(cmdq, buf, true, flags, 0, size, 0, NULL, NULL, &cl->err);
+    cl_check(cl, "failed to map buffer");
+    return ptr;
+}
+
+static inline void
+cl_destroy_memory(struct cl *cl, cl_mem mem)
+{
+    cl->err = cl->ReleaseMemObject(mem);
+    cl_check(cl, "failed to destroy memory");
+}
+
+static inline void
+cl_unmap_memory(struct cl *cl, cl_command_queue cmdq, cl_mem mem, void *ptr)
+{
+    cl->err = cl->EnqueueUnmapMemObject(cmdq, mem, ptr, 0, NULL, NULL);
+    cl_check(cl, "failed to unmap memory");
+}
+
+static inline void
+cl_get_program_build_info(struct cl *cl,
+                          cl_program prog,
+                          cl_device_id dev_id,
+                          cl_program_build_info param,
+                          void *buf,
+                          size_t size)
+{
+    size_t real_size;
+    cl->err = cl->GetProgramBuildInfo(prog, dev_id, param, size, buf, &real_size);
+    cl_check(cl, "failed to get program build info");
+    if (size != real_size)
+        cl_die("bad program build info size");
+}
+
+static inline void *
+cl_get_program_build_info_alloc(struct cl *cl,
+                                cl_program prog,
+                                cl_device_id dev_id,
+                                cl_program_build_info param,
+                                size_t *size)
+{
+    size_t real_size;
+    cl->err = cl->GetProgramBuildInfo(prog, dev_id, param, 0, NULL, &real_size);
+    cl_check(cl, "failed to get program build info size");
+
+    void *buf = malloc(real_size);
+    if (!buf)
+        cl_die("failed to alloc program build info buf");
+    cl_get_program_build_info(cl, prog, dev_id, param, buf, real_size);
+
+    if (size)
+        *size = real_size;
+    return buf;
+}
+
+static inline cl_program
+cl_create_program(struct cl *cl, cl_context ctx, const char *code)
+{
+    cl_program prog = cl->CreateProgramWithSource(ctx, 1, &code, NULL, &cl->err);
+    cl_check(cl, "failed to create program");
+
+    cl_device_id dev_id;
+    cl_get_context_info(cl, ctx, CL_CONTEXT_DEVICES, &dev_id, sizeof(dev_id));
+
+    cl->err = cl->BuildProgram(prog, 1, &dev_id, "-cl-std=CL3.0", NULL, NULL);
+    if (cl->err != CL_SUCCESS) {
+        cl_build_status status;
+        cl_get_program_build_info(cl, prog, dev_id, CL_PROGRAM_BUILD_STATUS, &status,
+                                  sizeof(status));
+        char *log = cl_get_program_build_info_alloc(cl, prog, dev_id, CL_PROGRAM_BUILD_LOG, NULL);
+        cl_die("failed to build program: status %d, log %s", status, log);
+    }
+
+    return prog;
+}
+
+static inline void
+cl_destroy_program(struct cl *cl, cl_program prog)
+{
+    cl->err = cl->ReleaseProgram(prog);
+    cl_check(cl, "failed to destroy program");
+}
+
+static inline cl_kernel
+cl_create_kernel(struct cl *cl, cl_program prog, const char *name)
+{
+    cl_kernel kern = cl->CreateKernel(prog, name, &cl->err);
+    cl_check(cl, "failed to create kernel");
+    return kern;
+}
+
+static inline void
+cl_destroy_kernel(struct cl *cl, cl_kernel kern)
+{
+    cl->err = cl->ReleaseKernel(kern);
+    cl_check(cl, "failed to destroy kernel");
+}
+
+static inline void
+cl_set_kernel_arg(struct cl *cl, cl_kernel kern, uint32_t idx, const void *val, size_t size)
+{
+    cl->err = cl->SetKernelArg(kern, idx, size, val);
+    cl_check(cl, "failed to set kernel arg");
+}
+
+static inline void
+cl_enqueue_kernel(struct cl *cl,
+                  cl_command_queue cmdq,
+                  cl_kernel kern,
+                  uint32_t dim,
+                  const size_t *offsets,
+                  const size_t *sizes,
+                  const size_t *locals)
+{
+    cl->err = cl->EnqueueNDRangeKernel(cmdq, kern, dim, offsets, sizes, locals, 0, NULL, NULL);
+    cl_check(cl, "failed to enqueue kernel");
+}
+
+static inline void
+cl_flush(struct cl *cl, cl_command_queue cmdq)
+{
+    cl->err = cl->Flush(cmdq);
+    cl_check(cl, "failed to flush cmdq");
+}
+
+static inline void
+cl_finish(struct cl *cl, cl_command_queue cmdq)
+{
+    cl->err = cl->Finish(cmdq);
+    cl_check(cl, "failed to finish cmdq");
+}
+
 #endif /* CLUTIL_H */

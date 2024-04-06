@@ -3,6 +3,7 @@
 
 cl_tests = [
   'clinfo',
+  'copy',
 ]
 
 foreach t : cl_tests
