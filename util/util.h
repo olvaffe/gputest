@@ -155,6 +155,25 @@ u_write_ppm(const char *filename, const void *data, int width, int height)
     fclose(fp);
 }
 
+static inline void
+u_rgb_to_yuv(const uint8_t *rgb, uint8_t *yuv)
+{
+    const int tmp[3] = {
+        ((66 * (rgb)[0] + 129 * (rgb)[1] + 25 * (rgb)[2] + 128) >> 8) + 16,
+        ((-38 * (rgb)[0] - 74 * (rgb)[1] + 112 * (rgb)[2] + 128) >> 8) + 128,
+        ((112 * (rgb)[0] - 94 * (rgb)[1] - 18 * (rgb)[2] + 128) >> 8) + 128,
+    };
+
+    for (int i = 0; i < 3; i++) {
+        if (tmp[i] > 255)
+            yuv[i] = 255;
+        else if (tmp[i] < 0)
+            yuv[i] = 0;
+        else
+            yuv[i] = tmp[i];
+    }
+}
+
 static inline int
 u_drm_format_to_cpp(int drm_format)
 {

@@ -838,25 +838,6 @@ vk_parse_ppm(const void *ppm_data, size_t ppm_size, int *width, int *height)
     return ppm_data + hdr_size;
 }
 
-static inline void
-vk_rgb_to_yuv(const uint8_t *rgb, uint8_t *yuv)
-{
-    const int tmp[3] = {
-        ((66 * (rgb)[0] + 129 * (rgb)[1] + 25 * (rgb)[2] + 128) >> 8) + 16,
-        ((-38 * (rgb)[0] - 74 * (rgb)[1] + 112 * (rgb)[2] + 128) >> 8) + 128,
-        ((112 * (rgb)[0] - 94 * (rgb)[1] - 18 * (rgb)[2] + 128) >> 8) + 128,
-    };
-
-    for (int i = 0; i < 3; i++) {
-        if (tmp[i] > 255)
-            yuv[i] = 255;
-        else if (tmp[i] < 0)
-            yuv[i] = 0;
-        else
-            yuv[i] = tmp[i];
-    }
-}
-
 static inline struct vk_image *
 vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, bool planar)
 {
@@ -911,7 +892,7 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
 
             for (int x = 0; x < width; x++) {
                 uint8_t yuv[3];
-                vk_rgb_to_yuv(rgb_data, yuv);
+                u_rgb_to_yuv(rgb_data, yuv);
                 rgb_data += 3;
 
                 y_dst[0] = yuv[0];

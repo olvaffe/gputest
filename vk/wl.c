@@ -55,7 +55,7 @@ wl_test_paint_yuv_pattern(struct wl_test *test, void *dst, uint32_t pitch, uint3
             (int)(v * 255),
         };
         uint8_t yuv[3];
-        vk_rgb_to_yuv(rgb, yuv);
+        u_rgb_to_yuv(rgb, yuv);
 
         union {
             void *ptr;

@@ -1045,25 +1045,6 @@ egl_create_image(struct egl *egl, const struct egl_image_info *info)
     return img;
 }
 
-static inline void
-egl_rgb_to_yuv(const uint8_t *rgb, uint8_t *yuv)
-{
-    const int tmp[3] = {
-        ((66 * (rgb)[0] + 129 * (rgb)[1] + 25 * (rgb)[2] + 128) >> 8) + 16,
-        ((-38 * (rgb)[0] - 74 * (rgb)[1] + 112 * (rgb)[2] + 128) >> 8) + 128,
-        ((112 * (rgb)[0] - 94 * (rgb)[1] - 18 * (rgb)[2] + 128) >> 8) + 128,
-    };
-
-    for (int i = 0; i < 3; i++) {
-        if (tmp[i] > 255)
-            yuv[i] = 255;
-        else if (tmp[i] < 0)
-            yuv[i] = 0;
-        else
-            yuv[i] = tmp[i];
-    }
-}
-
 static inline struct egl_image *
 egl_create_image_from_ppm(struct egl *egl, const void *ppm_data, size_t ppm_size, bool planar)
 {
@@ -1112,7 +1093,7 @@ egl_create_image_from_ppm(struct egl *egl, const void *ppm_data, size_t ppm_size
 
             for (int x = 0; x < width; x++) {
                 uint8_t yuv[3];
-                egl_rgb_to_yuv(ppm_data, yuv);
+                u_rgb_to_yuv(ppm_data, yuv);
                 ppm_data += 3;
 
                 const int write_count = (x | y) & 1 ? 1 : 3;
