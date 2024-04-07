@@ -9,6 +9,7 @@
 #include "drm/drm_fourcc.h"
 
 #include <assert.h>
+#include <ctype.h>
 #include <inttypes.h>
 #include <math.h>
 #include <stdalign.h>
@@ -116,6 +117,42 @@ u_sleep(uint32_t ms)
     const int ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, NULL);
     if (ret)
         u_die("util", "failed to sleep");
+}
+
+static inline const void *
+u_parse_ppm(const void *ppm_data, size_t ppm_size, int *width, int *height)
+{
+    if (sscanf(ppm_data, "P6 %d %d 255\n", width, height) != 2)
+        u_die("util", "invalid ppm header");
+
+    const size_t img_size = *width * *height * 3;
+    if (img_size >= ppm_size)
+        u_die("util", "bad ppm dimension %dx%d", *width, *height);
+
+    const size_t hdr_size = ppm_size - img_size;
+    if (!isspace(((const char *)ppm_data)[hdr_size - 1]))
+        u_die("util", "no space at the end of ppm header");
+
+    return ppm_data + hdr_size;
+}
+
+static inline void
+u_write_ppm(const char *filename, const void *data, int width, int height)
+{
+    FILE *fp = fopen(filename, "w");
+    if (!fp)
+        u_die("util", "failed to open %s", filename);
+
+    fprintf(fp, "P6 %d %d 255\n", width, height);
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            const void *pixel = data + ((width * y) + x) * 4;
+            if (fwrite(pixel, 3, 1, fp) != 1)
+                u_die("util", "failed to write pixel (%d, %x)", x, y);
+        }
+    }
+
+    fclose(fp);
 }
 
 static inline int

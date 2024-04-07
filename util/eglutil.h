@@ -17,7 +17,6 @@
 #include <GLES3/gl32.h>
 #include <GLES2/gl2ext.h>
 /* clang-format on */
-#include <ctype.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <strings.h>
@@ -872,42 +871,6 @@ egl_dump_drm_formats(struct egl *egl)
     }
 }
 
-static inline const void *
-egl_parse_ppm(const void *ppm_data, size_t ppm_size, int *width, int *height)
-{
-    if (sscanf(ppm_data, "P6 %d %d 255\n", width, height) != 2)
-        egl_die("invalid ppm header");
-
-    const size_t img_size = *width * *height * 3;
-    if (img_size >= ppm_size)
-        egl_die("bad ppm dimension %dx%d", *width, *height);
-
-    const size_t hdr_size = ppm_size - img_size;
-    if (!isspace(((const char *)ppm_data)[hdr_size - 1]))
-        egl_die("no space at the end of ppm header");
-
-    return ppm_data + hdr_size;
-}
-
-static inline void
-egl_write_ppm(const char *filename, const void *data, int width, int height)
-{
-    FILE *fp = fopen(filename, "w");
-    if (!fp)
-        egl_die("failed to open %s", filename);
-
-    fprintf(fp, "P6 %d %d 255\n", width, height);
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            const void *pixel = data + ((width * y) + x) * 4;
-            if (fwrite(pixel, 3, 1, fp) != 1)
-                egl_die("failed to write pixel (%d, %x)", x, y);
-        }
-    }
-
-    fclose(fp);
-}
-
 static inline void
 egl_dump_image(struct egl *egl, int width, int height, const char *filename)
 {
@@ -922,7 +885,7 @@ egl_dump_image(struct egl *egl, int width, int height, const char *filename)
     egl->gl.ReadnPixels(0, 0, width, height, format, type, size, data);
     egl_check(egl, "dump");
 
-    egl_write_ppm(filename, data, width, height);
+    u_write_ppm(filename, data, width, height);
 
     free(data);
 }
@@ -934,7 +897,7 @@ egl_teximage_2d_from_ppm(struct egl *egl, GLenum target, const void *ppm_data, s
 
     int width;
     int height;
-    ppm_data = egl_parse_ppm(ppm_data, ppm_size, &width, &height);
+    ppm_data = u_parse_ppm(ppm_data, ppm_size, &width, &height);
 
     void *texels = malloc(width * height * 4);
     if (!texels)
@@ -1106,7 +1069,7 @@ egl_create_image_from_ppm(struct egl *egl, const void *ppm_data, size_t ppm_size
 {
     int width;
     int height;
-    ppm_data = egl_parse_ppm(ppm_data, ppm_size, &width, &height);
+    ppm_data = u_parse_ppm(ppm_data, ppm_size, &width, &height);
 
     if (planar && egl->gbm && !egl->is_minigbm)
         egl_die("only minigbm supports planar formats");
