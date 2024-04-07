@@ -91,7 +91,7 @@ if idep_skutil.found()
   subdir('sk')
 endif
 
-if idep_vautil.found()
+if idep_drmutil.found() and idep_vautil.found()
   subdir('va')
 endif
 
