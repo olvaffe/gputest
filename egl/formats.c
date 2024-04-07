@@ -11,7 +11,7 @@ main(void)
     struct egl egl;
 
     egl_init(&egl, NULL);
-    egl_dump_formats(&egl);
+    egl_dump_drm_formats(&egl);
     egl_cleanup(&egl);
 
     return 0;

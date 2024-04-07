@@ -51,7 +51,7 @@ struct egl_gl {
 #include "eglutil_entrypoints.inc"
 };
 
-struct egl_format {
+struct egl_drm_format {
     int drm_format;
     int drm_modifier_count;
     const EGLuint64KHR *drm_modifiers;
@@ -97,8 +97,8 @@ struct egl {
 
     EGLContext ctx;
 
-    int format_count;
-    struct egl_format **formats;
+    int drm_format_count;
+    struct egl_drm_format **drm_formats;
 
     const char *gl_exts;
 };
@@ -430,18 +430,18 @@ egl_cleanup_image_allocator(struct egl *egl)
     }
 }
 
-static inline const struct egl_format *
-egl_find_format(const struct egl *egl, int drm_format)
+static inline const struct egl_drm_format *
+egl_find_drm_format(const struct egl *egl, int drm_format)
 {
-    for (int i = 0; i < egl->format_count; i++) {
-        if (egl->formats[i]->drm_format == drm_format)
-            return egl->formats[i];
+    for (int i = 0; i < egl->drm_format_count; i++) {
+        if (egl->drm_formats[i]->drm_format == drm_format)
+            return egl->drm_formats[i];
     }
     return NULL;
 }
 
 static inline const uint64_t *
-egl_find_modifier(const struct egl_format *fmt, uint64_t drm_modifier)
+egl_find_drm_modifier(const struct egl_drm_format *fmt, uint64_t drm_modifier)
 {
     for (int i = 0; i < fmt->drm_modifier_count; i++) {
         if (fmt->drm_modifiers[i] == drm_modifier) {
@@ -456,14 +456,14 @@ egl_alloc_image_storage(struct egl *egl, struct egl_image *img)
 {
     const struct egl_image_info *info = &img->info;
 
-    const struct egl_format *fmt = egl_find_format(egl, info->drm_format);
+    const struct egl_drm_format *fmt = egl_find_drm_format(egl, info->drm_format);
     if (!fmt)
         egl_die("unsupported drm format 0x%08x", info->drm_format);
 
     const uint64_t *drm_modifiers = fmt->drm_modifiers;
     int drm_modifier_count = fmt->drm_modifier_count;
     if (info->force_linear) {
-        drm_modifiers = egl_find_modifier(fmt, DRM_FORMAT_MOD_LINEAR);
+        drm_modifiers = egl_find_drm_modifier(fmt, DRM_FORMAT_MOD_LINEAR);
         if (!drm_modifiers)
             egl_die("failed to find linear modifier");
         drm_modifier_count = 1;
@@ -806,7 +806,7 @@ egl_init_context(struct egl *egl)
 }
 
 static inline void
-egl_init_formats(struct egl *egl)
+egl_init_drm_formats(struct egl *egl)
 {
     if (!egl->EXT_image_dma_buf_import_modifiers)
         return;
@@ -815,7 +815,7 @@ egl_init_formats(struct egl *egl)
     if (!egl->QueryDmaBufFormatsEXT(egl->dpy, 0, NULL, &fmt_count))
         egl_die("failed to get dma-buf format count");
 
-    struct egl_format **fmts = malloc(sizeof(*fmts) * fmt_count);
+    struct egl_drm_format **fmts = malloc(sizeof(*fmts) * fmt_count);
     EGLint *drm_fmts = malloc(sizeof(*drm_fmts) * fmt_count);
     if (!fmts || !drm_fmts)
         egl_die("failed to alloc fmts");
@@ -830,8 +830,9 @@ egl_init_formats(struct egl *egl)
         if (!egl->QueryDmaBufModifiersEXT(egl->dpy, drm_fmt, 0, NULL, NULL, &mod_count))
             egl_die("failed to get dma-buf modifier count");
 
-        struct egl_format *fmt = malloc(sizeof(*fmt) + sizeof(fmt->drm_modifiers) * mod_count +
-                                        sizeof(fmt->external_only) * mod_count);
+        struct egl_drm_format *fmt =
+            malloc(sizeof(*fmt) + sizeof(fmt->drm_modifiers) * mod_count +
+                   sizeof(fmt->external_only) * mod_count);
         if (!fmt)
             egl_die("failed to alloc fmt");
         EGLuint64KHR *drm_modifiers = (EGLuint64KHR *)(fmt + 1);
@@ -850,8 +851,8 @@ egl_init_formats(struct egl *egl)
 
     free(drm_fmts);
 
-    egl->format_count = fmt_count;
-    egl->formats = fmts;
+    egl->drm_format_count = fmt_count;
+    egl->drm_formats = fmts;
 }
 
 static inline void
@@ -885,7 +886,7 @@ egl_init(struct egl *egl, const struct egl_init_params *params)
     egl_init_context(egl);
     egl_check(egl, "init context");
 
-    egl_init_formats(egl);
+    egl_init_drm_formats(egl);
     egl_check(egl, "init formats");
 
     egl_init_gl(egl);
@@ -897,10 +898,10 @@ egl_cleanup(struct egl *egl)
 {
     egl_check(egl, "cleanup");
 
-    if (egl->format_count) {
-        for (int i = 0; i < egl->format_count; i++)
-            free(egl->formats[i]);
-        free(egl->formats);
+    if (egl->drm_format_count) {
+        for (int i = 0; i < egl->drm_format_count; i++)
+            free(egl->drm_formats[i]);
+        free(egl->drm_formats);
     }
 
     egl->MakeCurrent(egl->dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -917,10 +918,10 @@ egl_cleanup(struct egl *egl)
 }
 
 static inline void
-egl_dump_formats(struct egl *egl)
+egl_dump_drm_formats(struct egl *egl)
 {
-    for (int i = 0; i < egl->format_count; i++) {
-        const struct egl_format *fmt = egl->formats[i];
+    for (int i = 0; i < egl->drm_format_count; i++) {
+        const struct egl_drm_format *fmt = egl->drm_formats[i];
 
         egl_log("format %d: %c%c%c%c (0x%08x)", i, (fmt->drm_format >> 0) & 0xff,
                 (fmt->drm_format >> 8) & 0xff, (fmt->drm_format >> 16) & 0xff,
