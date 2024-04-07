@@ -168,10 +168,6 @@ v4l2_ctrl_type_to_str(enum v4l2_ctrl_type val)
     CASE(HEVC_SLICE_PARAMS);
     CASE(HEVC_SCALING_MATRIX);
     CASE(HEVC_DECODE_PARAMS);
-    CASE(AV1_SEQUENCE);
-    CASE(AV1_TILE_GROUP_ENTRY);
-    CASE(AV1_FRAME);
-    CASE(AV1_FILM_GRAIN);
 #endif
     default: return "UNKNOWN";
 #undef CASE
