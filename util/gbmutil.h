@@ -107,7 +107,7 @@ gbm_init_device(struct gbm *gbm)
 
     gbm->dev = gbm_create_device(gbm->fd);
     if (!gbm->dev)
-        gbm_die("failed to create gbm device");
+        gbm_die("failed to create gbm device: no driver?");
 
     gbm->backend_name = gbm_device_get_backend_name(gbm->dev);
 

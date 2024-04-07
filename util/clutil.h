@@ -414,7 +414,7 @@ cl_init_platforms(struct cl *cl)
 {
     uint32_t count;
     cl->err = cl->GetPlatformIDs(0, NULL, &count);
-    cl_check(cl, "failed to get platform count");
+    cl_check(cl, "failed to get platform count: %d (no suitable icd?)", cl->err);
 
     cl_platform_id *ids = malloc(sizeof(*ids) * count);
     if (!ids)

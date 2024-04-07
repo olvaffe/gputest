@@ -48,7 +48,7 @@ sdl_init_video(struct sdl *sdl)
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "1");
 
     if (SDL_Init(SDL_INIT_VIDEO))
-        sdl_die("failed to init sdl");
+        sdl_die("failed to init sdl video: %s", SDL_GetError());
 
     if (sdl->params.gl) {
         SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);

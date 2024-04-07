@@ -478,7 +478,7 @@ wl_init_display(struct wl *wl)
 {
     wl->display = wl_display_connect(NULL);
     if (!wl->display)
-        wl_die("failed to connect to display");
+        wl_die("failed to connect to display: no or bad WAYLAND_DISPLAY?");
 
     wl->display_fd = wl_display_get_fd(wl->display);
 }
