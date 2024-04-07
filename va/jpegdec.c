@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "drmutil.h"
 #include "vautil.h"
 
 struct jpegdec_test_file {
@@ -62,6 +63,7 @@ struct jpegdec_test {
     VAProfile profile;
     VAEntrypoint entrypoint;
 
+    struct drm drm;
     struct va va;
 
     struct jpegdec_test_file file;
@@ -86,9 +88,16 @@ segment_param_be16(const unsigned char *stream)
 static void
 jpegdec_test_init(struct jpegdec_test *test)
 {
+    struct drm *drm = &test->drm;
     struct va *va = &test->va;
 
-    va_init(va, NULL);
+    drm_init(drm, NULL);
+    drm_open(drm, 0, DRM_NODE_RENDER);
+
+    const struct va_init_params params = {
+        .drm_fd = drm->fd,
+    };
+    va_init(va, &params);
 }
 
 static void
@@ -457,9 +466,13 @@ jpegdec_test_decode_file(struct jpegdec_test *test, const char *filename)
 static void
 jpegdec_test_cleanup(struct jpegdec_test *test)
 {
+    struct drm *drm = &test->drm;
     struct va *va = &test->va;
 
     va_cleanup(va);
+
+    drm_close(drm);
+    drm_cleanup(drm);
 }
 
 int

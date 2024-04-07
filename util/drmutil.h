@@ -157,6 +157,8 @@ drm_init_devices(struct drm *drm)
 
     drm->ret = drmGetDevices2(DRM_DEVICE_GET_PCI_REVISION, drm->devices, count);
     drm_check(drm, "failed to get devices");
+    if (!drm->ret)
+        drm_die("no drm device");
 
     drm->device_count = drm->ret;
 }
@@ -183,6 +185,9 @@ static inline void
 drm_open(struct drm *drm, uint32_t idx, int node_type)
 {
     struct drm_file *file = &drm->file;
+
+    if (idx >= drm->device_count)
+        drm_die("bad device index");
 
     drmDevicePtr dev = drm->devices[idx];
     if (!(dev->available_nodes & (1 << node_type)))

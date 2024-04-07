@@ -286,7 +286,7 @@ vk_init_instance(struct vk *vk)
     };
 
     vk->result = vk->CreateInstance(&instance_info, NULL, &vk->instance);
-    vk_check(vk, "failed to create instane");
+    vk_check(vk, "failed to create instance: %d (no icd?)", vk->result);
 
     vk_init_instance_dispatch(vk);
 }
@@ -392,8 +392,10 @@ vk_init_physical_device(struct vk *vk)
     VkPhysicalDevice physical_devs[32];
     uint32_t count = vk->params.render_node ? ARRAY_SIZE(physical_devs) : 1;
     vk->result = vk->EnumeratePhysicalDevices(vk->instance, &count, physical_devs);
-    if (vk->result < VK_SUCCESS || !count)
-        vk_die("failed to enumerate physical devices");
+    if (vk->result < VK_SUCCESS || !count) {
+        vk_die("failed to enumerate physical devices: %d (no suitable icd or no dev nodes?)",
+               vk->result);
+    }
 
     for (uint32_t i = 0; i < count; i++) {
         vk->physical_dev = physical_devs[i];

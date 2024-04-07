@@ -3,12 +3,14 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "drmutil.h"
 #include "ffutil.h"
 #include "vautil.h"
 
 struct ffdec_test {
     const char *filename;
 
+    struct drm drm;
     struct va va;
     struct ff ff;
 };
@@ -16,21 +18,33 @@ struct ffdec_test {
 static void
 ffdec_test_init(struct ffdec_test *test)
 {
+    struct drm *drm = &test->drm;
     struct va *va = &test->va;
     struct ff *ff = &test->ff;
 
-    va_init(va, NULL);
+    drm_init(drm, NULL);
+    drm_open(drm, 0, DRM_NODE_RENDER);
+
+    const struct va_init_params params = {
+        .drm_fd = drm->fd,
+    };
+    va_init(va, &params);
+
     ff_init(ff, va->display, test->filename);
 }
 
 static void
 ffdec_test_cleanup(struct ffdec_test *test)
 {
+    struct drm *drm = &test->drm;
     struct va *va = &test->va;
     struct ff *ff = &test->ff;
 
     ff_cleanup(ff);
     va_cleanup(va);
+
+    drm_close(drm);
+    drm_cleanup(drm);
 }
 
 static void
@@ -39,6 +53,7 @@ ffdec_test_decode(struct ffdec_test *test)
     struct va *va = &test->va;
     struct ff *ff = &test->ff;
 
+    const uint64_t start_time = u_now();
     int frame_idx = 0;
     while (ff_decode_frame(ff)) {
         const uint32_t flags = VA_EXPORT_SURFACE_READ_ONLY | VA_EXPORT_SURFACE_COMPOSED_LAYERS;
@@ -68,6 +83,10 @@ ffdec_test_decode(struct ffdec_test *test)
 
         frame_idx++;
     }
+    const uint64_t decode_time = u_now() - start_time;
+    const uint32_t decode_ms = decode_time / 1000000;
+
+    va_log("decoded %d frames in %d.%ds", frame_idx, decode_ms / 1000, decode_ms % 1000);
 }
 
 int

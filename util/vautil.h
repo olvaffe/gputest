@@ -18,7 +18,7 @@
 #include <xf86drm.h>
 
 struct va_init_params {
-    int unused;
+    int drm_fd;
 };
 
 struct va_pair {
@@ -80,42 +80,16 @@ static inline void PRINTFLIKE(2, 3) va_check(const struct va *va, const char *fo
 }
 
 static inline void
-va_init_display_drm(struct va *va)
-{
-    drmDevicePtr devs[64];
-    int dev_count = drmGetDevices2(0, devs, ARRAY_SIZE(devs));
-
-    int fd = -1;
-    for (int i = 0; i < dev_count; i++) {
-        const int type = DRM_NODE_RENDER;
-        drmDevicePtr dev = devs[i];
-
-        if (!(dev->available_nodes & (1 << type)))
-            continue;
-
-        fd = open(dev->nodes[type], O_RDWR | O_CLOEXEC);
-        if (fd >= 0)
-            break;
-    }
-
-    drmFreeDevices(devs, dev_count);
-
-    if (fd < 0)
-        va_die("failed to find any render node");
-
-    va->native_display = fd;
-}
-
-static inline void
 va_init_display(struct va *va)
 {
-    va_init_display_drm(va);
+    va->native_display = va->params.drm_fd;
+
     va->display = vaGetDisplayDRM(va->native_display);
     if (!va->display)
         va_die("failed to get display");
 
     va->status = vaInitialize(va->display, &va->major, &va->minor);
-    va_check(va, "failed to initialize display");
+    va_check(va, "failed to initialize display: %d (no driver?)", va->status);
 
     va->vendor = vaQueryVendorString(va->display);
 
@@ -216,8 +190,7 @@ static inline void
 va_init(struct va *va, const struct va_init_params *params)
 {
     memset(va, 0, sizeof(*va));
-    if (params)
-        va->params = *params;
+    va->params = *params;
 
     va_init_display(va);
     va_init_pairs(va);

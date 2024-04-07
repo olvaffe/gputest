@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "drmutil.h"
 #include "vautil.h"
 
 static void
@@ -258,9 +259,15 @@ info_display(const struct va *va)
 int
 main(void)
 {
+    struct drm drm;
+    drm_init(&drm, NULL);
+    drm_open(&drm, 0, DRM_NODE_RENDER);
 
+    const struct va_init_params params = {
+        .drm_fd = drm.fd,
+    };
     struct va va;
-    va_init(&va, NULL);
+    va_init(&va, &params);
 
     info_display(&va);
     info_pairs(&va);
@@ -268,6 +275,9 @@ main(void)
     info_subpics(&va);
 
     va_cleanup(&va);
+
+    drm_close(&drm);
+    drm_cleanup(&drm);
 
     return 0;
 }
