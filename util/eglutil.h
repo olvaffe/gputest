@@ -135,7 +135,7 @@ struct egl_image_storage {
 
 struct egl_image_map {
     /* This can be different from gbm_bo_get_plane_count or
-     * egl_drm_format_to_plane_count.  An RGB-format always has 1 plane.  A
+     * u_drm_format_to_plane_count.  An RGB-format always has 1 plane.  A
      * YUV format always has 3 planes.
      */
     int plane_count;
@@ -182,67 +182,6 @@ egl_check(struct egl *egl, const char *where)
     }
 }
 
-static inline int
-egl_drm_format_to_cpp(int drm_format)
-{
-    switch (drm_format) {
-    case DRM_FORMAT_ABGR16161616F:
-        return 8;
-    case DRM_FORMAT_ABGR8888:
-    case DRM_FORMAT_XBGR8888:
-    case DRM_FORMAT_ABGR2101010:
-    case DRM_FORMAT_GR1616:
-        return 4;
-    case DRM_FORMAT_BGR888:
-        return 3;
-    case DRM_FORMAT_RGB565:
-    case DRM_FORMAT_GR88:
-    case DRM_FORMAT_R16:
-        return 2;
-    case DRM_FORMAT_R8:
-        return 1;
-    case DRM_FORMAT_P010:
-    case DRM_FORMAT_NV12:
-    case DRM_FORMAT_YVU420:
-        /* cpp makes no sense to planar formats */
-        return 0;
-    default:
-        egl_die("unsupported drm format 0x%x", drm_format);
-    }
-}
-
-static inline int
-egl_drm_format_to_plane_count(int drm_format)
-{
-    switch (drm_format) {
-    case DRM_FORMAT_YVU420:
-        return 3;
-    case DRM_FORMAT_P010:
-    case DRM_FORMAT_NV12:
-        return 2;
-    default:
-        return 1;
-    }
-}
-
-static inline int
-egl_drm_format_to_plane_format(int drm_format, int plane)
-{
-    if (plane >= egl_drm_format_to_plane_count(drm_format))
-        egl_die("bad plane");
-
-    switch (drm_format) {
-    case DRM_FORMAT_YVU420:
-        return DRM_FORMAT_R8;
-    case DRM_FORMAT_P010:
-        return plane ? DRM_FORMAT_GR1616 : DRM_FORMAT_R16;
-    case DRM_FORMAT_NV12:
-        return plane ? DRM_FORMAT_GR88 : DRM_FORMAT_R8;
-    default:
-        return drm_format;
-    }
-}
-
 #ifdef __ANDROID__
 
 static inline void
@@ -260,7 +199,7 @@ static inline enum AHardwareBuffer_Format
 egl_drm_format_to_ahb_format(int drm_format)
 {
     /* sanity check */
-    egl_drm_format_to_cpp(drm_format);
+    u_drm_format_to_cpp(drm_format);
 
     switch (drm_format) {
     case DRM_FORMAT_ABGR8888:
@@ -344,7 +283,7 @@ egl_map_image_storage(struct egl *egl, const struct egl_image *img, struct egl_i
         map->pixel_strides[i] = planes.planes[i].pixelStride;
     }
 #else
-    if (egl_drm_format_to_plane_count(info->drm_format) > 1)
+    if (u_drm_format_to_plane_count(info->drm_format) > 1)
         egl_die("no AHardwareBuffer_lockPlanes support");
 
     void *ptr;
@@ -354,7 +293,7 @@ egl_map_image_storage(struct egl *egl, const struct egl_image *img, struct egl_i
     AHardwareBuffer_Desc desc;
     AHardwareBuffer_describe(img->storage.ahb, &desc);
 
-    const int cpp = egl_drm_format_to_cpp(info->drm_format);
+    const int cpp = u_drm_format_to_cpp(info->drm_format);
     map->plane_count = 1;
     map->planes[0] = ptr;
     map->row_strides[0] = desc.stride * cpp;
@@ -507,7 +446,7 @@ egl_map_image_storage(struct egl *egl, struct egl_image *img, struct egl_image_m
     if (!ptr)
         egl_die("failed to map bo");
 
-    map->plane_count = egl_drm_format_to_plane_count(info->drm_format);
+    map->plane_count = u_drm_format_to_plane_count(info->drm_format);
     if (map->plane_count > 1) {
         if (map->plane_count > gbm_bo_get_plane_count(bo))
             egl_die("unexpected bo plane count");
@@ -516,7 +455,7 @@ egl_map_image_storage(struct egl *egl, struct egl_image *img, struct egl_image_m
             map->planes[i] = ptr + gbm_bo_get_offset(bo, i);
             map->row_strides[i] = gbm_bo_get_stride_for_plane(bo, i);
             map->pixel_strides[i] =
-                egl_drm_format_to_cpp(egl_drm_format_to_plane_format(info->drm_format, i));
+                u_drm_format_to_cpp(u_drm_format_to_plane_format(info->drm_format, i));
         }
 
         /* Y and UV */
@@ -529,7 +468,7 @@ egl_map_image_storage(struct egl *egl, struct egl_image *img, struct egl_image_m
     } else {
         map->planes[0] = ptr;
         map->row_strides[0] = stride;
-        map->pixel_strides[0] = egl_drm_format_to_cpp(info->drm_format);
+        map->pixel_strides[0] = u_drm_format_to_cpp(info->drm_format);
     }
 
     map->bo_xfer = xfer;

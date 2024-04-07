@@ -118,4 +118,65 @@ u_sleep(uint32_t ms)
         u_die("util", "failed to sleep");
 }
 
+static inline int
+u_drm_format_to_cpp(int drm_format)
+{
+    switch (drm_format) {
+    case DRM_FORMAT_ABGR16161616F:
+        return 8;
+    case DRM_FORMAT_ABGR8888:
+    case DRM_FORMAT_XBGR8888:
+    case DRM_FORMAT_ABGR2101010:
+    case DRM_FORMAT_GR1616:
+        return 4;
+    case DRM_FORMAT_BGR888:
+        return 3;
+    case DRM_FORMAT_RGB565:
+    case DRM_FORMAT_GR88:
+    case DRM_FORMAT_R16:
+        return 2;
+    case DRM_FORMAT_R8:
+        return 1;
+    case DRM_FORMAT_P010:
+    case DRM_FORMAT_NV12:
+    case DRM_FORMAT_YVU420:
+        /* cpp makes no sense to planar formats */
+        return 0;
+    default:
+        u_die("util", "unsupported drm format 0x%x", drm_format);
+    }
+}
+
+static inline int
+u_drm_format_to_plane_count(int drm_format)
+{
+    switch (drm_format) {
+    case DRM_FORMAT_YVU420:
+        return 3;
+    case DRM_FORMAT_P010:
+    case DRM_FORMAT_NV12:
+        return 2;
+    default:
+        return 1;
+    }
+}
+
+static inline int
+u_drm_format_to_plane_format(int drm_format, int plane)
+{
+    if (plane >= u_drm_format_to_plane_count(drm_format))
+        u_die("util", "bad plane");
+
+    switch (drm_format) {
+    case DRM_FORMAT_YVU420:
+        return DRM_FORMAT_R8;
+    case DRM_FORMAT_P010:
+        return plane ? DRM_FORMAT_GR1616 : DRM_FORMAT_R16;
+    case DRM_FORMAT_NV12:
+        return plane ? DRM_FORMAT_GR88 : DRM_FORMAT_R8;
+    default:
+        return drm_format;
+    }
+}
+
 #endif /* UTIL_H */
