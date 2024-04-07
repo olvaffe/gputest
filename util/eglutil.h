@@ -1106,39 +1106,33 @@ egl_create_image_from_ppm(struct egl *egl, const void *ppm_data, size_t ppm_size
     if (storage->plane_count != (planar ? 3 : 1))
         egl_die("unexpected plane count");
 
-    if (planar) {
-        /* be careful about 4:2:0 subsampling */
-        for (int y = 0; y < height; y++) {
-            uint8_t *rows[3];
-            for (int i = 0; i < storage->plane_count; i++) {
-                const int offy = i > 0 ? y / 2 : y;
-                rows[i] = storage->planes[i] + storage->row_strides[i] * offy;
-            }
+    struct u_format_conversion conv = {
+        .width = width,
+        .height = height,
 
-            for (int x = 0; x < width; x++) {
-                uint8_t yuv[3];
-                u_rgb_to_yuv(ppm_data, yuv);
-                ppm_data += 3;
+        .src_format = DRM_FORMAT_BGR888,
+        .src_plane_count = 1,
+        .src_plane_ptrs = { ppm_data, },
+        .src_plane_strides = { width * 3, },
 
-                const int write_count = (x | y) & 1 ? 1 : 3;
-                for (int i = 0; i < write_count; i++) {
-                    const int offx = i > 0 ? x / 2 : x;
-                    rows[i][storage->pixel_strides[i] * offx] = yuv[i];
-                }
-            }
-        }
-    } else {
-        for (int y = 0; y < height; y++) {
-            uint8_t *dst = storage->planes[0] + storage->row_strides[0] * y;
-            for (int x = 0; x < width; x++) {
-                memcpy(dst, ppm_data, 3);
-                dst[3] = 0xff;
-
-                ppm_data += 3;
-                dst += storage->pixel_strides[0];
-            }
-        }
+        .dst_format = planar ? DRM_FORMAT_NV12 : DRM_FORMAT_ABGR8888,
+        .dst_plane_count = planar ? 2 : 1,
+    };
+    for (int i = 0; i < conv.dst_plane_count; i++) {
+        conv.dst_plane_ptrs[i] = storage->planes[i];
+        conv.dst_plane_strides[i] = storage->row_strides[i];
     }
+
+    if (conv.dst_plane_count < storage->plane_count) {
+        if (conv.dst_plane_count != 2 || storage->plane_count != 3)
+            egl_die("unexpected plane count");
+        if (storage->planes[1] + 1 != storage->planes[2])
+            egl_die("unexpected plane ptr");
+        if (storage->pixel_strides[1] != 2 || storage->pixel_strides[2] != 2)
+            egl_die("unexpected pixel strides");
+    }
+
+    u_convert_format(&conv);
 
     egl_unmap_image_storage(egl, storage);
 

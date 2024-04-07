@@ -174,6 +174,79 @@ u_rgb_to_yuv(const uint8_t *rgb, uint8_t *yuv)
     }
 }
 
+struct u_format_conversion {
+    int width;
+    int height;
+
+    int src_format;
+    int src_plane_count;
+    const void *src_plane_ptrs[3];
+    int src_plane_strides[3];
+
+    int dst_format;
+    int dst_plane_count;
+    void *dst_plane_ptrs[3];
+    int dst_plane_strides[3];
+};
+
+static inline void
+u_convert_format(const struct u_format_conversion *conv)
+{
+    if (conv->src_format != DRM_FORMAT_BGR888)
+        u_die("util", "unsupported src format");
+    if (conv->src_plane_count != 1)
+        u_die("util", "bad src plane count");
+
+    switch (conv->dst_format) {
+    case DRM_FORMAT_ABGR8888:
+        if (conv->dst_plane_count != 1)
+            u_die("util", "bad dst plane count");
+
+        for (int y = 0; y < conv->height; y++) {
+            const uint8_t *src = conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
+            uint8_t *dst = conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+            for (int x = 0; x < conv->width; x++) {
+                memcpy(dst, src, 3);
+                dst[3] = 0xff;
+
+                src += 3;
+                dst += 4;
+            }
+        }
+        break;
+    case DRM_FORMAT_NV12:
+        if (conv->dst_plane_count != 2)
+            u_die("util", "bad dst plane count");
+
+        /* be careful about 4:2:0 subsampling */
+        for (int y = 0; y < conv->height; y++) {
+            const uint8_t *src = conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
+            uint8_t *dst_y = conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+            uint8_t *dst_uv =
+                (y & 1) ? NULL : conv->dst_plane_ptrs[1] + conv->dst_plane_strides[1] * y / 2;
+
+            for (int x = 0; x < conv->width; x++) {
+                uint8_t yuv[3];
+                u_rgb_to_yuv(src, yuv);
+                src += 3;
+
+                dst_y[0] = yuv[0];
+                dst_y += 1;
+
+                if (dst_uv && !(x & 1)) {
+                    dst_uv[0] = yuv[1];
+                    dst_uv[1] = yuv[2];
+                    dst_uv += 2;
+                }
+            }
+        }
+        break;
+    default:
+        u_die("util", "unsupported dst format");
+        break;
+    }
+}
+
 static inline int
 u_drm_format_to_cpp(int drm_format)
 {
