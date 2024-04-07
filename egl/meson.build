@@ -3,7 +3,6 @@
 
 tests = [
   'clear',
-  'fbo',
   'formats',
   'image',
   'info',

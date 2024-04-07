@@ -43,8 +43,10 @@ static const float tri_test_vertices[3][6] = {
 struct tri_test {
     uint32_t width;
     uint32_t height;
+    bool use_fbo;
 
     struct egl egl;
+    struct egl_framebuffer *fb;
 
     struct egl_program *prog;
 };
@@ -54,11 +56,16 @@ tri_test_init(struct tri_test *test)
 {
     struct egl *egl = &test->egl;
 
-    const struct egl_init_params params = {
-        .pbuffer_width = test->width,
-        .pbuffer_height = test->height,
-    };
-    egl_init(egl, &params);
+    if (test->use_fbo) {
+        egl_init(egl, NULL);
+        test->fb = egl_create_framebuffer(egl, test->width, test->height);
+    } else {
+        const struct egl_init_params params = {
+            .pbuffer_width = test->width,
+            .pbuffer_height = test->height,
+        };
+        egl_init(egl, &params);
+    }
 
     test->prog = egl_create_program(egl, tri_test_vs, tri_test_fs);
 
@@ -73,6 +80,9 @@ tri_test_cleanup(struct tri_test *test)
     egl_check(egl, "cleanup");
 
     egl_destroy_program(egl, test->prog);
+
+    if (test->use_fbo)
+        egl_destroy_framebuffer(egl, test->fb);
     egl_cleanup(egl);
 }
 
@@ -81,6 +91,11 @@ tri_test_draw(struct tri_test *test)
 {
     struct egl *egl = &test->egl;
     struct egl_gl *gl = &egl->gl;
+
+    if (test->use_fbo) {
+        gl->BindFramebuffer(GL_FRAMEBUFFER, test->fb->fbo);
+        gl->Viewport(0, 0, test->width, test->height);
+    }
 
     gl->Clear(GL_COLOR_BUFFER_BIT);
     egl_check(egl, "clear");
@@ -101,6 +116,9 @@ tri_test_draw(struct tri_test *test)
     egl_check(egl, "draw");
 
     egl_dump_image(&test->egl, test->width, test->height, "rt.ppm");
+
+    if (test->use_fbo)
+        gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 int
@@ -109,6 +127,7 @@ main(int argc, const char **argv)
     struct tri_test test = {
         .width = 480,
         .height = 360,
+        .use_fbo = false,
     };
 
     tri_test_init(&test);

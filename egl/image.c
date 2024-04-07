@@ -69,6 +69,7 @@ struct image_test {
     bool nearest;
 
     struct egl egl;
+    struct egl_framebuffer *fb;
 
     GLenum tex_target;
     GLuint tex;
@@ -84,11 +85,8 @@ image_test_init(struct image_test *test)
     struct egl *egl = &test->egl;
     struct egl_gl *gl = &egl->gl;
 
-    const struct egl_init_params params = {
-        .pbuffer_width = test->width,
-        .pbuffer_height = test->height,
-    };
-    egl_init(egl, &params);
+    egl_init(egl, NULL);
+    test->fb = egl_create_framebuffer(egl, test->width, test->height);
 
     if (!strstr(egl->gl_exts, "GL_OES_EGL_image_external"))
         egl_die("no GL_OES_EGL_image_external");
@@ -122,6 +120,8 @@ image_test_cleanup(struct image_test *test)
 
     egl_destroy_program(egl, test->prog);
     egl_destroy_image(egl, test->img);
+
+    egl_destroy_framebuffer(egl, test->fb);
     egl_cleanup(egl);
 }
 
@@ -130,6 +130,9 @@ image_test_draw(struct image_test *test)
 {
     struct egl *egl = &test->egl;
     struct egl_gl *gl = &egl->gl;
+
+    gl->BindFramebuffer(GL_FRAMEBUFFER, test->fb->fbo);
+    gl->Viewport(0, 0, test->width, test->height);
 
     gl->Clear(GL_COLOR_BUFFER_BIT);
     egl_check(egl, "clear");
@@ -154,6 +157,8 @@ image_test_draw(struct image_test *test)
     egl_check(egl, "draw");
 
     egl_dump_image(&test->egl, test->width, test->height, "rt.ppm");
+
+    gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 int

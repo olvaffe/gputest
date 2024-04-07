@@ -65,6 +65,7 @@ struct tex_test {
     uint32_t height;
 
     struct egl egl;
+    struct egl_framebuffer *fb;
 
     GLuint tex;
 
@@ -79,11 +80,8 @@ tex_test_init(struct tex_test *test)
     struct egl *egl = &test->egl;
     struct egl_gl *gl = &egl->gl;
 
-    const struct egl_init_params params = {
-        .pbuffer_width = test->width,
-        .pbuffer_height = test->height,
-    };
-    egl_init(egl, &params);
+    egl_init(egl, NULL);
+    test->fb = egl_create_framebuffer(egl, test->width, test->height);
 
     gl->GenTextures(1, &test->tex);
     gl->BindTexture(GL_TEXTURE_2D, test->tex);
@@ -107,6 +105,7 @@ tex_test_cleanup(struct tex_test *test)
     egl_check(egl, "cleanup");
 
     egl_destroy_program(egl, test->prog);
+    egl_destroy_framebuffer(egl, test->fb);
     egl_cleanup(egl);
 }
 
@@ -115,6 +114,9 @@ tex_test_draw(struct tex_test *test)
 {
     struct egl *egl = &test->egl;
     struct egl_gl *gl = &egl->gl;
+
+    gl->BindFramebuffer(GL_FRAMEBUFFER, test->fb->fbo);
+    gl->Viewport(0, 0, test->width, test->height);
 
     gl->Clear(GL_COLOR_BUFFER_BIT);
     egl_check(egl, "clear");
@@ -141,6 +143,8 @@ tex_test_draw(struct tex_test *test)
     egl_check(egl, "draw");
 
     egl_dump_image(&test->egl, test->width, test->height, "rt.ppm");
+
+    gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 int

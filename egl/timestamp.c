@@ -5,8 +5,6 @@
 
 #include "eglutil.h"
 
-#include <time.h>
-
 static const char timestamp_test_vs[] = {
 #include "timestamp_test.vert.inc"
 };
@@ -87,14 +85,6 @@ timestamp_test_cleanup(struct timestamp_test *test)
     egl_cleanup(egl);
 }
 
-static uint64_t
-get_time_ns(void)
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000llu + ts.tv_nsec;
-}
-
 static void
 timestamp_test_draw(struct timestamp_test *test)
 {
@@ -123,10 +113,10 @@ timestamp_test_draw(struct timestamp_test *test)
 
     GLint64 get_begin;
     GLint64 get_end;
-    const uint64_t cpu_begin = get_time_ns();
+    const uint64_t cpu_begin = u_now();
     gl->GetInteger64v(GL_TIMESTAMP_EXT, &get_begin);
     gl->Finish();
-    const uint64_t cpu_end = get_time_ns();
+    const uint64_t cpu_end = u_now();
     gl->GetInteger64v(GL_TIMESTAMP_EXT, &get_end);
 
     GLint64 gpu_begin;
