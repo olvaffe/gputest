@@ -140,14 +140,8 @@ struct egl_image_storage {
     void *obj;
     struct egl_image_info info;
 
-    /* This can be different from gbm_bo_get_plane_count or
-     * u_drm_format_to_plane_count.  An RGB-format always has 1 plane.  A
-     * YUV format always has 3 planes.
-     */
-    int plane_count;
     void *planes[3];
-    int row_strides[3];
-    int pixel_strides[3];
+    int strides[3];
     void *bo_xfer;
 };
 
@@ -301,11 +295,18 @@ egl_map_image_storage(struct egl *egl, struct egl_image_storage *storage)
     if (AHardwareBuffer_lockPlanes(ahb, usage, -1, &rect, &planes))
         egl_die("failed to lock ahb");
 
-    storage->plane_count = planes.planeCount;
-    for (int i = 0; i < storage->plane_count; i++) {
+    const int plane_count = u_drm_format_to_plane_count(storage->info.drm_format);
+    for (int i = 0; i < plane_count; i++) {
         storage->planes[i] = planes.planes[i].data;
-        storage->row_strides[i] = planes.planes[i].rowStride;
-        storage->pixel_strides[i] = planes.planes[i].pixelStride;
+        storage->strides[i] = planes.planes[i].rowStride;
+    }
+
+    if (plane_count < planes.planeCount) {
+        if (plane_count != 2 || planes.planeCount != 3 ||
+            planes.planes[1].rowStride != planes.planes[2].rowStride ||
+            planes.planes[1].pixelStride != 2 || planes.planes[2].pixelStride != 2 ||
+            planes.planes[1].data + 1 != planes.planes[2].data)
+            egl_die("ahb cb/cr is not interleaved");
     }
 #else
     if (u_drm_format_to_plane_count(storage->info.drm_format) > 1)
@@ -319,10 +320,8 @@ egl_map_image_storage(struct egl *egl, struct egl_image_storage *storage)
     AHardwareBuffer_describe(ahb, &desc);
 
     const int cpp = u_drm_format_to_cpp(storage->info.drm_format);
-    storage->plane_count = 1;
     storage->planes[0] = ptr;
-    storage->row_strides[0] = desc.stride * cpp;
-    storage->pixel_strides[0] = cpp;
+    storage->strides[0] = desc.stride * cpp;
 #endif
 
     storage->bo_xfer = NULL;
@@ -331,7 +330,6 @@ egl_map_image_storage(struct egl *egl, struct egl_image_storage *storage)
 static inline void
 egl_unmap_image_storage(struct egl *egl, struct egl_image_storage *storage)
 {
-    storage->plane_count = 0;
     AHardwareBuffer_unlock(storage->obj, NULL);
 }
 
@@ -475,29 +473,18 @@ egl_map_image_storage(struct egl *egl, struct egl_image_storage *storage)
     if (!ptr)
         egl_die("failed to map bo");
 
-    storage->plane_count = u_drm_format_to_plane_count(storage->info.drm_format);
-    if (storage->plane_count > 1) {
-        if (storage->plane_count > gbm_bo_get_plane_count(bo))
+    const int plane_count = u_drm_format_to_plane_count(storage->info.drm_format);
+    if (plane_count > 1) {
+        if (plane_count > gbm_bo_get_plane_count(bo))
             egl_die("unexpected bo plane count");
 
-        for (int i = 0; i < storage->plane_count; i++) {
+        for (int i = 0; i < plane_count; i++) {
             storage->planes[i] = ptr + gbm_bo_get_offset(bo, i);
-            storage->row_strides[i] = gbm_bo_get_stride_for_plane(bo, i);
-            storage->pixel_strides[i] =
-                u_drm_format_to_cpp(u_drm_format_to_plane_format(storage->info.drm_format, i));
-        }
-
-        /* Y and UV */
-        if (storage->plane_count == 2) {
-            storage->plane_count = 3;
-            storage->planes[2] = storage->planes[1] + storage->pixel_strides[1] / 2;
-            storage->row_strides[2] = storage->row_strides[1];
-            storage->pixel_strides[2] = storage->pixel_strides[1];
+            storage->strides[i] = gbm_bo_get_stride_for_plane(bo, i);
         }
     } else {
         storage->planes[0] = ptr;
-        storage->row_strides[0] = stride;
-        storage->pixel_strides[0] = u_drm_format_to_cpp(storage->info.drm_format);
+        storage->strides[0] = stride;
     }
 
     storage->bo_xfer = xfer;
@@ -506,7 +493,6 @@ egl_map_image_storage(struct egl *egl, struct egl_image_storage *storage)
 static inline void
 egl_unmap_image_storage(struct egl *egl, struct egl_image_storage *storage)
 {
-    storage->plane_count = 0;
     gbm_bo_unmap(storage->obj, storage->bo_xfer);
 }
 
@@ -1103,9 +1089,6 @@ egl_create_image_from_ppm(struct egl *egl, const void *ppm_data, size_t ppm_size
 
     egl_map_image_storage(egl, storage);
 
-    if (storage->plane_count != (planar ? 3 : 1))
-        egl_die("unexpected plane count");
-
     struct u_format_conversion conv = {
         .width = width,
         .height = height,
@@ -1120,16 +1103,7 @@ egl_create_image_from_ppm(struct egl *egl, const void *ppm_data, size_t ppm_size
     };
     for (int i = 0; i < conv.dst_plane_count; i++) {
         conv.dst_plane_ptrs[i] = storage->planes[i];
-        conv.dst_plane_strides[i] = storage->row_strides[i];
-    }
-
-    if (conv.dst_plane_count < storage->plane_count) {
-        if (conv.dst_plane_count != 2 || storage->plane_count != 3)
-            egl_die("unexpected plane count");
-        if (storage->planes[1] + 1 != storage->planes[2])
-            egl_die("unexpected plane ptr");
-        if (storage->pixel_strides[1] != 2 || storage->pixel_strides[2] != 2)
-            egl_die("unexpected pixel strides");
+        conv.dst_plane_strides[i] = storage->strides[i];
     }
 
     u_convert_format(&conv);
