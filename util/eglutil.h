@@ -29,15 +29,12 @@
 #define LIBEGL_NAME "libEGL.so"
 
 struct gbm_device;
-struct gbm_bo;
 
 #else /* __ANDROID__ */
 
 #include <gbm.h>
 
 #define LIBEGL_NAME "libEGL.so.1"
-
-typedef struct AHardwareBuffer AHardwareBuffer;
 
 #endif /* __ANDROID__ */
 
@@ -114,6 +111,21 @@ struct egl_program {
 };
 
 struct egl_image_info {
+    EGLContext ctx;
+    EGLenum target;
+    EGLClientBuffer buf;
+
+    int dma_buf_fd;
+    int width;
+    int height;
+    int drm_format;
+    uint64_t drm_modifier;
+    int mem_plane_count;
+    int offsets[4];
+    int pitches[4];
+};
+
+struct egl_image_storage_info {
     int width;
     int height;
     int drm_format;
@@ -125,14 +137,9 @@ struct egl_image_info {
 };
 
 struct egl_image_storage {
-#ifdef __ANDROID__
-    AHardwareBuffer *ahb;
-#else
-    struct gbm_bo *bo;
-#endif
-};
+    void *obj;
+    struct egl_image_info info;
 
-struct egl_image_map {
     /* This can be different from gbm_bo_get_plane_count or
      * u_drm_format_to_plane_count.  An RGB-format always has 1 plane.  A
      * YUV format always has 3 planes.
@@ -141,13 +148,12 @@ struct egl_image_map {
     void *planes[3];
     int row_strides[3];
     int pixel_strides[3];
-
     void *bo_xfer;
 };
 
 struct egl_image {
-    struct egl_image_info info;
-    struct egl_image_storage storage;
+    struct egl_image_storage *storage;
+
     EGLImage img;
 };
 
@@ -228,11 +234,9 @@ egl_drm_format_to_ahb_format(int drm_format)
     }
 }
 
-static inline void
-egl_alloc_image_storage(struct egl *egl, struct egl_image *img)
+static inline struct egl_image_storage *
+egl_alloc_image_storage(struct egl *egl, const struct egl_image_storage_info *info)
 {
-    const struct egl_image_info *info = &img->info;
-
     if (info->force_linear)
         egl_log("cannot force linear in AHB");
 
@@ -252,82 +256,83 @@ egl_alloc_image_storage(struct egl *egl, struct egl_image *img)
         .format = format,
         .usage = usage,
     };
-    if (AHardwareBuffer_allocate(&desc, &img->storage.ahb))
+    AHardwareBuffer *ahb;
+    if (AHardwareBuffer_allocate(&desc, &ahb))
         egl_die("failed to create ahb");
-}
 
-static inline void
-egl_free_image_storage(struct egl *egl, struct egl_image *img)
-{
-    AHardwareBuffer_release(img->storage.ahb);
-}
-
-static inline void
-egl_map_image_storage(struct egl *egl, const struct egl_image *img, struct egl_image_map *map)
-{
-    const struct egl_image_info *info = &img->info;
-    const uint64_t usage =
-        AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY;
-    const ARect rect = { .right = info->width, .bottom = info->height };
-
-#if __ANDROID_API__ >= 29
-    AHardwareBuffer_Planes planes;
-    if (AHardwareBuffer_lockPlanes(img->storage.ahb, usage, -1, &rect, &planes))
-        egl_die("failed to lock ahb");
-
-    map->plane_count = planes.planeCount;
-    for (int i = 0; i < map->plane_count; i++) {
-        map->planes[i] = planes.planes[i].data;
-        map->row_strides[i] = planes.planes[i].rowStride;
-        map->pixel_strides[i] = planes.planes[i].pixelStride;
-    }
-#else
-    if (u_drm_format_to_plane_count(info->drm_format) > 1)
-        egl_die("no AHardwareBuffer_lockPlanes support");
-
-    void *ptr;
-    if (AHardwareBuffer_lock(img->storage.ahb, usage, -1, &rect, &ptr))
-        egl_die("failed to lock ahb");
-
-    AHardwareBuffer_Desc desc;
-    AHardwareBuffer_describe(img->storage.ahb, &desc);
-
-    const int cpp = u_drm_format_to_cpp(info->drm_format);
-    map->plane_count = 1;
-    map->planes[0] = ptr;
-    map->row_strides[0] = desc.stride * cpp;
-    map->pixel_strides[0] = cpp;
-#endif
-
-    map->bo_xfer = NULL;
-}
-
-static inline void
-egl_unmap_image_storage(struct egl *egl, struct egl_image *img, struct egl_image_map *map)
-{
-    AHardwareBuffer_unlock(img->storage.ahb, NULL);
-}
-
-static inline void
-egl_wrap_image_storage(struct egl *egl, struct egl_image *img)
-{
-    if (!egl->ANDROID_get_native_client_buffer || !egl->ANDROID_image_native_buffer)
+    if (!egl->ANDROID_get_native_client_buffer)
         egl_die("no ahb import support");
-
-    EGLClientBuffer buf = egl->GetNativeClientBufferANDROID(img->storage.ahb);
+    EGLClientBuffer buf = egl->GetNativeClientBufferANDROID(ahb);
     if (!buf)
         egl_die("failed to get client buffer from ahb");
 
-    const EGLAttrib img_attrs[] = {
-        EGL_IMAGE_PRESERVED,
-        EGL_TRUE,
-        EGL_NONE,
-    };
+    struct egl_image_storage *storage = calloc(1, sizeof(*storage));
+    if (!storage)
+        egl_die("failed to alloc storage");
 
-    img->img =
-        egl->CreateImage(egl->dpy, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, buf, img_attrs);
-    if (img->img == EGL_NO_IMAGE)
-        egl_die("failed to create img");
+    storage->obj = ahb;
+    storage->info.ctx = EGL_NO_CONTEXT;
+    storage->info.target = EGL_NATIVE_BUFFER_ANDROID;
+    storage->info.buf = buf;
+    storage->info.width = info->width;
+    storage->info.height = info->height;
+    storage->info.drm_format = info->drm_format;
+
+    return storage;
+}
+
+static inline void
+egl_free_image_storage(struct egl *egl, struct egl_image_storage *storage)
+{
+    AHardwareBuffer_release(storage->obj);
+    free(storage);
+}
+
+static inline void
+egl_map_image_storage(struct egl *egl, struct egl_image_storage *storage)
+{
+    const uint64_t usage =
+        AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY;
+    const ARect rect = { .right = storage->info.width, .bottom = storage->info.height };
+    AHardwareBuffer *ahb = storage->obj;
+
+#if __ANDROID_API__ >= 29
+    AHardwareBuffer_Planes planes;
+    if (AHardwareBuffer_lockPlanes(ahb, usage, -1, &rect, &planes))
+        egl_die("failed to lock ahb");
+
+    storage->plane_count = planes.planeCount;
+    for (int i = 0; i < storage->plane_count; i++) {
+        storage->planes[i] = planes.planes[i].data;
+        storage->row_strides[i] = planes.planes[i].rowStride;
+        storage->pixel_strides[i] = planes.planes[i].pixelStride;
+    }
+#else
+    if (u_drm_format_to_plane_count(storage->info.drm_format) > 1)
+        egl_die("no AHardwareBuffer_lockPlanes support");
+
+    void *ptr;
+    if (AHardwareBuffer_lock(ahb, usage, -1, &rect, &ptr))
+        egl_die("failed to lock ahb");
+
+    AHardwareBuffer_Desc desc;
+    AHardwareBuffer_describe(ahb, &desc);
+
+    const int cpp = u_drm_format_to_cpp(storage->info.drm_format);
+    storage->plane_count = 1;
+    storage->planes[0] = ptr;
+    storage->row_strides[0] = desc.stride * cpp;
+    storage->pixel_strides[0] = cpp;
+#endif
+
+    storage->bo_xfer = NULL;
+}
+
+static inline void
+egl_unmap_image_storage(struct egl *egl, struct egl_image_storage *storage)
+{
+    storage->plane_count = 0;
+    AHardwareBuffer_unlock(storage->obj, NULL);
 }
 
 #else /* __ANDROID__ */
@@ -389,11 +394,9 @@ egl_find_drm_modifier(const struct egl_drm_format *fmt, uint64_t drm_modifier)
     return NULL;
 }
 
-static inline void
-egl_alloc_image_storage(struct egl *egl, struct egl_image *img)
+static inline struct egl_image_storage *
+egl_alloc_image_storage(struct egl *egl, const struct egl_image_storage_info *info)
 {
-    const struct egl_image_info *info = &img->info;
-
     const struct egl_drm_format *fmt = egl_find_drm_format(egl, info->drm_format);
     if (!fmt)
         egl_die("unsupported drm format 0x%08x", info->drm_format);
@@ -423,132 +426,88 @@ egl_alloc_image_storage(struct egl *egl, struct egl_image *img)
         }
     }
 
-    img->storage.bo = bo;
+    struct egl_image_storage *storage = calloc(1, sizeof(*storage));
+    if (!storage)
+        egl_die("failed to alloc storage");
+
+    storage->obj = bo;
+    storage->info.ctx = EGL_NO_CONTEXT;
+    storage->info.target = EGL_LINUX_DMA_BUF_EXT;
+    storage->info.buf = NULL;
+
+    storage->info.width = info->width;
+    storage->info.height = info->height;
+    storage->info.drm_format = info->drm_format;
+    storage->info.drm_modifier = gbm_bo_get_modifier(bo);
+
+    storage->info.mem_plane_count = gbm_bo_get_plane_count(bo);
+    if (storage->info.mem_plane_count > 4)
+        egl_die("unexpected plane count");
+    for (int i = 0; i < storage->info.mem_plane_count; i++) {
+        storage->info.offsets[i] = gbm_bo_get_offset(bo, i);
+        storage->info.pitches[i] = gbm_bo_get_stride_for_plane(bo, i);
+    }
+
+    storage->info.dma_buf_fd = gbm_bo_get_fd_for_plane(bo, 0);
+    if (storage->info.dma_buf_fd < 0)
+        egl_die("failed to export gbm bo");
+
+    return storage;
 }
 
 static inline void
-egl_free_image_storage(struct egl *egl, struct egl_image *img)
+egl_free_image_storage(struct egl *egl, struct egl_image_storage *storage)
 {
-    gbm_bo_destroy(img->storage.bo);
+    close(storage->info.dma_buf_fd);
+    gbm_bo_destroy(storage->obj);
+    free(storage);
 }
 
 static inline void
-egl_map_image_storage(struct egl *egl, struct egl_image *img, struct egl_image_map *map)
+egl_map_image_storage(struct egl *egl, struct egl_image_storage *storage)
 {
-    const struct egl_image_info *info = &img->info;
-    struct gbm_bo *bo = img->storage.bo;
+    struct gbm_bo *bo = storage->obj;
 
     uint32_t stride;
     void *xfer = NULL;
-    void *ptr = gbm_bo_map(bo, 0, 0, info->width, info->height, GBM_BO_TRANSFER_READ_WRITE,
-                           &stride, &xfer);
+    void *ptr = gbm_bo_map(bo, 0, 0, storage->info.width, storage->info.height,
+                           GBM_BO_TRANSFER_READ_WRITE, &stride, &xfer);
     if (!ptr)
         egl_die("failed to map bo");
 
-    map->plane_count = u_drm_format_to_plane_count(info->drm_format);
-    if (map->plane_count > 1) {
-        if (map->plane_count > gbm_bo_get_plane_count(bo))
+    storage->plane_count = u_drm_format_to_plane_count(storage->info.drm_format);
+    if (storage->plane_count > 1) {
+        if (storage->plane_count > gbm_bo_get_plane_count(bo))
             egl_die("unexpected bo plane count");
 
-        for (int i = 0; i < map->plane_count; i++) {
-            map->planes[i] = ptr + gbm_bo_get_offset(bo, i);
-            map->row_strides[i] = gbm_bo_get_stride_for_plane(bo, i);
-            map->pixel_strides[i] =
-                u_drm_format_to_cpp(u_drm_format_to_plane_format(info->drm_format, i));
+        for (int i = 0; i < storage->plane_count; i++) {
+            storage->planes[i] = ptr + gbm_bo_get_offset(bo, i);
+            storage->row_strides[i] = gbm_bo_get_stride_for_plane(bo, i);
+            storage->pixel_strides[i] =
+                u_drm_format_to_cpp(u_drm_format_to_plane_format(storage->info.drm_format, i));
         }
 
         /* Y and UV */
-        if (map->plane_count == 2) {
-            map->plane_count = 3;
-            map->planes[2] = map->planes[1] + map->pixel_strides[1] / 2;
-            map->row_strides[2] = map->row_strides[1];
-            map->pixel_strides[2] = map->pixel_strides[1];
+        if (storage->plane_count == 2) {
+            storage->plane_count = 3;
+            storage->planes[2] = storage->planes[1] + storage->pixel_strides[1] / 2;
+            storage->row_strides[2] = storage->row_strides[1];
+            storage->pixel_strides[2] = storage->pixel_strides[1];
         }
     } else {
-        map->planes[0] = ptr;
-        map->row_strides[0] = stride;
-        map->pixel_strides[0] = u_drm_format_to_cpp(info->drm_format);
+        storage->planes[0] = ptr;
+        storage->row_strides[0] = stride;
+        storage->pixel_strides[0] = u_drm_format_to_cpp(storage->info.drm_format);
     }
 
-    map->bo_xfer = xfer;
+    storage->bo_xfer = xfer;
 }
 
 static inline void
-egl_unmap_image_storage(struct egl *egl, struct egl_image *img, struct egl_image_map *map)
+egl_unmap_image_storage(struct egl *egl, struct egl_image_storage *storage)
 {
-    struct egl_image_storage *storage = &img->storage;
-
-    gbm_bo_unmap(storage->bo, map->bo_xfer);
-}
-
-static inline int
-egl_image_to_dma_buf_attrs(const struct egl_image *img, EGLAttrib *attrs, int count)
-{
-    const struct egl_image_info *info = &img->info;
-    struct gbm_bo *bo = img->storage.bo;
-
-    assert(count >= 64);
-    int c = 0;
-    attrs[c++] = EGL_IMAGE_PRESERVED;
-    attrs[c++] = EGL_TRUE;
-    attrs[c++] = EGL_WIDTH;
-    attrs[c++] = info->width;
-    attrs[c++] = EGL_HEIGHT;
-    attrs[c++] = info->height;
-    attrs[c++] = EGL_LINUX_DRM_FOURCC_EXT;
-    attrs[c++] = info->drm_format;
-
-    const int fd = gbm_bo_get_fd_for_plane(bo, 0);
-    if (fd < 0)
-        egl_die("failed to export gbm bo");
-    const uint64_t drm_modifier = gbm_bo_get_modifier(bo);
-    const int plane_count = gbm_bo_get_plane_count(bo);
-    for (int i = 0; i < plane_count; i++) {
-        const int offset = gbm_bo_get_offset(bo, i);
-        const int stride = gbm_bo_get_stride_for_plane(bo, i);
-
-        static_assert(GBM_MAX_PLANES <= 4, "");
-        if (i < 3) {
-            attrs[c++] = EGL_DMA_BUF_PLANE0_FD_EXT + 3 * i;
-            attrs[c++] = fd;
-            attrs[c++] = EGL_DMA_BUF_PLANE0_OFFSET_EXT + 3 * i;
-            attrs[c++] = offset;
-            attrs[c++] = EGL_DMA_BUF_PLANE0_PITCH_EXT + 3 * i;
-            attrs[c++] = stride;
-        } else {
-            attrs[c++] = EGL_DMA_BUF_PLANE3_FD_EXT;
-            attrs[c++] = fd;
-            attrs[c++] = EGL_DMA_BUF_PLANE3_OFFSET_EXT;
-            attrs[c++] = offset;
-            attrs[c++] = EGL_DMA_BUF_PLANE3_PITCH_EXT;
-            attrs[c++] = stride;
-        }
-        attrs[c++] = EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT + 2 * i;
-        attrs[c++] = (EGLAttrib)drm_modifier;
-        attrs[c++] = EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT + 2 * i;
-        attrs[c++] = (EGLAttrib)(drm_modifier >> 32);
-    }
-
-    attrs[c++] = EGL_NONE;
-    assert(c <= count);
-
-    return fd;
-}
-
-static inline void
-egl_wrap_image_storage(struct egl *egl, struct egl_image *img)
-{
-    if (!egl->EXT_image_dma_buf_import || !egl->EXT_image_dma_buf_import_modifiers)
-        egl_die("no dma-buf import support");
-
-    EGLAttrib img_attrs[64];
-    const int fd = egl_image_to_dma_buf_attrs(img, img_attrs, ARRAY_SIZE(img_attrs));
-
-    img->img = egl->CreateImage(egl->dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, NULL, img_attrs);
-    if (img->img == EGL_NO_IMAGE)
-        egl_die("failed to create img");
-
-    close(fd);
+    storage->plane_count = 0;
+    gbm_bo_unmap(storage->obj, storage->bo_xfer);
 }
 
 #endif /* __ANDROID__ */
@@ -1031,16 +990,81 @@ egl_destroy_program(struct egl *egl, struct egl_program *prog)
     free(prog);
 }
 
-static inline struct egl_image *
-egl_create_image(struct egl *egl, const struct egl_image_info *info)
+static inline void
+egl_import_image(struct egl *egl, struct egl_image *img)
 {
+    const struct egl_image_info *info = &img->storage->info;
+
+    EGLAttrib attrs[64];
+    uint32_t attr_count = 0;
+
+    attrs[attr_count++] = EGL_IMAGE_PRESERVED;
+    attrs[attr_count++] = EGL_TRUE;
+
+    switch (info->target) {
+    case EGL_NATIVE_BUFFER_ANDROID:
+        if (!egl->ANDROID_image_native_buffer)
+            egl_die("no native buffer import support");
+        break;
+    case EGL_LINUX_DMA_BUF_EXT:
+        if (!egl->EXT_image_dma_buf_import || !egl->EXT_image_dma_buf_import_modifiers)
+            egl_die("no dma-buf import support");
+
+        attrs[attr_count++] = EGL_WIDTH;
+        attrs[attr_count++] = info->width;
+        attrs[attr_count++] = EGL_HEIGHT;
+        attrs[attr_count++] = info->height;
+        attrs[attr_count++] = EGL_LINUX_DRM_FOURCC_EXT;
+        attrs[attr_count++] = info->drm_format;
+
+        if (info->mem_plane_count > 4)
+            egl_die("unexpected plane count");
+        for (int i = 0; i < info->mem_plane_count; i++) {
+            if (i < 3) {
+                attrs[attr_count++] = EGL_DMA_BUF_PLANE0_FD_EXT + 3 * i;
+                attrs[attr_count++] = info->dma_buf_fd;
+                attrs[attr_count++] = EGL_DMA_BUF_PLANE0_OFFSET_EXT + 3 * i;
+                attrs[attr_count++] = info->offsets[i];
+                attrs[attr_count++] = EGL_DMA_BUF_PLANE0_PITCH_EXT + 3 * i;
+                attrs[attr_count++] = info->pitches[i];
+            } else {
+                attrs[attr_count++] = EGL_DMA_BUF_PLANE3_FD_EXT;
+                attrs[attr_count++] = info->dma_buf_fd;
+                attrs[attr_count++] = EGL_DMA_BUF_PLANE3_OFFSET_EXT;
+                attrs[attr_count++] = info->offsets[i];
+                attrs[attr_count++] = EGL_DMA_BUF_PLANE3_PITCH_EXT;
+                attrs[attr_count++] = info->pitches[i];
+            }
+            attrs[attr_count++] = EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT + 2 * i;
+            attrs[attr_count++] = (EGLAttrib)info->drm_modifier;
+            attrs[attr_count++] = EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT + 2 * i;
+            attrs[attr_count++] = (EGLAttrib)(info->drm_modifier >> 32);
+        }
+        break;
+    default:
+        egl_die("bad image target");
+        break;
+    }
+
+    attrs[attr_count++] = EGL_NONE;
+    assert(attr_count <= ARRAY_SIZE(attrs));
+
+    img->img = egl->CreateImage(egl->dpy, info->ctx, info->target, info->buf, attrs);
+    if (img->img == EGL_NO_IMAGE)
+        egl_die("failed to create img");
+}
+
+static inline struct egl_image *
+egl_create_image(struct egl *egl, const struct egl_image_storage_info *info)
+{
+    struct egl_image_storage *storage = egl_alloc_image_storage(egl, info);
+
     struct egl_image *img = calloc(1, sizeof(*img));
     if (!img)
         egl_die("failed to alloc img");
 
-    img->info = *info;
-    egl_alloc_image_storage(egl, img);
-    egl_wrap_image_storage(egl, img);
+    img->storage = storage;
+    egl_import_image(egl, img);
 
     return img;
 }
@@ -1055,7 +1079,7 @@ egl_create_image_from_ppm(struct egl *egl, const void *ppm_data, size_t ppm_size
     if (planar && egl->gbm && !egl->is_minigbm)
         egl_die("only minigbm supports planar formats");
 
-    const struct egl_image_info img_info = {
+    const struct egl_image_storage_info storage_info = {
         .width = width,
         .height = height,
         .drm_format = planar ? DRM_FORMAT_NV12 : DRM_FORMAT_ABGR8888,
@@ -1074,21 +1098,21 @@ egl_create_image_from_ppm(struct egl *egl, const void *ppm_data, size_t ppm_size
          */
         .force_linear = egl->is_minigbm,
     };
-    struct egl_image *img = egl_create_image(egl, &img_info);
+    struct egl_image *img = egl_create_image(egl, &storage_info);
+    struct egl_image_storage *storage = img->storage;
 
-    struct egl_image_map map;
-    egl_map_image_storage(egl, img, &map);
+    egl_map_image_storage(egl, storage);
 
-    if (map.plane_count != (planar ? 3 : 1))
+    if (storage->plane_count != (planar ? 3 : 1))
         egl_die("unexpected plane count");
 
     if (planar) {
         /* be careful about 4:2:0 subsampling */
         for (int y = 0; y < height; y++) {
             uint8_t *rows[3];
-            for (int i = 0; i < map.plane_count; i++) {
+            for (int i = 0; i < storage->plane_count; i++) {
                 const int offy = i > 0 ? y / 2 : y;
-                rows[i] = map.planes[i] + map.row_strides[i] * offy;
+                rows[i] = storage->planes[i] + storage->row_strides[i] * offy;
             }
 
             for (int x = 0; x < width; x++) {
@@ -1099,24 +1123,24 @@ egl_create_image_from_ppm(struct egl *egl, const void *ppm_data, size_t ppm_size
                 const int write_count = (x | y) & 1 ? 1 : 3;
                 for (int i = 0; i < write_count; i++) {
                     const int offx = i > 0 ? x / 2 : x;
-                    rows[i][map.pixel_strides[i] * offx] = yuv[i];
+                    rows[i][storage->pixel_strides[i] * offx] = yuv[i];
                 }
             }
         }
     } else {
         for (int y = 0; y < height; y++) {
-            uint8_t *dst = map.planes[0] + map.row_strides[0] * y;
+            uint8_t *dst = storage->planes[0] + storage->row_strides[0] * y;
             for (int x = 0; x < width; x++) {
                 memcpy(dst, ppm_data, 3);
                 dst[3] = 0xff;
 
                 ppm_data += 3;
-                dst += map.pixel_strides[0];
+                dst += storage->pixel_strides[0];
             }
         }
     }
 
-    egl_unmap_image_storage(egl, img, &map);
+    egl_unmap_image_storage(egl, storage);
 
     return img;
 }
@@ -1125,7 +1149,7 @@ static inline void
 egl_destroy_image(struct egl *egl, struct egl_image *img)
 {
     egl->DestroyImage(egl->dpy, img->img);
-    egl_free_image_storage(egl, img);
+    egl_free_image_storage(egl, img->storage);
     free(img);
 }
 

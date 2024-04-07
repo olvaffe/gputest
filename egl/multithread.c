@@ -213,7 +213,7 @@ multithread_test_draw_produce(struct multithread_test *test, int idx)
     GLuint tex = test->texs[idx];
 
     if (!img) {
-        const struct egl_image_info info = {
+        const struct egl_image_storage_info info = {
             .width = test->width,
             .height = test->height,
             .drm_format = DRM_FORMAT_ABGR8888,
@@ -232,7 +232,7 @@ multithread_test_draw_produce(struct multithread_test *test, int idx)
     egl->DestroyImage(egl->dpy, img->img);
 
     /* recreate EGLImage and GL tex */
-    egl_wrap_image_storage(egl, img);
+    egl_import_image(egl, img);
     gl->GenTextures(1, &tex);
     gl->BindTexture(GL_TEXTURE_2D, tex);
     gl->TexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
