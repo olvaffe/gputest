@@ -175,18 +175,18 @@ u_rgb_to_yuv(const uint8_t *rgb, uint8_t *yuv)
 }
 
 struct u_format_conversion {
-    int width;
-    int height;
+    uint32_t width;
+    uint32_t height;
 
-    int src_format;
-    int src_plane_count;
+    uint32_t src_format;
+    uint32_t src_plane_count;
     const void *src_plane_ptrs[3];
-    int src_plane_strides[3];
+    uint32_t src_plane_strides[3];
 
-    int dst_format;
-    int dst_plane_count;
+    uint32_t dst_format;
+    uint32_t dst_plane_count;
     void *dst_plane_ptrs[3];
-    int dst_plane_strides[3];
+    uint32_t dst_plane_strides[3];
 };
 
 static inline void
@@ -202,10 +202,10 @@ u_convert_format(const struct u_format_conversion *conv)
         if (conv->dst_plane_count != 1)
             u_die("util", "bad dst plane count");
 
-        for (int y = 0; y < conv->height; y++) {
+        for (uint32_t y = 0; y < conv->height; y++) {
             const uint8_t *src = conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
             uint8_t *dst = conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
-            for (int x = 0; x < conv->width; x++) {
+            for (uint32_t x = 0; x < conv->width; x++) {
                 memcpy(dst, src, 3);
                 dst[3] = 0xff;
 
@@ -219,13 +219,13 @@ u_convert_format(const struct u_format_conversion *conv)
             u_die("util", "bad dst plane count");
 
         /* be careful about 4:2:0 subsampling */
-        for (int y = 0; y < conv->height; y++) {
+        for (uint32_t y = 0; y < conv->height; y++) {
             const uint8_t *src = conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
             uint8_t *dst_y = conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
             uint8_t *dst_uv =
                 (y & 1) ? NULL : conv->dst_plane_ptrs[1] + conv->dst_plane_strides[1] * y / 2;
 
-            for (int x = 0; x < conv->width; x++) {
+            for (uint32_t x = 0; x < conv->width; x++) {
                 uint8_t yuv[3];
                 u_rgb_to_yuv(src, yuv);
                 src += 3;
@@ -247,12 +247,46 @@ u_convert_format(const struct u_format_conversion *conv)
     }
 }
 
-static inline int
-u_drm_format_to_cpp(int drm_format)
+static inline uint32_t
+u_drm_format_to_plane_count(uint32_t drm_format)
+{
+    switch (drm_format) {
+    case DRM_FORMAT_YVU420:
+        return 3;
+    case DRM_FORMAT_P010:
+    case DRM_FORMAT_NV12:
+        return 2;
+    default:
+        return 1;
+    }
+}
+
+static inline uint32_t
+u_drm_format_to_plane_format(uint32_t drm_format, uint32_t plane)
+{
+    if (plane >= u_drm_format_to_plane_count(drm_format))
+        u_die("util", "bad plane");
+
+    switch (drm_format) {
+    case DRM_FORMAT_YVU420:
+        return DRM_FORMAT_R8;
+    case DRM_FORMAT_P010:
+        return plane ? DRM_FORMAT_GR1616 : DRM_FORMAT_R16;
+    case DRM_FORMAT_NV12:
+        return plane ? DRM_FORMAT_GR88 : DRM_FORMAT_R8;
+    default:
+        return drm_format;
+    }
+}
+
+static inline uint32_t
+u_drm_format_to_cpp(uint32_t drm_format)
 {
     switch (drm_format) {
     case DRM_FORMAT_ABGR16161616F:
         return 8;
+    case DRM_FORMAT_ARGB8888:
+    case DRM_FORMAT_XRGB8888:
     case DRM_FORMAT_ABGR8888:
     case DRM_FORMAT_XBGR8888:
     case DRM_FORMAT_ABGR2101010:
@@ -269,42 +303,12 @@ u_drm_format_to_cpp(int drm_format)
     case DRM_FORMAT_P010:
     case DRM_FORMAT_NV12:
     case DRM_FORMAT_YVU420:
+    default:
         /* cpp makes no sense to planar formats */
-        return 0;
-    default:
+        if (u_drm_format_to_plane_count(drm_format) > 1)
+            return 0;
         u_die("util", "unsupported drm format 0x%x", drm_format);
-    }
-}
-
-static inline int
-u_drm_format_to_plane_count(int drm_format)
-{
-    switch (drm_format) {
-    case DRM_FORMAT_YVU420:
-        return 3;
-    case DRM_FORMAT_P010:
-    case DRM_FORMAT_NV12:
-        return 2;
-    default:
-        return 1;
-    }
-}
-
-static inline int
-u_drm_format_to_plane_format(int drm_format, int plane)
-{
-    if (plane >= u_drm_format_to_plane_count(drm_format))
-        u_die("util", "bad plane");
-
-    switch (drm_format) {
-    case DRM_FORMAT_YVU420:
-        return DRM_FORMAT_R8;
-    case DRM_FORMAT_P010:
-        return plane ? DRM_FORMAT_GR1616 : DRM_FORMAT_R16;
-    case DRM_FORMAT_NV12:
-        return plane ? DRM_FORMAT_GR88 : DRM_FORMAT_R8;
-    default:
-        return drm_format;
+        break;
     }
 }
 

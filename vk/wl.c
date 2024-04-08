@@ -158,7 +158,7 @@ wl_test_dispatch_redraw(void *data)
     const struct wl_swapchain_image *img = wl_acquire_swapchain_image(wl, test->swapchain);
 
     if (test->shm) {
-        const uint32_t pitch = test->width * wl_drm_format_cpp(test->drm_format);
+        const uint32_t pitch = test->width * u_drm_format_to_cpp(test->drm_format);
         wl_test_paint_rgba_pattern(test, img->data, pitch);
     } else if (test->modifier == DRM_FORMAT_MOD_LINEAR) {
         struct vk_allocator_bo *bo = img->data;
@@ -168,7 +168,7 @@ wl_test_dispatch_redraw(void *data)
         uint32_t pitches[VK_ALLOCATOR_MEMORY_PLANE_MAX];
         vk_allocator_bo_query_layout(alloc, bo, offsets, pitches);
 
-        assert(bo->mem_plane_count == wl_drm_format_plane_count(test->drm_format));
+        assert(bo->mem_plane_count == u_drm_format_to_plane_count(test->drm_format));
         for (uint32_t plane = 0; plane < bo->mem_plane_count; plane++) {
             if (bo->mem_plane_count > 1)
                 wl_test_paint_yuv_pattern(test, ptr + offsets[plane], pitches[plane], plane);
@@ -180,7 +180,7 @@ wl_test_dispatch_redraw(void *data)
     } else {
         struct vk_allocator_bo *bo = img->data;
         if (bo->mem_plane_count == 1) {
-            const uint32_t pitch = test->width * wl_drm_format_cpp(test->drm_format);
+            const uint32_t pitch = test->width * u_drm_format_to_cpp(test->drm_format);
             struct vk_allocator_bo *bo = img->data;
             struct vk_allocator_transfer *xfer = vk_allocator_bo_map_transfer(
                 alloc, bo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, 0, 0,
@@ -192,7 +192,7 @@ wl_test_dispatch_redraw(void *data)
         } else {
             struct vk_allocator_bo *bo = img->data;
 
-            if (bo->mem_plane_count != wl_drm_format_plane_count(test->drm_format))
+            if (bo->mem_plane_count != u_drm_format_to_plane_count(test->drm_format))
                 wl_die("no aux plane support");
 
             for (uint32_t plane = 0; plane < bo->mem_plane_count; plane++) {

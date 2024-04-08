@@ -546,9 +546,9 @@ gbm_create_bo_from_ppm(struct gbm *gbm,
         .dst_format = format,
         .dst_plane_count = u_drm_format_to_plane_count(format),
     };
-    if (conv.dst_plane_count > (int)info->plane_count)
+    if (conv.dst_plane_count > info->plane_count)
         gbm_die("unexpected bo plane count");
-    for (int i = 0; i < conv.dst_plane_count; i++) {
+    for (uint32_t i = 0; i < conv.dst_plane_count; i++) {
         conv.dst_plane_ptrs[i] = ptr + info->offsets[i];
         conv.dst_plane_strides[i] = info->strides[i];
     }

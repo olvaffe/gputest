@@ -637,39 +637,6 @@ wl_dispatch(const struct wl *wl)
 }
 
 static inline uint32_t
-wl_drm_format_cpp(uint32_t format)
-{
-    switch (format) {
-    case DRM_FORMAT_ARGB8888:
-    case DRM_FORMAT_XRGB8888:
-    case DRM_FORMAT_ABGR8888:
-    case DRM_FORMAT_XBGR8888:
-        return 4;
-    case DRM_FORMAT_RGB565:
-        return 2;
-    case DRM_FORMAT_YVU420:
-    case DRM_FORMAT_NV12:
-        /* it's more like 1.5 but it does not really matter */
-        return 2;
-    default:
-        return 0;
-    }
-}
-
-static inline uint32_t
-wl_drm_format_plane_count(uint32_t format)
-{
-    switch (format) {
-    case DRM_FORMAT_YVU420:
-        return 3;
-    case DRM_FORMAT_NV12:
-        return 2;
-    default:
-        return 1;
-    }
-}
-
-static inline uint32_t
 wl_drm_format_to_shm_format(uint32_t format)
 {
     switch (format) {
@@ -736,9 +703,6 @@ wl_create_swapchain(struct wl *wl,
     if (!swapchain->images)
         wl_die("failed to alloc swapchain images");
 
-    if (!wl_drm_format_cpp(format))
-        wl_die("unknown swapchain format");
-
     swapchain->width = width;
     swapchain->height = height;
     swapchain->format = format;
@@ -773,7 +737,7 @@ wl_add_swapchain_images_shm(struct wl *wl, struct wl_swapchain *swapchain)
                (const char *)&swapchain->format, swapchain->modifier);
     }
 
-    const uint32_t img_cpp = wl_drm_format_cpp(swapchain->format);
+    const uint32_t img_cpp = u_drm_format_to_cpp(swapchain->format);
     const uint32_t img_pitch = img_cpp * swapchain->width;
     const uint32_t img_size = img_pitch * swapchain->height;
 

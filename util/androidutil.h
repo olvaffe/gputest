@@ -286,9 +286,9 @@ android_create_ahb_from_ppm(struct android *android,
         .dst_format = drm_format,
         .dst_plane_count = u_drm_format_to_plane_count(drm_format),
     };
-    if (conv.dst_plane_count != (int)planes.planeCount)
+    if (conv.dst_plane_count != planes.planeCount)
         android_die("unexpected plane count");
-    for (int i = 0; i < conv.dst_plane_count; i++) {
+    for (uint32_t i = 0; i < conv.dst_plane_count; i++) {
         conv.dst_plane_ptrs[i] = planes.planes[i].data;
         conv.dst_plane_strides[i] = planes.planes[i].rowStride;
     }
