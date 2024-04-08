@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: MIT
 
 tests = [
-  'canvas-ganesh-gl',
   'canvas-ganesh-vk',
   'canvas-null',
   'canvas-pdf',
@@ -14,8 +13,16 @@ tests = [
   'image-raster',
 ]
 
+if idep_eglutil.found()
+  tests += ['canvas-ganesh-gl']
+endif
+
 foreach t : tests
   test_deps = [idep_skutil]
+
+  if t == 'canvas-ganesh-gl'
+    test_deps += [idep_eglutil]
+  endif
 
   executable(
     t,

@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "eglutil.h"
 #include "skutil.h"
-#include "skutil_egl.h"
 
 struct canvas_ganesh_gl_test {
     uint32_t width;
     uint32_t height;
 
+    struct egl egl;
     struct sk sk;
-    struct sk_egl egl;
     sk_sp<GrDirectContext> ctx;
     sk_sp<SkSurface> surf;
 };
@@ -19,11 +19,11 @@ struct canvas_ganesh_gl_test {
 static void
 canvas_ganesh_gl_test_init(struct canvas_ganesh_gl_test *test)
 {
+    struct egl *egl = &test->egl;
     struct sk *sk = &test->sk;
-    struct sk_egl *egl = &test->egl;
 
+    egl_init(egl, NULL);
     sk_init(sk, NULL);
-    sk_egl_init(egl);
 
     test->ctx = sk_create_context_ganesh_gl(sk);
     test->surf = sk_create_surface_ganesh(sk, test->ctx, test->width, test->height);
@@ -32,13 +32,13 @@ canvas_ganesh_gl_test_init(struct canvas_ganesh_gl_test *test)
 static void
 canvas_ganesh_gl_test_cleanup(struct canvas_ganesh_gl_test *test)
 {
+    struct egl *egl = &test->egl;
     struct sk *sk = &test->sk;
-    struct sk_egl *egl = &test->egl;
 
     test->surf.reset();
     test->ctx.reset();
-    sk_egl_cleanup(egl);
     sk_cleanup(sk);
+    egl_cleanup(egl);
 }
 
 static void
