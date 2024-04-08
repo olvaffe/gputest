@@ -24,6 +24,9 @@
 #define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
 #define NORETURN __attribute__((noreturn))
 
+#define _STRINGIFY(v) #v
+#define STRINGIFY(v) _STRINGIFY(v)
+
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define ALIGN(v, a) (((v) + (a) - 1) & ~((a) - 1))
 #define DIV_ROUND_UP(v, d) (((v) + (d) - 1) / (d))
