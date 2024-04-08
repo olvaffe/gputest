@@ -149,7 +149,10 @@ struct cl_platform {
 };
 
 struct cl_init_params {
-    int unused;
+    uint32_t platform_index;
+    uint32_t device_index;
+
+    bool profiling;
 };
 
 struct cl {
@@ -170,8 +173,9 @@ struct cl {
     struct cl_platform *platforms;
     uint32_t platform_count;
 
+    const struct cl_platform *plat;
+    const struct cl_device *dev;
     cl_context ctx;
-    cl_device_id dev;
 
     cl_command_queue cmdq;
 };
@@ -775,33 +779,39 @@ cl_context_notify(const char *errinfo, const void *private_info, size_t cb, void
 static inline void
 cl_init_context(struct cl *cl)
 {
-    const uint32_t plat_idx = 0;
-    const uint32_t dev_idx = 0;
+    if (cl->params.platform_index >= cl->platform_count)
+        cl_die("no platform %d", cl->params.platform_index);
+    const struct cl_platform *plat = &cl->platforms[cl->params.platform_index];
 
-    if (plat_idx >= cl->platform_count)
-        cl_die("no platform %d", plat_idx);
-    const struct cl_platform *plat = &cl->platforms[plat_idx];
+    if (cl->params.device_index >= plat->device_count)
+        cl_die("no device %d", cl->params.device_index);
+    const struct cl_device *dev = &plat->devices[cl->params.device_index];
 
-    if (dev_idx >= plat->device_count)
-        cl_die("no device %d", dev_idx);
-    const struct cl_device *dev = &plat->devices[dev_idx];
+    cl->plat = plat;
+    cl->dev = dev;
 
     const cl_context_properties props[] = {
         CL_CONTEXT_PLATFORM,
         (cl_context_properties)plat->id,
         0,
     };
-
     cl->ctx = cl->CreateContext(props, 1, &dev->id, cl_context_notify, NULL, &cl->err);
     cl_check(cl, "failed to init context");
-
-    cl->dev = dev->id;
 }
 
 static inline void
 cl_init_command_queue(struct cl *cl)
 {
-    cl->cmdq = cl->CreateCommandQueueWithProperties(cl->ctx, cl->dev, NULL, &cl->err);
+    const cl_command_queue_properties props =
+        cl->params.profiling ? CL_QUEUE_PROFILING_ENABLE : 0;
+
+    const cl_queue_properties_khr create_props[] = {
+        CL_QUEUE_PROPERTIES,
+        (cl_queue_properties)props,
+        0,
+    };
+
+    cl->cmdq = cl->CreateCommandQueueWithProperties(cl->ctx, cl->dev->id, create_props, &cl->err);
     cl_check(cl, "failed to create cmdq");
 }
 
@@ -887,9 +897,20 @@ static inline void
 cl_destroy_buffer(struct cl *cl, struct cl_buffer *buf)
 {
     cl->err = cl->ReleaseMemObject(buf->mem);
-    cl_check(cl, "failed to destroy memory");
+    cl_check(cl, "failed to destroy buffer");
 
     free(buf);
+}
+
+static inline void
+cl_fill_buffer(struct cl *cl, struct cl_buffer *buf, const void *pattern, size_t pattern_size)
+{
+    if (buf->size % pattern_size)
+        cl_die("bad pattern size");
+
+    cl->err = cl->EnqueueFillBuffer(cl->cmdq, buf->mem, pattern, pattern_size, 0, buf->size, 0,
+                                    NULL, NULL);
+    cl_check(cl, "failed to fill buffer");
 }
 
 static inline void *
@@ -916,7 +937,7 @@ cl_get_program_build_info(
     struct cl *cl, cl_program prog, cl_program_build_info param, void *buf, size_t size)
 {
     size_t real_size;
-    cl->err = cl->GetProgramBuildInfo(prog, cl->dev, param, size, buf, &real_size);
+    cl->err = cl->GetProgramBuildInfo(prog, cl->dev->id, param, size, buf, &real_size);
     cl_check(cl, "failed to get program build info");
     if (size != real_size)
         cl_die("bad program build info size");
@@ -929,7 +950,7 @@ cl_get_program_build_info_alloc(struct cl *cl,
                                 size_t *size)
 {
     size_t real_size;
-    cl->err = cl->GetProgramBuildInfo(prog, cl->dev, param, 0, NULL, &real_size);
+    cl->err = cl->GetProgramBuildInfo(prog, cl->dev->id, param, 0, NULL, &real_size);
     cl_check(cl, "failed to get program build info size");
 
     void *buf = malloc(real_size);
@@ -948,7 +969,7 @@ cl_create_pipeline(struct cl *cl, const char *code, const char *main)
     cl_program prog = cl->CreateProgramWithSource(cl->ctx, 1, &code, NULL, &cl->err);
     cl_check(cl, "failed to create program");
 
-    cl->err = cl->BuildProgram(prog, 1, &cl->dev, "-cl-std=CL3.0", NULL, NULL);
+    cl->err = cl->BuildProgram(prog, 1, &cl->dev->id, "-cl-std=CL3.0", NULL, NULL);
     if (cl->err != CL_SUCCESS) {
         cl_build_status status;
         cl_get_program_build_info(cl, prog, CL_PROGRAM_BUILD_STATUS, &status, sizeof(status));
@@ -990,14 +1011,18 @@ cl_set_pipeline_arg(
 }
 
 static inline void
-cl_enqueue_pipeline(
-    struct cl *cl, struct cl_pipeline *pipeline, size_t width, size_t height, size_t depth)
+cl_enqueue_pipeline(struct cl *cl,
+                    struct cl_pipeline *pipeline,
+                    size_t width,
+                    size_t height,
+                    size_t depth,
+                    cl_event *ev)
 {
     const cl_uint dim = depth ? 3 : height ? 2 : 1;
     const size_t global_work_size[] = { width, height, depth };
 
     cl->err = cl->EnqueueNDRangeKernel(cl->cmdq, pipeline->kern, dim, NULL, global_work_size,
-                                       NULL, 0, NULL, NULL);
+                                       NULL, 0, NULL, ev);
     cl_check(cl, "failed to enqueue kernel");
 }
 
@@ -1013,6 +1038,39 @@ cl_finish(struct cl *cl)
 {
     cl->err = cl->Finish(cl->cmdq);
     cl_check(cl, "failed to finish cmdq");
+}
+
+static inline cl_event
+cl_create_event(struct cl *cl)
+{
+    cl_event ev = cl->CreateUserEvent(cl->ctx, &cl->err);
+    cl_check(cl, "failed to create event");
+    return ev;
+}
+
+static inline void
+cl_destroy_event(struct cl *cl, cl_event ev)
+{
+    cl->err = cl->ReleaseEvent(ev);
+    cl_check(cl, "failed to destroy event");
+}
+
+static inline void
+cl_get_event_profiling_info(
+    struct cl *cl, cl_event ev, cl_profiling_info param, void *buf, size_t size)
+{
+    size_t real_size;
+    cl->err = cl->GetEventProfilingInfo(ev, param, size, buf, &real_size);
+    cl_check(cl, "failed to get event profiling info");
+    if (size != real_size)
+        cl_die("bad event profiling info size");
+}
+
+static inline void
+cl_wait_event(struct cl *cl, cl_event ev)
+{
+    cl->err = cl->WaitForEvents(1, &ev);
+    cl_check(cl, "failed to wait for event");
 }
 
 #endif /* CLUTIL_H */
