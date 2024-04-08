@@ -120,19 +120,23 @@ u_sleep(uint32_t ms)
 }
 
 static inline const void *
-u_parse_ppm(const void *ppm_data, size_t ppm_size, int *width, int *height)
+u_parse_ppm(const void *ppm_data, size_t ppm_size, uint32_t *width, uint32_t *height)
 {
-    if (sscanf((const char *)ppm_data, "P6 %d %d 255\n", width, height) != 2)
+    int w;
+    int h;
+    if (sscanf((const char *)ppm_data, "P6 %d %d 255\n", &w, &h) != 2)
         u_die("util", "invalid ppm header");
 
-    const size_t img_size = *width * *height * 3;
+    const size_t img_size = w * h * 3;
     if (img_size >= ppm_size)
-        u_die("util", "bad ppm dimension %dx%d", *width, *height);
+        u_die("util", "bad ppm dimension %dx%d", w, h);
 
     const size_t hdr_size = ppm_size - img_size;
     if (!isspace(((const char *)ppm_data)[hdr_size - 1]))
         u_die("util", "no space at the end of ppm header");
 
+    *width = w;
+    *height = h;
     return ppm_data + hdr_size;
 }
 

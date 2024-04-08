@@ -258,8 +258,8 @@ android_create_ahb_from_ppm(struct android *android,
                             enum AHardwareBuffer_Format format,
                             uint64_t usage)
 {
-    int width;
-    int height;
+    uint32_t width;
+    uint32_t height;
     ppm_data = u_parse_ppm(ppm_data, ppm_size, &width, &height);
 
     const uint32_t drm_format = android_ahb_format_to_drm_format(format);

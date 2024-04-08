@@ -518,8 +518,8 @@ gbm_create_bo_from_ppm(struct gbm *gbm,
                        uint32_t modifier_count,
                        uint32_t flags)
 {
-    int width;
-    int height;
+    uint32_t width;
+    uint32_t height;
     ppm_data = u_parse_ppm(ppm_data, ppm_size, &width, &height);
 
     if (format != DRM_FORMAT_NV12 && format != DRM_FORMAT_ABGR8888)

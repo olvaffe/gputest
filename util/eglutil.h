@@ -491,8 +491,8 @@ egl_teximage_2d_from_ppm(struct egl *egl, GLenum target, const void *ppm_data, s
 {
     struct egl_gl *gl = &egl->gl;
 
-    int width;
-    int height;
+    uint32_t width;
+    uint32_t height;
     ppm_data = u_parse_ppm(ppm_data, ppm_size, &width, &height);
 
     void *texels = malloc(width * height * 4);
@@ -501,8 +501,8 @@ egl_teximage_2d_from_ppm(struct egl *egl, GLenum target, const void *ppm_data, s
 
     const uint8_t *rgb = (const uint8_t *)ppm_data;
     uint8_t *rgba = (uint8_t *)texels;
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
+    for (uint32_t y = 0; y < height; y++) {
+        for (uint32_t x = 0; x < width; x++) {
             rgba[0] = rgb[0];
             rgba[1] = rgb[1];
             rgba[2] = rgb[2];
