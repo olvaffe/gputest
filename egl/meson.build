@@ -4,14 +4,18 @@
 tests = [
   'clear',
   'formats',
-  'image',
   'info',
-  'multithread',
   'tex',
   'timestamp',
   'tri',
 ]
 
+if idep_androidutil.found() or idep_gbmutil.found()
+  tests += ['image']
+endif
+if idep_gbmutil.found()
+  tests += ['multithread']
+endif
 if dep_sdl2.found()
   tests += ['sdl']
 endif
@@ -37,7 +41,11 @@ foreach t : tests
   endforeach
 
   test_deps = [idep_eglutil]
-  if t == 'sdl'
+  if t == 'image'
+    test_deps += [idep_androidutil, idep_gbmutil]
+  elif t == 'multithread'
+    test_deps += [idep_gbmutil]
+  elif t == 'sdl'
     test_deps += [dep_sdl2]
   endif
 

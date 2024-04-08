@@ -8,6 +8,7 @@
  */
 
 #include "eglutil.h"
+#include "gbmutil.h"
 
 #include <strings.h>
 #include <threads.h>
@@ -46,9 +47,12 @@ struct multithread_test {
     uint32_t height;
 
     struct egl egl;
+    struct gbm gbm;
 
     mtx_t mtx;
 
+    struct gbm_bo *bos[IMAGE_COUNT];
+    struct egl_image_info img_infos[IMAGE_COUNT];
     struct egl_image *imgs[IMAGE_COUNT];
     GLuint texs[IMAGE_COUNT];
 
@@ -173,9 +177,15 @@ static void
 multithread_test_init(struct multithread_test *test)
 {
     struct egl *egl = &test->egl;
+    struct gbm *gbm = &test->gbm;
 
     egl_init(egl, NULL);
     egl_check(egl, "init");
+
+    const struct gbm_init_params gbm_params = {
+        .path = egl_get_drm_render_node(egl),
+    };
+    gbm_init(gbm, &gbm_params);
 
     if (mtx_init(&test->mtx, mtx_plain) != thrd_success ||
         cnd_init(&test->producer.cnd) != thrd_success ||
@@ -187,20 +197,26 @@ static void
 multithread_test_cleanup(struct multithread_test *test)
 {
     struct egl *egl = &test->egl;
+    struct gbm *gbm = &test->gbm;
     struct egl_gl *gl = &egl->gl;
 
     gl->DeleteTextures(IMAGE_COUNT, test->texs);
     for (int i = 0; i < IMAGE_COUNT; i++) {
         if (test->imgs[i])
             egl_destroy_image(egl, test->imgs[i]);
+        if (test->bos[i]) {
+            close(test->img_infos[i].dma_buf_fd);
+            gbm_destroy_bo(gbm, test->bos[i]);
+        }
     }
 
     mtx_destroy(&test->mtx);
     cnd_destroy(&test->producer.cnd);
     cnd_destroy(&test->consumer.cnd);
 
-    egl_check(egl, "cleanup");
+    gbm_cleanup(gbm);
 
+    egl_check(egl, "cleanup");
     egl_cleanup(egl);
 }
 
@@ -208,31 +224,56 @@ static void
 multithread_test_draw_produce(struct multithread_test *test, int idx)
 {
     struct egl *egl = &test->egl;
+    struct gbm *gbm = &test->gbm;
     struct egl_gl *gl = &egl->gl;
     struct egl_image *img = test->imgs[idx];
     GLuint tex = test->texs[idx];
 
     if (!img) {
-        const struct egl_image_storage_info info = {
-            .width = test->width,
-            .height = test->height,
-            .drm_format = DRM_FORMAT_ABGR8888,
-            .rendering = true,
-            .sampling = true,
-            .force_linear = true,
-        };
-        img = egl_create_image(egl, &info);
+        struct gbm_bo *bo = gbm_create_bo(gbm, test->width, test->height, DRM_FORMAT_ABGR8888,
+                                          NULL, 0, GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
+        const struct gbm_bo_info *bo_info = gbm_get_bo_info(gbm, bo);
+        if (bo_info->disjoint)
+            egl_die("unsupported disjoint bo");
 
+        struct gbm_import_fd_modifier_data bo_data;
+        gbm_export_bo(gbm, bo, &bo_data);
+        for (uint32_t i = 1; i < bo_data.num_fds; i++)
+            close(bo_data.fds[i]);
+
+        struct egl_image_info *img_info = &test->img_infos[idx];
+        *img_info = (struct egl_image_info){
+            .target = EGL_LINUX_DMA_BUF_EXT,
+            .width = bo_data.width,
+            .height = bo_data.height,
+            .drm_format = bo_data.format,
+            .drm_modifier = bo_data.modifier,
+            .mem_plane_count = bo_data.num_fds,
+            .dma_buf_fd = bo_data.fds[0],
+        };
+        if (img_info->mem_plane_count > 4)
+            egl_die("unexpected plane count");
+        for (int i = 0; i < img_info->mem_plane_count; i++) {
+            img_info->offsets[i] = bo_data.offsets[i];
+            img_info->pitches[i] = bo_data.strides[i];
+        }
+
+        img = egl_create_image(egl, img_info);
+
+        test->bos[idx] = bo;
         test->imgs[idx] = img;
     }
 
     /* destroy EGLImage and GL tex */
     if (tex)
         gl->DeleteTextures(1, &tex);
-    egl->DestroyImage(egl->dpy, img->img);
 
-    /* recreate EGLImage and GL tex */
-    egl_import_image(egl, img);
+    /* recreate EGLImage */
+    egl_destroy_image(egl, img);
+    img = egl_create_image(egl, &test->img_infos[idx]);
+    test->imgs[idx] = img;
+
+    /* recreate GL tex */
     gl->GenTextures(1, &tex);
     gl->BindTexture(GL_TEXTURE_2D, tex);
     gl->TexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);

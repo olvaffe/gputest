@@ -4,6 +4,11 @@
  */
 
 #include "eglutil.h"
+#ifdef __ANDROID__
+#include "androidutil.h"
+#else
+#include "gbmutil.h"
+#endif
 
 static const char image_test_vs[] = {
 #include "image_test.vert.inc"
@@ -76,8 +81,107 @@ struct image_test {
 
     struct egl_program *prog;
 
+#ifdef __ANDROID__
+    struct android android;
+    struct android_ahb *ahb;
+#else
+    struct gbm gbm;
+    struct gbm_bo *bo;
+#endif
+
     struct egl_image *img;
 };
+
+static void
+image_test_init_image(struct image_test *test)
+{
+    struct egl *egl = &test->egl;
+    const uint32_t drm_format = test->planar ? DRM_FORMAT_NV12 : DRM_FORMAT_ABGR8888;
+
+    egl_log("loading ppm as a %s image", test->planar ? "planar" : "non-planar");
+
+#ifdef __ANDROID__
+    struct android *android = &test->android;
+
+    android_init(android, NULL);
+
+    test->ahb = android_create_ahb_from_ppm(
+        android, image_test_ppm, sizeof(image_test_ppm),
+        android_ahb_format_from_drm_format(drm_format),
+        AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY | AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE);
+
+    if (!egl->ANDROID_get_native_client_buffer)
+        egl_die("no ahb export support");
+    EGLClientBuffer buf = egl->GetNativeClientBufferANDROID(test->ahb->ahb);
+    if (!buf)
+        egl_die("failed to get client buffer from ahb");
+
+    const struct egl_image_info img_info = {
+        .target = EGL_NATIVE_BUFFER_ANDROID,
+        .buf = buf,
+    };
+    test->img = egl_create_image(egl, &img_info);
+#else
+    struct gbm *gbm = &test->gbm;
+
+    const struct gbm_init_params gbm_params = {
+        .path = egl_get_drm_render_node(egl),
+    };
+    gbm_init(gbm, &gbm_params);
+
+    test->bo = gbm_create_bo_from_ppm(gbm, image_test_ppm, sizeof(image_test_ppm), drm_format,
+                                      NULL, 0, GBM_BO_USE_LINEAR);
+
+    const struct gbm_bo_info *bo_info = gbm_get_bo_info(gbm, test->bo);
+    if (bo_info->disjoint)
+        egl_die("unsupported disjoint bo");
+
+    struct gbm_import_fd_modifier_data bo_data;
+    gbm_export_bo(gbm, test->bo, &bo_data);
+
+    struct egl_image_info img_info = {
+        .target = EGL_LINUX_DMA_BUF_EXT,
+        .width = bo_data.width,
+        .height = bo_data.height,
+        .drm_format = bo_data.format,
+        .drm_modifier = bo_data.modifier,
+        .mem_plane_count = bo_data.num_fds,
+        .dma_buf_fd = bo_data.fds[0],
+    };
+
+    if (img_info.mem_plane_count > 4)
+        egl_die("unexpected plane count");
+    for (int i = 0; i < img_info.mem_plane_count; i++) {
+        img_info.offsets[i] = bo_data.offsets[i];
+        img_info.pitches[i] = bo_data.strides[i];
+    }
+
+    test->img = egl_create_image(egl, &img_info);
+
+    for (uint32_t i = 0; i < bo_data.num_fds; i++)
+        close(bo_data.fds[i]);
+#endif
+}
+
+static void
+image_test_cleanup_image(struct image_test *test)
+{
+    struct egl *egl = &test->egl;
+
+    egl_destroy_image(egl, test->img);
+
+#ifdef __ANDROID__
+    struct android *android = &test->android;
+
+    android_destroy_ahb(android, test->ahb);
+    android_cleanup(android);
+#else
+    struct gbm *gbm = &test->gbm;
+
+    gbm_destroy_bo(gbm, test->bo);
+    gbm_cleanup(gbm);
+#endif
+}
 
 static void
 image_test_init(struct image_test *test)
@@ -103,9 +207,8 @@ image_test_init(struct image_test *test)
 
     test->prog = egl_create_program(egl, image_test_vs, image_test_fs);
 
-    egl_log("loading ppm as a %s image", test->planar ? "planar" : "non-planar");
-    test->img =
-        egl_create_image_from_ppm(egl, image_test_ppm, sizeof(image_test_ppm), test->planar);
+    image_test_init_image(test);
+
     gl->EGLImageTargetTexture2DOES(test->tex_target, test->img->img);
 
     egl_check(egl, "init");
@@ -118,8 +221,9 @@ image_test_cleanup(struct image_test *test)
 
     egl_check(egl, "cleanup");
 
+    image_test_cleanup_image(test);
+
     egl_destroy_program(egl, test->prog);
-    egl_destroy_image(egl, test->img);
 
     egl_destroy_framebuffer(egl, test->fb);
     egl_cleanup(egl);
