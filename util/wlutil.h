@@ -587,7 +587,19 @@ wl_info(const struct wl *wl)
     uint32_t idx = 0;
     wl_array_for_each(shm_iter, &wl->shm_formats)
     {
-        wl_log("shm format %d: '%.*s'", idx++, 4, (const char *)shm_iter);
+        uint32_t drm_format;
+        switch (*shm_iter) {
+        case WL_SHM_FORMAT_ARGB8888:
+            drm_format = DRM_FORMAT_ARGB8888;
+            break;
+        case WL_SHM_FORMAT_XRGB8888:
+            drm_format = DRM_FORMAT_XRGB8888;
+            break;
+        default:
+            drm_format = *shm_iter;
+            break;
+        }
+        wl_log("shm format %d: '%.*s'", idx++, 4, (const char *)&drm_format);
     }
 
     wl_log("dmabuf: main %s target, scanout %d, tranche count %d",
