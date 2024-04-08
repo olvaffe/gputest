@@ -168,7 +168,7 @@ egl_init_library(struct egl *egl)
         egl_die("failed to load %s: %s", LIBEGL_NAME, dlerror());
 
     const char gipa_name[] = "eglGetProcAddress";
-    egl->GetProcAddress = dlsym(egl->handle, gipa_name);
+    egl->GetProcAddress = (PFNEGLGETPROCADDRESSPROC)dlsym(egl->handle, gipa_name);
     if (!egl->GetProcAddress)
         egl_die("failed to find %s: %s", gipa_name, dlerror());
 
@@ -341,8 +341,8 @@ egl_init_drm_formats(struct egl *egl)
     if (!egl->QueryDmaBufFormatsEXT(egl->dpy, 0, NULL, &fmt_count))
         egl_die("failed to get dma-buf format count");
 
-    struct egl_drm_format **fmts = malloc(sizeof(*fmts) * fmt_count);
-    EGLint *drm_fmts = malloc(sizeof(*drm_fmts) * fmt_count);
+    struct egl_drm_format **fmts = (struct egl_drm_format **)malloc(sizeof(*fmts) * fmt_count);
+    EGLint *drm_fmts = (EGLint *)malloc(sizeof(*drm_fmts) * fmt_count);
     if (!fmts || !drm_fmts)
         egl_die("failed to alloc fmts");
 
@@ -356,9 +356,9 @@ egl_init_drm_formats(struct egl *egl)
         if (!egl->QueryDmaBufModifiersEXT(egl->dpy, drm_fmt, 0, NULL, NULL, &mod_count))
             egl_die("failed to get dma-buf modifier count");
 
-        struct egl_drm_format *fmt =
-            malloc(sizeof(*fmt) + sizeof(fmt->drm_modifiers) * mod_count +
-                   sizeof(fmt->external_only) * mod_count);
+        struct egl_drm_format *fmt = (struct egl_drm_format *)malloc(
+            sizeof(*fmt) + sizeof(fmt->drm_modifiers) * mod_count +
+            sizeof(fmt->external_only) * mod_count);
         if (!fmt)
             egl_die("failed to alloc fmt");
         EGLuint64KHR *drm_modifiers = (EGLuint64KHR *)(fmt + 1);
@@ -474,7 +474,7 @@ egl_dump_image(struct egl *egl, int width, int height, const char *filename)
     const GLenum type = GL_UNSIGNED_BYTE;
     const GLsizei size = width * height * 4;
 
-    char *data = malloc(size);
+    char *data = (char *)malloc(size);
     if (!data)
         egl_die("failed to alloc readback buf");
 
@@ -499,8 +499,8 @@ egl_teximage_2d_from_ppm(struct egl *egl, GLenum target, const void *ppm_data, s
     if (!texels)
         egl_die("failed to alloc texels");
 
-    const uint8_t *rgb = ppm_data;
-    uint8_t *rgba = texels;
+    const uint8_t *rgb = (const uint8_t *)ppm_data;
+    uint8_t *rgba = (uint8_t *)texels;
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             rgba[0] = rgb[0];
@@ -522,7 +522,7 @@ egl_create_framebuffer(struct egl *egl, int width, int height)
 {
     struct egl_gl *gl = &egl->gl;
 
-    struct egl_framebuffer *fb = calloc(1, sizeof(*fb));
+    struct egl_framebuffer *fb = (struct egl_framebuffer *)calloc(1, sizeof(*fb));
     if (!fb)
         egl_die("failed to alloc fb");
 
@@ -602,7 +602,7 @@ egl_link_program(struct egl *egl, const GLuint *shaders, int count)
 static inline struct egl_program *
 egl_create_program(struct egl *egl, const char *vs_glsl, const char *fs_glsl)
 {
-    struct egl_program *prog = calloc(1, sizeof(*prog));
+    struct egl_program *prog = (struct egl_program *)calloc(1, sizeof(*prog));
     if (!prog)
         egl_die("failed to alloc prog");
 
@@ -684,7 +684,7 @@ egl_create_image(struct egl *egl, const struct egl_image_info *info)
     attrs[attr_count++] = EGL_NONE;
     assert(attr_count <= ARRAY_SIZE(attrs));
 
-    struct egl_image *img = calloc(1, sizeof(*img));
+    struct egl_image *img = (struct egl_image *)calloc(1, sizeof(*img));
     if (!img)
         egl_die("failed to alloc img");
 
