@@ -821,29 +821,12 @@ vk_create_image(struct vk *vk,
     return vk_create_image_from_info(vk, &info);
 }
 
-static inline const void *
-vk_parse_ppm(const void *ppm_data, size_t ppm_size, int *width, int *height)
-{
-    if (sscanf(ppm_data, "P6 %d %d 255\n", width, height) != 2)
-        vk_die("invalid ppm header");
-
-    const size_t img_size = *width * *height * 3;
-    if (img_size >= ppm_size)
-        vk_die("bad ppm dimension %dx%d", *width, *height);
-
-    const size_t hdr_size = ppm_size - img_size;
-    if (!isspace(((const char *)ppm_data)[hdr_size - 1]))
-        vk_die("no space at the end of ppm header");
-
-    return ppm_data + hdr_size;
-}
-
 static inline struct vk_image *
 vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, bool planar)
 {
-    int width;
-    int height;
-    const uint8_t *rgb_data = vk_parse_ppm(ppm_data, ppm_size, &width, &height);
+    uint32_t width;
+    uint32_t height;
+    ppm_data = u_parse_ppm(ppm_data, ppm_size, &width, &height);
 
     const VkFormat fmt = planar ? VK_FORMAT_G8_B8R8_2PLANE_420_UNORM : VK_FORMAT_B8G8R8A8_UNORM;
 
@@ -874,6 +857,18 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
     vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
     vk_check(vk, "failed to map image");
 
+    struct u_format_conversion conv = {
+        .width = width,
+        .height = height,
+
+        .src_format = DRM_FORMAT_BGR888,
+        .src_plane_count = 1,
+        .src_plane_ptrs = { ppm_data, },
+        .src_plane_strides = { width * 3, },
+
+        .dst_format = planar ? DRM_FORMAT_NV12 : DRM_FORMAT_ABGR8888,
+        .dst_plane_count = planar ? 2 : 1,
+    };
     if (planar) {
         const VkImageSubresource y_subres = {
             .aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT,
@@ -886,24 +881,10 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
         vk->GetImageSubresourceLayout(vk->dev, img->img, &y_subres, &y_layout);
         vk->GetImageSubresourceLayout(vk->dev, img->img, &uv_subres, &uv_layout);
 
-        for (int y = 0; y < height; y++) {
-            uint8_t *y_dst = ptr + y_layout.offset + y_layout.rowPitch * y;
-            uint8_t *uv_dst = ptr + uv_layout.offset + uv_layout.rowPitch * y / 2;
-
-            for (int x = 0; x < width; x++) {
-                uint8_t yuv[3];
-                u_rgb_to_yuv(rgb_data, yuv);
-                rgb_data += 3;
-
-                y_dst[0] = yuv[0];
-                y_dst++;
-                if (!((x | y) & 1)) {
-                    uv_dst[0] = yuv[1];
-                    uv_dst[1] = yuv[2];
-                    uv_dst += 2;
-                }
-            }
-        }
+        conv.dst_plane_ptrs[0] = ptr + y_layout.offset;
+        conv.dst_plane_strides[0] = y_layout.rowPitch;
+        conv.dst_plane_ptrs[1] = ptr + uv_layout.offset;
+        conv.dst_plane_strides[1] = uv_layout.rowPitch;
     } else {
         const VkImageSubresource subres = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -911,19 +892,11 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
         VkSubresourceLayout layout;
         vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
 
-        for (int y = 0; y < height; y++) {
-            uint8_t *dst = ptr + layout.offset + layout.rowPitch * y;
-            for (int x = 0; x < width; x++) {
-                dst[0] = rgb_data[2];
-                dst[1] = rgb_data[1];
-                dst[2] = rgb_data[0];
-                dst[3] = 0xff;
-
-                rgb_data += 3;
-                dst += 4;
-            }
-        }
+        conv.dst_plane_ptrs[0] = ptr + layout.offset;
+        conv.dst_plane_strides[0] = layout.rowPitch;
     }
+
+    u_convert_format(&conv);
 
     vk->UnmapMemory(vk->dev, img->mem);
 
