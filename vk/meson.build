@@ -64,10 +64,9 @@ foreach t : tests
     if fs.exists(src)
       test_incs += custom_target(
         dst,
-        input: [src],
+        input: [file_hexdump, src],
         output: [dst],
-        command: [prog_xxd, '-i', '-n', t + '_test_ppm', '@INPUT@'],
-        capture: true,
+        command: [prog_python, '@INPUT0@', 'binary', '@INPUT1@', '@OUTPUT@'],
       )
     endif
   endforeach

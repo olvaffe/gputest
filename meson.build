@@ -24,7 +24,6 @@ add_project_arguments(['-D_GNU_SOURCE', warning_args], language: ['c', 'cpp'])
 
 prog_glslang = find_program('glslangValidator')
 prog_python = import('python').find_installation('python3')
-prog_xxd = find_program('xxd')
 
 dep_not_found = dependency('', required : false)
 

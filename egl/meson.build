@@ -33,7 +33,7 @@ foreach t : tests
     if fs.exists(src)
       test_incs += custom_target(
         dst,
-        input: ['hexdump.py', src],
+        input: [file_hexdump, src],
         output: [dst],
         command: [prog_python, '@INPUT0@', mode, '@INPUT1@', '@OUTPUT@'],
       )

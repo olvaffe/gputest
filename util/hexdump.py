@@ -4,13 +4,19 @@
 
 import sys
 
-mode = sys.argv[1]
+if len(sys.argv) != 4:
+    print(f'usage: {sys.argv[0]} {{binary|text}} <input-file> <output-file>')
+    exit(1)
+
+text = 'text'.startswith(sys.argv[1])
 in_fn = sys.argv[2]
 out_fn = sys.argv[3]
 
 with open(in_fn, 'rb') as f:
     data = f.read()
-if 't' in mode:
+
+# null-terminate the data
+if text:
     data += b'\0'
 
 with open(out_fn, 'w') as f:

@@ -13,8 +13,9 @@ static const uint32_t ycbcr_test_fs[] = {
 #include "ycbcr_test.frag.inc"
 };
 
-/* for ycbcr_test_ppm */
+static const unsigned char ycbcr_test_ppm[] = {
 #include "ycbcr_test.ppm.inc"
+};
 
 static const float ycbcr_test_vertices[][2] = {
     { -1.0f, 1.0f },

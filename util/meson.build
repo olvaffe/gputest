@@ -1,6 +1,8 @@
 # Copyright 2024 Google LLC
 # SPDX-License-Identifier: MIT
 
+file_hexdump = files('hexdump.py')
+
 util_summary = {}
 
 idep_util = declare_dependency(
