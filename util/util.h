@@ -122,7 +122,7 @@ u_sleep(uint32_t ms)
 static inline const void *
 u_parse_ppm(const void *ppm_data, size_t ppm_size, int *width, int *height)
 {
-    if (sscanf(ppm_data, "P6 %d %d 255\n", width, height) != 2)
+    if (sscanf((const char *)ppm_data, "P6 %d %d 255\n", width, height) != 2)
         u_die("util", "invalid ppm header");
 
     const size_t img_size = *width * *height * 3;
@@ -203,8 +203,9 @@ u_convert_format(const struct u_format_conversion *conv)
             u_die("util", "bad dst plane count");
 
         for (uint32_t y = 0; y < conv->height; y++) {
-            const uint8_t *src = conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
-            uint8_t *dst = conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+            const uint8_t *src =
+                (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
+            uint8_t *dst = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
             for (uint32_t x = 0; x < conv->width; x++) {
                 memcpy(dst, src, 3);
                 dst[3] = 0xff;
@@ -220,10 +221,12 @@ u_convert_format(const struct u_format_conversion *conv)
 
         /* be careful about 4:2:0 subsampling */
         for (uint32_t y = 0; y < conv->height; y++) {
-            const uint8_t *src = conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
-            uint8_t *dst_y = conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+            const uint8_t *src =
+                (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
+            uint8_t *dst_y = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
             uint8_t *dst_uv =
-                (y & 1) ? NULL : conv->dst_plane_ptrs[1] + conv->dst_plane_strides[1] * y / 2;
+                (y & 1) ? NULL
+                        : (uint8_t *)conv->dst_plane_ptrs[1] + conv->dst_plane_strides[1] * y / 2;
 
             for (uint32_t x = 0; x < conv->width; x++) {
                 uint8_t yuv[3];
