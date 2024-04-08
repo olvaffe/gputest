@@ -9,6 +9,15 @@ idep_util = declare_dependency(
   include_directories: ['.', inc_include],
 )
 
+idep_androidutil = dep_not_found
+if cc.has_header('android/hardware_buffer.h')
+  idep_androidutil = declare_dependency(
+    sources: ['androidutil.h'],
+    dependencies: [idep_util],
+  )
+endif
+util_summary += {'androidutil': idep_androidutil}
+
 idep_clutil = dep_not_found
 if cc.has_header('CL/cl.h')
   idep_clutil = declare_dependency(
