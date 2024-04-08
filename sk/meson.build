@@ -2,19 +2,20 @@
 # SPDX-License-Identifier: MIT
 
 tests = [
-  'canvas-ganesh-vk',
   'canvas-null',
   'canvas-pdf',
   'canvas-picture',
   'canvas-raster',
   'canvas-svg',
   'drawable',
-  'image-ganesh-vk',
   'image-raster',
 ]
 
 if idep_eglutil.found()
   tests += ['canvas-ganesh-gl']
+endif
+if idep_vkutil.found()
+  tests += ['canvas-ganesh-vk', 'image-ganesh-vk']
 endif
 
 foreach t : tests
@@ -22,6 +23,8 @@ foreach t : tests
 
   if t == 'canvas-ganesh-gl'
     test_deps += [idep_eglutil]
+  elif t in ['canvas-ganesh-vk', 'image-ganesh-vk']
+    test_deps += [idep_vkutil]
   endif
 
   executable(
