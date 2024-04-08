@@ -3,6 +3,7 @@
 
 cl_tests = [
   'bench_copy',
+  'bench_fill',
   'clinfo',
   'copy',
 ]
