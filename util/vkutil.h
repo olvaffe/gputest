@@ -87,7 +87,7 @@ struct vk {
     struct {
         VkCommandBuffer cmds[4];
         VkFence fences[4];
-        bool protected[4];
+        bool protected_submits[4];
         uint32_t count;
         uint32_t next;
     } submit;
@@ -251,7 +251,7 @@ vk_init_library(struct vk *vk)
         vk_die("failed to load %s: %s", LIBVULKAN_NAME, dlerror());
 
     const char gipa_name[] = "vkGetInstanceProcAddr";
-    vk->GetInstanceProcAddr = dlsym(vk->handle, gipa_name);
+    vk->GetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)dlsym(vk->handle, gipa_name);
     if (!vk->GetInstanceProcAddr)
         vk_die("failed to find %s: %s", gipa_name, dlerror());
 
@@ -274,13 +274,13 @@ vk_init_instance(struct vk *vk)
     if (api_version < vk->params.api_version)
         vk_die("instance api version %d < %d", api_version, vk->params.api_version);
 
+    const VkApplicationInfo app_info = {
+        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        .apiVersion = vk->params.api_version,
+    };
     const VkInstanceCreateInfo instance_info = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pApplicationInfo =
-            &(VkApplicationInfo){
-                .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-                .apiVersion = vk->params.api_version,
-            },
+        .pApplicationInfo = &app_info,
         .enabledExtensionCount = vk->params.instance_ext_count,
         .ppEnabledExtensionNames = vk->params.instance_exts,
     };
@@ -471,8 +471,8 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     *features = (VkPhysicalDeviceFeatures2){
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
         .features = {
-            .tessellationShader = true,
             .geometryShader = true,
+            .tessellationShader = true,
             .fillModeNonSolid = true,
         },
     };
@@ -520,18 +520,21 @@ vk_init_device(struct vk *vk)
     if (!queue_props.timestampValidBits)
         vk_die("queue family 0 does not support timestamps");
 
+    const VkDeviceQueueCreateFlags queue_flags =
+        vk->params.protected_memory ? VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT : 0;
+    const float queue_priority = 1.0f;
+    const VkDeviceQueueCreateInfo queue_create_info = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .flags = queue_flags,
+        .queueFamilyIndex = vk->queue_family_index,
+        .queueCount = 1,
+        .pQueuePriorities = &queue_priority,
+    };
     const VkDeviceCreateInfo dev_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .pNext = &enabled_features,
         .queueCreateInfoCount = 1,
-        .pQueueCreateInfos =
-            &(VkDeviceQueueCreateInfo){
-                .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                .flags = vk->params.protected_memory ? VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT : 0,
-                .queueFamilyIndex = vk->queue_family_index,
-                .queueCount = 1,
-                .pQueuePriorities = &(float){ 1.0f },
-            },
+        .pQueueCreateInfos = &queue_create_info,
         .enabledExtensionCount = vk->params.dev_ext_count,
         .ppEnabledExtensionNames = vk->params.dev_exts,
     };
@@ -542,7 +545,7 @@ vk_init_device(struct vk *vk)
 
     const VkDeviceQueueInfo2 queue_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2,
-        .flags = vk->params.protected_memory ? VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT : 0,
+        .flags = queue_flags,
         .queueFamilyIndex = vk->queue_family_index,
     };
     vk->GetDeviceQueue2(vk->dev, &queue_info, &vk->queue);
@@ -611,7 +614,7 @@ vk_init(struct vk *vk, const struct vk_init_params *params)
     vk_init_cmd_pool(vk);
 
     static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.fences), "");
-    static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.protected), "");
+    static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.protected_submits), "");
     vk->submit.count = ARRAY_SIZE(vk->submit.cmds);
 
     /* avoid accessing dangling pointers */
@@ -662,7 +665,7 @@ vk_create_buffer(struct vk *vk,
                  VkDeviceSize size,
                  VkBufferUsageFlags usage)
 {
-    struct vk_buffer *buf = calloc(1, sizeof(*buf));
+    struct vk_buffer *buf = (struct vk_buffer *)calloc(1, sizeof(*buf));
     if (!buf)
         vk_die("failed to alloc buf");
 
@@ -779,7 +782,7 @@ vk_init_image(struct vk *vk, struct vk_image *img)
 static inline struct vk_image *
 vk_create_image_from_info(struct vk *vk, const VkImageCreateInfo *info)
 {
-    struct vk_image *img = calloc(1, sizeof(*img));
+    struct vk_image *img = (struct vk_image *)calloc(1, sizeof(*img));
     if (!img)
         vk_die("failed to alloc img");
 
@@ -798,7 +801,7 @@ vk_create_image(struct vk *vk,
                 VkImageTiling tiling,
                 VkImageUsageFlags usage)
 {
-    struct vk_image *img = calloc(1, sizeof(*img));
+    struct vk_image *img = (struct vk_image *)calloc(1, sizeof(*img));
     if (!img)
         vk_die("failed to alloc img");
 
@@ -830,7 +833,7 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
 
     const VkFormat fmt = planar ? VK_FORMAT_G8_B8R8_2PLANE_420_UNORM : VK_FORMAT_B8G8R8A8_UNORM;
 
-    struct vk_image *img = calloc(1, sizeof(*img));
+    struct vk_image *img = (struct vk_image *)calloc(1, sizeof(*img));
     if (!img)
         vk_die("failed to alloc img");
 
@@ -867,7 +870,7 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
         .src_plane_strides = { width * 3, },
 
         .dst_format = planar ? DRM_FORMAT_NV12 : DRM_FORMAT_ABGR8888,
-        .dst_plane_count = planar ? 2 : 1,
+        .dst_plane_count = (uint32_t)(planar ? 2 : 1),
     };
     if (planar) {
         const VkImageSubresource y_subres = {
@@ -1138,23 +1141,25 @@ vk_write_ppm(const char *filename,
     for (uint32_t y = 0; y < height; y++) {
         for (uint32_t x = 0; x < width; x++) {
             if (format == VK_FORMAT_R32G32B32A32_UINT) {
-                const uint32_t *pixel = data + pitch * y + cpp * x;
+                const uint32_t *pixel = (const uint32_t *)(data + pitch * y + cpp * x);
                 /* discard the higher bytes */
-                const char bytes[3] = { pixel[swizzle[0]], pixel[swizzle[1]], pixel[swizzle[2]] };
+                const char bytes[3] = { (char)pixel[swizzle[0]], (char)pixel[swizzle[1]],
+                                        (char)pixel[swizzle[2]] };
                 if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
                     vk_die("failed to write pixel (%u, %u)", x, y);
             } else if (packed) {
-                const uint16_t *pixel = data + pitch * y + cpp * x;
+                const uint16_t *pixel = (const uint16_t *)(data + pitch * y + cpp * x);
                 uint16_t val = *pixel;
                 if (format == VK_FORMAT_R5G5B5A1_UNORM_PACK16)
                     val >>= 1;
 
-                const uint8_t comps[3] = { val & 0x1f, (val >> 5) & 0x1f, (val >> 10) & 0x1f };
+                const char comps[3] = { (char)(val & 0x1f), (char)((val >> 5) & 0x1f),
+                                        (char)((val >> 10) & 0x1f) };
                 const char bytes[3] = { comps[swizzle[0]], comps[swizzle[1]], comps[swizzle[2]] };
                 if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
                     vk_die("failed to write pixel (%u, %u)", x, y);
             } else {
-                const uint8_t *pixel = data + pitch * y + cpp * x;
+                const char *pixel = (const char *)(data + pitch * y + cpp * x);
                 const char bytes[3] = { pixel[swizzle[0]], pixel[swizzle[1]], pixel[swizzle[2]] };
                 if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
                     vk_die("failed to write pixel (%u, %u)", x, y);
@@ -1253,7 +1258,7 @@ vk_create_framebuffer(struct vk *vk,
                       VkAttachmentLoadOp load_op,
                       VkAttachmentStoreOp store_op)
 {
-    struct vk_framebuffer *fb = calloc(1, sizeof(*fb));
+    struct vk_framebuffer *fb = (struct vk_framebuffer *)calloc(1, sizeof(*fb));
     if (!fb)
         vk_die("failed to alloc fb");
 
@@ -1317,19 +1322,19 @@ vk_create_framebuffer(struct vk *vk,
         att_count++;
     }
 
+    const VkSubpassDescription subpass_desc = {
+        .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+        .colorAttachmentCount = (uint32_t)(color ? 1 : 0),
+        .pColorAttachments = color ? &color_ref : NULL,
+        .pResolveAttachments = resolve ? &resolve_ref : NULL,
+        .pDepthStencilAttachment = depth ? &depth_ref : NULL,
+    };
     const VkRenderPassCreateInfo pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .attachmentCount = att_count,
         .pAttachments = att_descs,
         .subpassCount = 1,
-        .pSubpasses =
-            &(VkSubpassDescription){
-                .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-                .colorAttachmentCount = color ? 1 : 0,
-                .pColorAttachments = color ? &color_ref : NULL,
-                .pResolveAttachments = resolve ? &resolve_ref : NULL,
-                .pDepthStencilAttachment = depth ? &depth_ref : NULL,
-            },
+        .pSubpasses = &subpass_desc,
     };
 
     vk->result = vk->CreateRenderPass(vk->dev, &pass_info, NULL, &fb->pass);
@@ -1366,7 +1371,7 @@ vk_destroy_framebuffer(struct vk *vk, struct vk_framebuffer *fb)
 static inline struct vk_pipeline *
 vk_create_pipeline(struct vk *vk)
 {
-    struct vk_pipeline *pipeline = calloc(1, sizeof(*pipeline));
+    struct vk_pipeline *pipeline = (struct vk_pipeline *)calloc(1, sizeof(*pipeline));
     if (!pipeline)
         vk_die("failed to alloc pipeline");
 
@@ -1503,7 +1508,9 @@ vk_set_pipeline_tessellation(struct vk *vk, struct vk_pipeline *pipeline, uint32
 }
 
 static inline void
-vk_set_pipeline_sample_count(struct vk *vk, struct vk_pipeline *pipeline, uint32_t sample_count)
+vk_set_pipeline_sample_count(struct vk *vk,
+                             struct vk_pipeline *pipeline,
+                             VkSampleCountFlagBits sample_count)
 {
     pipeline->sample_mask = (1u << sample_count) - 1;
     pipeline->msaa_info = (VkPipelineMultisampleStateCreateInfo){
@@ -1560,7 +1567,7 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = pipeline->set_layout_count,
         .pSetLayouts = pipeline->set_layouts,
-        .pushConstantRangeCount = pipeline->push_const.size ? 1 : 0,
+        .pushConstantRangeCount = (uint32_t)(pipeline->push_const.size ? 1 : 0),
         .pPushConstantRanges = &pipeline->push_const,
     };
     vk->result = vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL,
@@ -1600,7 +1607,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 
     const VkPipelineVertexInputStateCreateInfo vi_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = pipeline->vi_attr_count ? 1 : 0,
+        .vertexBindingDescriptionCount = (uint32_t)(pipeline->vi_attr_count ? 1 : 0),
         .pVertexBindingDescriptions = &pipeline->vi_binding,
         .vertexAttributeDescriptionCount = pipeline->vi_attr_count,
         .pVertexAttributeDescriptions = pipeline->vi_attrs,
@@ -1661,7 +1668,7 @@ vk_destroy_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 static inline struct vk_descriptor_set *
 vk_create_descriptor_set(struct vk *vk, VkDescriptorSetLayout layout)
 {
-    struct vk_descriptor_set *set = calloc(1, sizeof(*set));
+    struct vk_descriptor_set *set = (struct vk_descriptor_set *)calloc(1, sizeof(*set));
     if (!set)
         vk_die("failed to alloc set");
 
@@ -1735,7 +1742,7 @@ vk_destroy_descriptor_set(struct vk *vk, struct vk_descriptor_set *set)
 static inline struct vk_event *
 vk_create_event(struct vk *vk)
 {
-    struct vk_event *ev = calloc(1, sizeof(*ev));
+    struct vk_event *ev = (struct vk_event *)calloc(1, sizeof(*ev));
     if (!ev)
         vk_die("failed to alloc event");
 
@@ -1759,7 +1766,7 @@ vk_destroy_event(struct vk *vk, struct vk_event *ev)
 static inline struct vk_query *
 vk_create_query(struct vk *vk, VkQueryType type, uint32_t count)
 {
-    struct vk_query *query = calloc(1, sizeof(*query));
+    struct vk_query *query = (struct vk_query *)calloc(1, sizeof(*query));
     if (!query)
         vk_die("failed to alloc query");
 
@@ -1799,10 +1806,10 @@ vk_begin_cmd(struct vk *vk, bool prot)
 {
     VkCommandBuffer *cmd = &vk->submit.cmds[vk->submit.next];
     VkFence *fence = &vk->submit.fences[vk->submit.next];
-    bool *protected = &vk->submit.protected[vk->submit.next];
+    bool *protected_submit = &vk->submit.protected_submits[vk->submit.next];
 
     /* reuse or allocate */
-    if (*cmd && *protected == prot) {
+    if (*cmd && *protected_submit == prot) {
         vk->result = vk->WaitForFences(vk->dev, 1, fence, true, UINT64_MAX);
         vk_check(vk, "failed to wait fence");
 
@@ -1813,8 +1820,8 @@ vk_begin_cmd(struct vk *vk, bool prot)
         vk_check(vk, "failed to reset fence");
     } else {
         if (*cmd) {
-            vk->FreeCommandBuffers(vk->dev, *protected ? vk->protected_cmd_pool : vk->cmd_pool, 1,
-                                   cmd);
+            vk->FreeCommandBuffers(
+                vk->dev, *protected_submit ? vk->protected_cmd_pool : vk->cmd_pool, 1, cmd);
         }
 
         const VkCommandBufferAllocateInfo alloc_info = {
@@ -1833,7 +1840,7 @@ vk_begin_cmd(struct vk *vk, bool prot)
         vk->result = vk->CreateFence(vk->dev, &fence_info, NULL, fence);
         vk_check(vk, "failed to create fence");
 
-        *protected = prot;
+        *protected_submit = prot;
     }
 
     const VkCommandBufferBeginInfo begin_info = {
@@ -1850,7 +1857,7 @@ vk_end_cmd(struct vk *vk)
 {
     VkCommandBuffer cmd = vk->submit.cmds[vk->submit.next];
     VkFence fence = vk->submit.fences[vk->submit.next];
-    bool protected = vk->submit.protected[vk->submit.next];
+    bool protected_submit = vk->submit.protected_submits[vk->submit.next];
 
     /* increment */
     vk->submit.next = (vk->submit.next + 1) % vk->submit.count;
@@ -1860,7 +1867,7 @@ vk_end_cmd(struct vk *vk)
 
     const VkProtectedSubmitInfo protected_info = {
         .sType = VK_STRUCTURE_TYPE_PROTECTED_SUBMIT_INFO,
-        .protectedSubmit = protected,
+        .protectedSubmit = protected_submit,
     };
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -1975,8 +1982,9 @@ vk_recreate_swapchain(struct vk *vk,
         vk->GetSwapchainImagesKHR(vk->dev, swapchain->swapchain, &swapchain->img_count, NULL);
     vk_check(vk, "failed to get swapchain image count");
 
-    swapchain->img_handles = calloc(swapchain->img_count, sizeof(*swapchain->img_handles));
-    swapchain->imgs = calloc(swapchain->img_count, sizeof(*swapchain->imgs));
+    swapchain->img_handles =
+        (VkImage *)calloc(swapchain->img_count, sizeof(*swapchain->img_handles));
+    swapchain->imgs = (struct vk_image *)calloc(swapchain->img_count, sizeof(*swapchain->imgs));
     if (!swapchain->img_handles || !swapchain->imgs)
         vk_die("failed to alloc swapchain imgs");
 
@@ -2031,7 +2039,7 @@ vk_create_swapchain(struct vk *vk,
     vk->result = vk->GetPhysicalDeviceSurfaceCapabilitiesKHR(vk->physical_dev, surf, &surf_caps);
     vk_check(vk, "failed to get surface caps");
 
-    struct vk_swapchain *swapchain = calloc(1, sizeof(*swapchain));
+    struct vk_swapchain *swapchain = (struct vk_swapchain *)calloc(1, sizeof(*swapchain));
     if (!swapchain)
         vk_die("failed to alloc swapchain");
 
@@ -2041,8 +2049,10 @@ vk_create_swapchain(struct vk *vk,
         .minImageCount = surf_caps.minImageCount,
         .imageFormat = format,
         .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
-        .imageExtent.width = width,
-        .imageExtent.height = height,
+        .imageExtent = {
+            .width = width,
+            .height = height,
+        },
         .imageArrayLayers = 1,
         .imageUsage = usage,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,

@@ -7,7 +7,7 @@ project(
   version: '0.1',
   license: 'MIT',
   meson_version: '>=1.1.0',
-  default_options: ['c_std=c11', 'warning_level=3'],
+  default_options: ['c_std=c11', 'cpp_std=c++17', 'warning_level=3'],
 )
 
 fs = import('fs')
