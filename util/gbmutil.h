@@ -417,7 +417,9 @@ gbm_create_bo_from_dmabuf(struct gbm *gbm,
                           const struct gbm_import_fd_modifier_data *data,
                           uint32_t flags)
 {
-    struct gbm_bo *bo = gbm_bo_import(gbm->dev, GBM_BO_IMPORT_FD_MODIFIER, (void *)data, flags);
+    /* minigbm defines GBM_BO_IMPORT_FD_MODIFIER to 0x5505... */
+    const uint32_t type = gbm->is_minigbm ? 0x5505 : 0x5504;
+    struct gbm_bo *bo = gbm_bo_import(gbm->dev, type, (void *)data, flags);
     if (!bo) {
         gbm_die("failed to import bo: size %dx%d, format %.*s, modifier 0x%" PRIx64
                 ", flags 0x%x",
