@@ -30,6 +30,7 @@ struct gbm {
     int fd;
     struct gbm_device *dev;
     const char *backend_name;
+    bool is_minigbm;
 
     struct gbm_format_info *formats;
     uint32_t format_count;
@@ -42,9 +43,11 @@ struct gbm_bo_info {
     uint64_t modifier;
     uint32_t bpp;
 
+    int32_t handles[GBM_MAX_PLANES];
     uint32_t offsets[GBM_MAX_PLANES];
     uint32_t strides[GBM_MAX_PLANES];
     uint32_t plane_count;
+    bool disjoint;
 
     void *map_data;
 };
@@ -110,6 +113,7 @@ gbm_init_device(struct gbm *gbm)
         gbm_die("failed to create gbm device: no driver?");
 
     gbm->backend_name = gbm_device_get_backend_name(gbm->dev);
+    gbm->is_minigbm = strcmp(gbm->backend_name, "drm");
 
     if (gbm_device_get_fd(gbm->dev) != gbm->fd)
         gbm_die("unexpected fd change");
@@ -217,23 +221,26 @@ gbm_init_formats(struct gbm *gbm)
 
         for (uint32_t j = 0; j < ARRAY_SIZE(all_modifiers); j++) {
             const uint64_t mod = all_modifiers[j];
-#ifdef MINIGBM
-            struct gbm_bo *bo =
-                gbm_bo_create_with_modifiers2(gbm->dev, 8, 8, info->format, &mod, 1, 0);
-            if (bo) {
-                if (gbm_bo_get_modifier(bo) == mod)
+            if (gbm->is_minigbm) {
+                if (u_drm_format_to_plane_count(info->format) > 1 && mod != DRM_FORMAT_MOD_LINEAR)
+                    continue;
+
+                struct gbm_bo *bo =
+                    gbm_bo_create_with_modifiers2(gbm->dev, 8, 8, info->format, &mod, 1, 0);
+                if (bo) {
+                    if (gbm_bo_get_modifier(bo) == mod)
+                        info->modifiers[info->modifier_count++] = mod;
+                    gbm_bo_destroy(bo);
+                }
+            } else {
+                const int count =
+                    gbm_device_get_format_modifier_plane_count(gbm->dev, info->format, mod);
+                if (count >= 0) {
+                    if (count == 0)
+                        gbm_die("unexpected plane count 0");
                     info->modifiers[info->modifier_count++] = mod;
-                gbm_bo_destroy(bo);
+                }
             }
-#else
-            const int count =
-                gbm_device_get_format_modifier_plane_count(gbm->dev, info->format, mod);
-            if (count >= 0) {
-                if (count == 0)
-                    gbm_die("unexpected plane count 0");
-                info->modifiers[info->modifier_count++] = mod;
-            }
-#endif
         }
     }
 }
@@ -327,22 +334,26 @@ gbm_init_bo_info(struct gbm *gbm, struct gbm_bo *bo)
     if (info->plane_count > GBM_MAX_PLANES)
         gbm_die("unexpected plane count");
     for (uint32_t i = 0; i < info->plane_count; i++) {
+        info->handles[i] = gbm_bo_get_handle_for_plane(bo, i).s32;
         info->offsets[i] = gbm_bo_get_offset(bo, i);
         info->strides[i] = gbm_bo_get_stride_for_plane(bo, i);
+
+        if (info->handles[i] != info->handles[0])
+            info->disjoint = true;
     }
 
     if (gbm_bo_get_device(bo) != gbm->dev)
         gbm_die("unexpceted dev change");
     if (info->strides[0] != gbm_bo_get_stride(bo))
         gbm_die("unexpceted stride change");
-    if (gbm_bo_get_handle(bo).s32 != gbm_bo_get_handle_for_plane(bo, 0).s32)
+    if (info->handles[0] != gbm_bo_get_handle(bo).s32)
         gbm_die("unexpceted handle change");
-#ifndef MINIGBM
+
     /* minigbm always returns 0 for gbm_device_get_format_modifier_plane_count */
-    if (info->plane_count != (uint32_t)gbm_device_get_format_modifier_plane_count(
+    if (!gbm->is_minigbm &&
+        info->plane_count != (uint32_t)gbm_device_get_format_modifier_plane_count(
                                  gbm->dev, info->format, info->modifier))
         gbm_die("unexpceted plane count change");
-#endif
 
     gbm_bo_set_user_data(bo, info, gbm_free_bo_info);
 }
@@ -356,38 +367,40 @@ gbm_create_bo(struct gbm *gbm,
               uint32_t modifier_count,
               uint32_t flags)
 {
-#ifdef MINIGBM
     struct gbm_bo *bo;
-    if (modifier_count) {
-        /* minigbm does not allow flags to be specified */
-        bo = gbm_bo_create_with_modifiers2(gbm->dev, width, height, format, modifiers,
-                                           modifier_count, 0);
 
-        /* minigbm falls back to DRM_FORMAT_MOD_LINEAR automatically */
-        if (bo) {
-            bool found = false;
-            const uint64_t mod = gbm_bo_get_modifier(bo);
-            for (uint32_t i = 0; i < modifier_count; i++) {
-                if (modifiers[i] == mod) {
-                    found = true;
-                    break;
+    if (gbm->is_minigbm) {
+        if (modifier_count) {
+            /* minigbm does not allow flags to be specified */
+            bo = gbm_bo_create_with_modifiers2(gbm->dev, width, height, format, modifiers,
+                                               modifier_count, 0);
+
+            /* minigbm falls back to DRM_FORMAT_MOD_LINEAR automatically */
+            if (bo) {
+                bool found = false;
+                const uint64_t mod = gbm_bo_get_modifier(bo);
+                for (uint32_t i = 0; i < modifier_count; i++) {
+                    if (modifiers[i] == mod) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    gbm_bo_destroy(bo);
+                    bo = NULL;
                 }
             }
-            if (!found) {
-                gbm_bo_destroy(bo);
-                bo = NULL;
-            }
+        } else {
+            bo = gbm_bo_create(gbm->dev, width, height, format, flags);
         }
     } else {
-        bo = gbm_bo_create(gbm->dev, width, height, format, flags);
+        /* when there is no modifier, this is the same as gbm_bo_create; when flags is
+         * GBM_BO_USE_SCANOUT, this is the same as gbm_bo_create_with_modifiers
+         */
+        bo = gbm_bo_create_with_modifiers2(gbm->dev, width, height, format, modifiers,
+                                           modifier_count, flags);
     }
-#else
-    /* when there is no modifier, this is the same as gbm_bo_create; when flags is
-     * GBM_BO_USE_SCANOUT, this is the same as gbm_bo_create_with_modifiers
-     */
-    struct gbm_bo *bo = gbm_bo_create_with_modifiers2(gbm->dev, width, height, format, modifiers,
-                                                      modifier_count, flags);
-#endif
+
     if (!bo) {
         gbm_die("failed to alloc bo: size %dx%d, format %.*s, modifier count %d, flags 0x%x",
                 width, height, 4, (const char *)&format, modifier_count, flags);
@@ -431,6 +444,12 @@ static inline void
 gbm_destroy_bo(struct gbm *gbm, struct gbm_bo *bo)
 {
     gbm_bo_destroy(bo);
+}
+
+static inline const struct gbm_bo_info *
+gbm_get_bo_info(struct gbm *gbm, struct gbm_bo *bo)
+{
+    return gbm_bo_get_user_data(bo);
 }
 
 static inline void
@@ -486,6 +505,57 @@ gbm_unmap_bo(struct gbm *gbm, struct gbm_bo *bo)
     gbm_bo_unmap(bo, info->map_data);
 
     info->map_data = NULL;
+}
+
+static inline struct gbm_bo *
+gbm_create_bo_from_ppm(struct gbm *gbm,
+                       const void *ppm_data,
+                       size_t ppm_size,
+                       uint32_t format,
+                       const uint64_t *modifiers,
+                       uint32_t modifier_count,
+                       uint32_t flags)
+{
+    int width;
+    int height;
+    ppm_data = u_parse_ppm(ppm_data, ppm_size, &width, &height);
+
+    if (format != DRM_FORMAT_NV12 && format != DRM_FORMAT_ABGR8888)
+        gbm_die("unsupported target format");
+
+    struct gbm_bo *bo =
+        gbm_create_bo(gbm, width, height, format, modifiers, modifier_count, flags);
+    const struct gbm_bo_info *info = gbm_bo_get_user_data(bo);
+    if (info->disjoint)
+        gbm_die("unsupported disjoint bo");
+
+    uint32_t stride;
+    void *ptr = gbm_map_bo(gbm, bo, GBM_BO_TRANSFER_WRITE, &stride);
+
+    struct u_format_conversion conv = {
+        .width = width,
+        .height = height,
+
+        .src_format = DRM_FORMAT_BGR888,
+        .src_plane_count = 1,
+        .src_plane_ptrs = { ppm_data, },
+        .src_plane_strides = { width * 3, },
+
+        .dst_format = format,
+        .dst_plane_count = u_drm_format_to_plane_count(format),
+    };
+    if (conv.dst_plane_count > (int)info->plane_count)
+        gbm_die("unexpected bo plane count");
+    for (int i = 0; i < conv.dst_plane_count; i++) {
+        conv.dst_plane_ptrs[i] = ptr + info->offsets[i];
+        conv.dst_plane_strides[i] = info->strides[i];
+    }
+
+    u_convert_format(&conv);
+
+    gbm_unmap_bo(gbm, bo);
+
+    return bo;
 }
 
 #endif /* GBMUTIL_H */
