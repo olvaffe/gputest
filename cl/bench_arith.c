@@ -41,22 +41,28 @@ bench_arith_init_type(struct bench_arith *test)
         if (isdigit(*width))
             break;
     }
-    const int len = width - test->type_name;
 
-    if (!strncmp(test->type_name, "char", len))
-        test->type_size = sizeof(cl_char);
-    else if (!strncmp(test->type_name, "short", len))
-        test->type_size = sizeof(cl_short);
-    else if (!strncmp(test->type_name, "int", len))
-        test->type_size = sizeof(cl_int);
-    else if (!strncmp(test->type_name, "long", len))
-        test->type_size = sizeof(cl_long);
-    else if (!strncmp(test->type_name, "half", len))
-        test->type_size = sizeof(cl_half);
-    else if (!strncmp(test->type_name, "float", len))
-        test->type_size = sizeof(cl_float);
-    else if (!strncmp(test->type_name, "double", len))
-        test->type_size = sizeof(cl_double);
+    const size_t len = width - test->type_name;
+    char name[32];
+    if (len < sizeof(name)) {
+        memcpy(name, test->type_name, len);
+        name[len] = '\0';
+
+        if (!strcmp(name, "char"))
+            test->type_size = sizeof(cl_char);
+        else if (!strcmp(name, "short"))
+            test->type_size = sizeof(cl_short);
+        else if (!strcmp(name, "int"))
+            test->type_size = sizeof(cl_int);
+        else if (!strcmp(name, "long"))
+            test->type_size = sizeof(cl_long);
+        else if (!strcmp(name, "half"))
+            test->type_size = sizeof(cl_half);
+        else if (!strcmp(name, "float"))
+            test->type_size = sizeof(cl_float);
+        else if (!strcmp(name, "double"))
+            test->type_size = sizeof(cl_double);
+    }
 
     test->type_width = *width != '\0' ? atoi(width) : 1;
 
