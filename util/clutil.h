@@ -18,6 +18,23 @@
 
 #define LIBOPENCL_NAME "libOpenCL.so.1"
 
+#ifndef CL_VERSION_3_0
+
+#define CL_MAKE_VERSION(major, minor, patch) ((major) << 22 | (minor) << 12 | (patch))
+#define CL_VERSION_MAJOR(version) ((version) >> 22)
+#define CL_VERSION_MINOR(version) (((version) >> 12) & 0x3ff)
+#define CL_VERSION_PATCH(version) ((version) & 0xfff)
+
+typedef cl_uint cl_version;
+typedef cl_bitfield cl_device_atomic_capabilities;
+typedef cl_bitfield cl_device_device_enqueue_capabilities;
+typedef struct {
+    cl_version version;
+    char name[64];
+} cl_name_version;
+
+#endif /* CL_VERSION_3_0 */
+
 struct cl_device {
     cl_device_id id;
 
@@ -97,8 +114,8 @@ struct cl_device {
     char *vendor;
     char *driver_version;
     char *profile;
-    cl_version version;
     char *version_str;
+    cl_version version;
     cl_name_version *opencl_c_versions;
     uint32_t opencl_c_version_count;
     cl_name_version *opencl_c_features;
@@ -342,6 +359,7 @@ cl_device_atomic_capabilities_to_str(cl_device_atomic_capabilities val, char *st
     /* clang-format off */
     static const struct u_bitmask_desc descs[] = {
 #define DESC(v) { .bitmask = CL_DEVICE_ATOMIC_ ##v, .str = #v }
+#ifdef CL_VERSION_3_0
         DESC(ORDER_RELAXED),
         DESC(ORDER_ACQ_REL),
         DESC(ORDER_SEQ_CST),
@@ -349,6 +367,7 @@ cl_device_atomic_capabilities_to_str(cl_device_atomic_capabilities val, char *st
         DESC(SCOPE_WORK_GROUP),
         DESC(SCOPE_DEVICE),
         DESC(SCOPE_ALL_DEVICES),
+#endif
 #undef DESC
     };
     /* clang-format on */
@@ -374,6 +393,38 @@ cl_init_library(struct cl *cl)
     if (!cl->name)                                                                               \
         cl_die("no cl" #name);
 #include "clutil_entrypoints.inc"
+}
+
+static inline cl_name_version *
+cl_parse_extension_string(const char *ext_str, uint32_t *count)
+{
+    uint32_t c = 0;
+    const char *cur = ext_str;
+    while ((cur = strstr(cur, "cl_"))) {
+        c++;
+        cur += 3;
+    }
+
+    cl_name_version *exts = calloc(c, sizeof(*exts));
+
+    c = 0;
+    cur = ext_str;
+    while ((cur = strstr(cur, "cl_"))) {
+        cl_name_version *ext = &exts[c++];
+
+        const char *end = strchr(cur + 3, ' ');
+        size_t len = end ? (size_t)(end - cur) : strlen(cur);
+        if (len >= sizeof(ext->name))
+            len = sizeof(ext->name) - 1;
+        memcpy(ext->name, cur, len);
+        ext->name[len] = '\0';
+
+        if (end)
+            cur = end + 1;
+    }
+
+    *count = c;
+    return exts;
 }
 
 static inline int
@@ -436,20 +487,33 @@ cl_init_platforms(struct cl *cl)
 
     for (uint32_t i = 0; i < count; i++) {
         struct cl_platform *plat = &cl->platforms[i];
-        size_t size;
 
         plat->id = ids[i];
 
         plat->profile = cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_PROFILE, NULL);
         plat->version_str = cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_VERSION, NULL);
+#ifdef CL_VERSION_3_0
         cl_get_platform_info(cl, plat->id, CL_PLATFORM_NUMERIC_VERSION, &plat->version,
                              sizeof(plat->version));
+#else
+        int ver_major;
+        int ver_minor;
+        sscanf(plat->version_str, "OpenCL %d.%d ", &ver_major, &ver_minor);
+        plat->version = CL_MAKE_VERSION(ver_major, ver_minor, 0);
+#endif
         plat->name = cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_NAME, NULL);
         plat->vendor = cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_VENDOR, NULL);
 
+#ifdef CL_VERSION_3_0
+        size_t size;
         plat->extensions =
             cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_EXTENSIONS_WITH_VERSION, &size);
         plat->extension_count = size / sizeof(*plat->extensions);
+#else
+        char *ext_str = cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_EXTENSIONS, NULL);
+        plat->extensions = cl_parse_extension_string(ext_str, &plat->extension_count);
+        free(ext_str);
+#endif
         qsort(plat->extensions, plat->extension_count, sizeof(*plat->extensions),
               cl_sort_name_versions);
 
@@ -579,8 +643,10 @@ cl_init_devices(struct cl *cl, uint32_t idx)
                            &dev->max_read_write_image_args,
                            sizeof(dev->max_read_write_image_args));
 
+#ifdef CL_VERSION_3_0
         dev->ils = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_ILS_WITH_VERSION, &size);
         dev->il_count = size / sizeof(*dev->ils);
+#endif
 
         cl_get_device_info(cl, dev->id, CL_DEVICE_IMAGE2D_MAX_WIDTH, &dev->image2d_max_width,
                            sizeof(dev->image2d_max_width));
@@ -670,9 +736,11 @@ cl_init_devices(struct cl *cl, uint32_t idx)
         cl_get_device_info(cl, dev->id, CL_DEVICE_MAX_ON_DEVICE_EVENTS,
                            &dev->max_on_device_events, sizeof(dev->max_on_device_events));
 
+#ifdef CL_VERSION_3_0
         dev->built_in_kernels =
             cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_BUILT_IN_KERNELS_WITH_VERSION, &size);
         dev->built_in_kernel_count = size / sizeof(*dev->built_in_kernels);
+#endif
 
         cl_get_device_info(cl, dev->id, CL_DEVICE_PLATFORM, &dev->platform,
                            sizeof(dev->platform));
@@ -681,10 +749,11 @@ cl_init_devices(struct cl *cl, uint32_t idx)
         dev->vendor = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_VENDOR, NULL);
         dev->driver_version = cl_get_device_info_alloc(cl, dev->id, CL_DRIVER_VERSION, NULL);
         dev->profile = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_PROFILE, NULL);
+        dev->version_str = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_VERSION, NULL);
 
+#ifdef CL_VERSION_3_0
         cl_get_device_info(cl, dev->id, CL_DEVICE_NUMERIC_VERSION, &dev->version,
                            sizeof(dev->version));
-        dev->version_str = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_VERSION, NULL);
 
         dev->opencl_c_versions =
             cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_OPENCL_C_ALL_VERSIONS, &size);
@@ -699,6 +768,24 @@ cl_init_devices(struct cl *cl, uint32_t idx)
         dev->extensions =
             cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_EXTENSIONS_WITH_VERSION, &size);
         dev->extension_count = size / sizeof(*dev->extensions);
+#else
+        int ver_major;
+        int ver_minor;
+        sscanf(dev->version_str, "OpenCL %d.%d ", &ver_major, &ver_minor);
+        dev->version = CL_MAKE_VERSION(ver_major, ver_minor, 0);
+
+        char *c_ver_str = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_OPENCL_C_VERSION, NULL);
+        sscanf(c_ver_str, "OpenCL C %d.%d ", &ver_major, &ver_minor);
+        dev->opencl_c_versions = calloc(1, sizeof(*dev->opencl_c_versions));
+        dev->opencl_c_versions->version = CL_MAKE_VERSION(ver_major, ver_minor, 0);
+        memcpy(dev->opencl_c_versions->name, "OpenCL C", 9);
+        dev->opencl_c_version_count = 1;
+        free(c_ver_str);
+
+        char *ext_str = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_EXTENSIONS, NULL);
+        dev->extensions = cl_parse_extension_string(ext_str, &dev->extension_count);
+        free(ext_str);
+#endif
         qsort(dev->extensions, dev->extension_count, sizeof(*dev->extensions),
               cl_sort_name_versions);
 
@@ -738,11 +825,14 @@ cl_init_devices(struct cl *cl, uint32_t idx)
         cl_get_device_info(cl, dev->id, CL_DEVICE_PREFERRED_LOCAL_ATOMIC_ALIGNMENT,
                            &dev->preferred_local_atomic_alignment,
                            sizeof(dev->preferred_local_atomic_alignment));
+#ifdef CL_VERSION_3_0
+        /* these two belong to 2.1 but might not be supported by 2.1 implementations */
         cl_get_device_info(cl, dev->id, CL_DEVICE_MAX_NUM_SUB_GROUPS, &dev->max_num_sub_groups,
                            sizeof(dev->max_num_sub_groups));
         cl_get_device_info(cl, dev->id, CL_DEVICE_SUB_GROUP_INDEPENDENT_FORWARD_PROGRESS,
                            &dev->sub_group_independent_forward_progress,
                            sizeof(dev->sub_group_independent_forward_progress));
+
         cl_get_device_info(cl, dev->id, CL_DEVICE_ATOMIC_MEMORY_CAPABILITIES,
                            &dev->atomic_memory_capabilities,
                            sizeof(dev->atomic_memory_capabilities));
@@ -769,6 +859,7 @@ cl_init_devices(struct cl *cl, uint32_t idx)
 
         dev->latest_conformance_version_passed = cl_get_device_info_alloc(
             cl, dev->id, CL_DEVICE_LATEST_CONFORMANCE_VERSION_PASSED, NULL);
+#endif
     }
 }
 
@@ -887,7 +978,11 @@ cl_create_buffer(struct cl *cl, cl_mem_flags flags, size_t size)
     if (!buf)
         cl_die("failed to alloc buf");
 
+#ifdef CL_VERSION_3_0
     buf->mem = cl->CreateBufferWithProperties(cl->ctx, NULL, flags, size, NULL, &cl->err);
+#else
+    buf->mem = cl->CreateBuffer(cl->ctx, flags, size, NULL, &cl->err);
+#endif
     cl_check(cl, "failed to create buffer");
 
     buf->size = size;

@@ -98,8 +98,10 @@ PFN(CloneKernel)
 PFN(GetKernelSubGroupInfo)
 PFN(EnqueueSVMMigrateMem)
 PFN(SetProgramSpecializationConstant)
+#ifdef CL_VERSION_3_0
 PFN(SetContextDestructorCallback)
 PFN(CreateBufferWithProperties)
 PFN(CreateImageWithProperties)
+#endif
 
 #undef PFN
