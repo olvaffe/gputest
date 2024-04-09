@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 cl_tests = [
+  'bench_arith',
   'bench_copy',
   'bench_fill',
   'clinfo',
