@@ -12,7 +12,7 @@ kernel void arith(global REPLACE_REAL_TYPE *dst)               \n\
     const size_t idx = get_global_id(0);                       \n\
     REPLACE_REAL_TYPE x = (REPLACE_REAL_TYPE)idx;              \n\
     REPLACE_REAL_TYPE y = (REPLACE_REAL_TYPE)idx;              \n\
-    __attribute__((opencl_unroll_hint(10000)))                 \n\
+    __attribute__((opencl_unroll_hint(100)))                   \n\
     for (int i = 0; i < 10000; i++) {                          \n\
         x = (x * y) + y;                                       \n\
         y = (y * x) + x;                                       \n\
