@@ -136,6 +136,22 @@ bench_copy_dispatch(struct bench_copy *test)
         cl_unmap_buffer(cl, test->src);
         cl_unmap_buffer(cl, test->dst);
     }
+
+    {
+        const size_t size = test->size / SKIP_SCALE;
+        void *src = malloc(size);
+        void *dst = malloc(size);
+        memset(src, 0x7f, size);
+        memcpy(dst, src, size);
+
+        const uint64_t start_ns = u_now();
+        memcpy(dst, src, size);
+        const uint64_t end_ns = u_now();
+        const uint64_t dur_us = (end_ns - start_ns) / 1000;
+        const float gbps = (float)size / (end_ns - start_ns) / 1.024f / 1.024f / 1.024f;
+        cl_log("cpu baseline: memcpy %zu MiBs took %.3f ms: %.1f GiB/s", size / 1024 / 1024,
+               (float)dur_us / 1000.0f, gbps);
+    }
 }
 
 int

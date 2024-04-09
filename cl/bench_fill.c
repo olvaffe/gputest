@@ -112,7 +112,7 @@ bench_fill_dispatch(struct bench_fill *test)
         cl_get_event_profiling_info(cl, ev, CL_PROFILING_COMMAND_END, &end_ns, sizeof(end_ns));
         const uint32_t dur_us = (end_ns - start_ns) / 1000;
         const float gbps = (float)fill_size / (end_ns - start_ns) / 1.024f / 1.024f / 1.024f;
-        cl_log("copying %zu MiBs took %.3f ms: %.1f GiB/s", fill_size / 1024 / 1024,
+        cl_log("filling %zu MiBs took %.3f ms: %.1f GiB/s", fill_size / 1024 / 1024,
                (float)dur_us / 1000.0f, gbps);
 
         cl_destroy_event(cl, ev);
@@ -126,6 +126,20 @@ bench_fill_dispatch(struct bench_fill *test)
                 cl_die("ptr[%u] is 0x%x, not 0x%x", i, ptr[i], expected);
         }
         cl_unmap_buffer(cl, test->buf);
+    }
+
+    {
+        const size_t size = test->size / SKIP_SCALE;
+        void *buf = malloc(size);
+        memset(buf, 0x7f, size);
+
+        const uint64_t start_ns = u_now();
+        memset(buf, 0x7f, size);
+        const uint64_t end_ns = u_now();
+        const uint64_t dur_us = (end_ns - start_ns) / 1000;
+        const float gbps = (float)size / (end_ns - start_ns) / 1.024f / 1.024f / 1.024f;
+        cl_log("cpu baseline: memset %zu MiBs took %.3f ms: %.1f GiB/s", size / 1024 / 1024,
+               (float)dur_us / 1000.0f, gbps);
     }
 }
 
