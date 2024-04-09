@@ -419,8 +419,7 @@ cl_parse_extension_string(const char *ext_str, uint32_t *count)
         memcpy(ext->name, cur, len);
         ext->name[len] = '\0';
 
-        if (end)
-            cur = end + 1;
+        cur = end ? end + 1 : cur + len;
     }
 
     *count = c;
@@ -480,7 +479,7 @@ cl_init_platforms(struct cl *cl)
     cl->err = cl->GetPlatformIDs(count, ids, &count);
     cl_check(cl, "failed to get platform ids");
 
-    cl->platforms = malloc(sizeof(*cl->platforms) * count);
+    cl->platforms = calloc(count, sizeof(*cl->platforms));
     if (!cl->platforms)
         cl_die("failed to alloc platforms");
     cl->platform_count = count;
@@ -565,7 +564,7 @@ cl_init_devices(struct cl *cl, uint32_t idx)
     cl->err = cl->GetDeviceIDs(plat->id, CL_DEVICE_TYPE_ALL, count, ids, &count);
     cl_check(cl, "failed to get device ids");
 
-    plat->devices = malloc(sizeof(*plat->devices) * count);
+    plat->devices = calloc(count, sizeof(*plat->devices));
     if (!plat->devices)
         cl_die("failed to alloc devices");
     plat->device_count = count;
