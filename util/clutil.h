@@ -773,7 +773,7 @@ cl_init_devices(struct cl *cl, uint32_t idx)
 static inline void
 cl_context_notify(const char *errinfo, const void *private_info, size_t cb, void *user_data)
 {
-    cl_log(errinfo);
+    cl_log("%s", errinfo);
 }
 
 static inline void
