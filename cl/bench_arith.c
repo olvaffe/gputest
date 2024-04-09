@@ -81,10 +81,12 @@ bench_arith_init_global_work_size(struct bench_arith *test)
     struct cl *cl = &test->cl;
 
     const uint64_t work_item_ops = BENCH_ARITH_CS_OP_COUNT * test->type_width;
-    const uint32_t align =
-        cl->dev->max_compute_units * cl->dev->preferred_work_group_size_multiple;
     test->global_work_size = target_ops / work_item_ops;
 
+    const uint32_t align =
+        cl->dev->max_compute_units * (cl->dev->preferred_work_group_size_multiple
+                                          ? cl->dev->preferred_work_group_size_multiple
+                                          : cl->dev->max_work_group_size);
     const uint32_t rem = test->global_work_size % align;
     if (rem)
         test->global_work_size += align - rem;
