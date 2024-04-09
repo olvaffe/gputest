@@ -1066,7 +1066,12 @@ cl_create_pipeline(struct cl *cl, const char *code, const char *main)
     cl_program prog = cl->CreateProgramWithSource(cl->ctx, 1, &code, NULL, &cl->err);
     cl_check(cl, "failed to create program");
 
-    cl->err = cl->BuildProgram(prog, 1, &cl->dev->id, "-cl-std=CL3.0", NULL, NULL);
+#ifdef CL_VERSION_3_0
+    const char options[] = "-cl-std=CL3.0";
+#else
+    const char options[] = "-cl-std=CL2.0";
+#endif
+    cl->err = cl->BuildProgram(prog, 1, &cl->dev->id, options, NULL, NULL);
     if (cl->err != CL_SUCCESS) {
         cl_build_status status;
         cl_get_program_build_info(cl, prog, CL_PROGRAM_BUILD_STATUS, &status, sizeof(status));
