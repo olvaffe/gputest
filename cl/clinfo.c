@@ -14,7 +14,7 @@ info_dump_device(struct cl *cl, uint32_t plat_idx, uint32_t dev_idx)
 
     cl_log("platform #%d device #%d:", plat_idx, dev_idx);
 
-    cl_log("  type: %s", cl_device_type_to_str(dev->type));
+    cl_log("  type: %s", cl_device_type_to_str(dev->type, str, sizeof(str)));
     cl_log("  vendor_id: 0x%x", dev->vendor_id);
     cl_log("  max_compute_units: %u", dev->max_compute_units);
     cl_log("  max_work_item_dimensions: %u", dev->max_work_item_dimensions);

@@ -220,19 +220,21 @@ static inline void PRINTFLIKE(2, 3) cl_check(struct cl *cl, const char *format, 
 }
 
 static inline const char *
-cl_device_type_to_str(cl_device_type val)
+cl_device_type_to_str(cl_device_type val, char *str, size_t size)
 {
     /* clang-format off */
-    switch (val) {
-#define CASE(v) case CL_DEVICE_TYPE_ ##v: return #v
-    CASE(CPU);
-    CASE(GPU);
-    CASE(ACCELERATOR);
-    CASE(CUSTOM);
-    default: return "UNKNOWN";
-#undef CASE
-    }
+    static const struct u_bitmask_desc descs[] = {
+#define DESC(v) { .bitmask = CL_DEVICE_TYPE_ ##v, .str = #v }
+        DESC(DEFAULT),
+        DESC(CPU),
+        DESC(GPU),
+        DESC(ACCELERATOR),
+        DESC(CUSTOM),
+#undef DESC
+    };
     /* clang-format on */
+
+    return u_bitmask_to_str(val, descs, ARRAY_SIZE(descs), str, size);
 }
 
 static inline const char *
