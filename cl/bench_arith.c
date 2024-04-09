@@ -145,6 +145,7 @@ bench_arith_init(struct bench_arith *test)
         .profiling = true,
     };
     cl_init(cl, &params);
+    cl_log("device: %s", cl->dev->name);
 
     bench_arith_init_global_work_size(test);
     bench_arith_init_buffer(test);
@@ -166,7 +167,7 @@ static void
 bench_arith_dispatch(struct bench_arith *test)
 {
     struct cl *cl = &test->cl;
-    const uint32_t loops = 5;
+    const uint32_t loops = 4;
 
     cl_set_pipeline_arg(cl, test->pipeline, 0, &test->buf->mem, sizeof(test->buf->mem));
 

@@ -69,6 +69,7 @@ bench_fill_init(struct bench_fill *test)
         .profiling = true,
     };
     cl_init(cl, &params);
+    cl_log("device: %s", cl->dev->name);
 
     bench_fill_init_size(test);
     bench_fill_init_buffer(test);
@@ -93,7 +94,7 @@ bench_fill_dispatch(struct bench_fill *test)
     struct cl *cl = &test->cl;
     const size_t fill_size = test->size / SKIP_SCALE;
     const size_t count = fill_size / sizeof(cl_uint);
-    const uint32_t loops = 5;
+    const uint32_t loops = 4;
 
     cl_set_pipeline_arg(cl, test->pipeline, 0, &test->buf->mem, sizeof(test->buf->mem));
     cl_set_pipeline_arg(cl, test->pipeline, 1, &test->val, sizeof(test->val));
