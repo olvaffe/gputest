@@ -5,17 +5,23 @@
 
 #include "clutil.h"
 
-#define BENCH_ARITH_CS_OP_COUNT (10000 * 2 * 2)
+#define BENCH_ARITH_CS_OP_COUNT (400 * 128)
 static const char bench_arith_cs[] = "                         \n\
+#define OP(x, y) x *= y                                        \n\
+#define OP2(x, y) OP(x, y); OP(y, x)                           \n\
+#define OP4(x, y) OP2(x, y); OP2(x, y)                         \n\
+#define OP8(x, y) OP4(x, y); OP4(x, y)                         \n\
+#define OP16(x, y) OP8(x, y); OP8(x, y)                        \n\
+#define OP32(x, y) OP16(x, y); OP16(x, y)                      \n\
+#define OP64(x, y) OP32(x, y); OP32(x, y)                      \n\
+#define OP128(x, y) OP64(x, y); OP64(x, y)                     \n\
 kernel void arith(global REPLACE_REAL_TYPE *dst)               \n\
 {                                                              \n\
     const size_t idx = get_global_id(0);                       \n\
     REPLACE_REAL_TYPE x = (REPLACE_REAL_TYPE)idx;              \n\
     REPLACE_REAL_TYPE y = (REPLACE_REAL_TYPE)idx;              \n\
-    __attribute__((opencl_unroll_hint(100)))                   \n\
-    for (int i = 0; i < 10000; i++) {                          \n\
-        x = (x * y) + y;                                       \n\
-        y = (y * x) + x;                                       \n\
+    for (int i = 0; i < 400; i++) {                            \n\
+        OP128(x, y);                                           \n\
     }                                                          \n\
     dst[idx] = y;                                              \n\
 }";
