@@ -7,6 +7,9 @@
 
 #define BENCH_ARITH_CS_OP_COUNT (1500 * 32)
 static const char bench_arith_cs[] = "                         \n\
+#ifdef cl_khr_fp16                                             \n\
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable                  \n\
+#endif                                                         \n\
 #define OP(x, y) x *= y                                        \n\
 #define OP2(x, y) OP(x, y); OP(y, x)                           \n\
 #define OP4(x, y) OP2(x, y); OP2(x, y)                         \n\
