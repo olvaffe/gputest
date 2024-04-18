@@ -20,7 +20,6 @@
 #include "include/gpu/ganesh/vk/GrVkDirectContext.h"
 #include "util.h"
 
-#include <fcntl.h>
 #include <memory>
 
 struct sk_init_params {

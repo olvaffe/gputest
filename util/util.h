@@ -10,6 +10,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <math.h>
 #include <stdalign.h>
@@ -19,7 +20,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <time.h>
+#include <unistd.h>
 
 #define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
 #define NORETURN __attribute__((noreturn))
@@ -120,6 +123,33 @@ u_sleep(uint32_t ms)
     const int ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, NULL);
     if (ret)
         u_die("util", "failed to sleep");
+}
+
+static inline const void *
+u_map_file(const char *filename, size_t *out_size)
+{
+    const int fd = open(filename, O_RDONLY);
+    if (fd < 0)
+        u_die("util", "failed to open %s", filename);
+
+    const off_t size = lseek(fd, 0, SEEK_END);
+    if (size < 0)
+        u_die("util", "failed to seek file");
+
+    const void *ptr = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
+    if (ptr == MAP_FAILED)
+        u_die("util", "failed to map file");
+
+    close(fd);
+
+    *out_size = size;
+    return ptr;
+}
+
+static inline void
+u_unmap_file(const void *ptr, size_t size)
+{
+    munmap((void *)ptr, size);
 }
 
 static inline const void *

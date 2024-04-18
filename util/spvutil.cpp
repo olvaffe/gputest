@@ -5,7 +5,6 @@
 
 #include "spvutil.h"
 
-#include <fcntl.h>
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
@@ -13,8 +12,6 @@
 #include <memory>
 #include <sstream>
 #include <string>
-#include <sys/mman.h>
-#include <unistd.h>
 
 namespace {
 
@@ -60,33 +57,6 @@ spv_get_stage(const std::string &name)
         spv_die("bad stage name %s", name.c_str());
 }
 
-const void *
-spv_map_file(const char *filename, size_t *size)
-{
-    const int fd = open(filename, O_RDONLY | O_CLOEXEC);
-    if (fd < 0)
-        spv_die("failed to open %s", filename);
-
-    const off_t end = lseek(fd, 0, SEEK_END);
-    if (end < 0)
-        spv_die("failed to seek %s", filename);
-
-    const void *ptr = mmap(NULL, end, PROT_READ, MAP_SHARED, fd, 0);
-    if (ptr == MAP_FAILED)
-        spv_die("failed to map %s", filename);
-
-    close(fd);
-
-    *size = end;
-    return ptr;
-}
-
-void
-spv_unmap_file(const void *ptr, size_t size)
-{
-    munmap(const_cast<void *>(ptr), size);
-}
-
 } // namespace
 
 void
@@ -118,7 +88,7 @@ spv_compile_file(struct u_spv *spv, const char *filename, size_t *size)
         static_cast<EShMessages>(EShMsgDefault | EShMsgSpvRules | EShMsgVulkanRules);
 
     size_t src_size;
-    const char *src_ptr = static_cast<const char *>(spv_map_file(filename, &src_size));
+    const char *src_ptr = static_cast<const char *>(u_map_file(filename, &src_size));
 
     const char *suffix = strrchr(filename, '.');
     if (!suffix)
@@ -134,7 +104,7 @@ spv_compile_file(struct u_spv *spv, const char *filename, size_t *size)
     if (!sh.parse(GetResources(), dialect_ver, true, messages))
         spv_die("failed to parse %s: %s", filename, sh.getInfoLog());
 
-    spv_unmap_file(src_ptr, src_size);
+    u_unmap_file(src_ptr, src_size);
 
     glslang::TProgram prog;
     prog.addShader(&sh);

@@ -8,8 +8,6 @@
 
 #include "util.h"
 
-#include <fcntl.h>
-#include <unistd.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 

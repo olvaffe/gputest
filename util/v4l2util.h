@@ -8,10 +8,8 @@
 
 #include "util.h"
 
-#include <fcntl.h>
 #include <linux/videodev2.h>
 #include <sys/ioctl.h>
-#include <unistd.h>
 
 #ifdef V4L2_FMT_FLAG_CONTINUOUS_BYTESTREAM
 #define V4L2_NEW_ENOUGH

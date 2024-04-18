@@ -8,9 +8,6 @@
 
 #include "util.h"
 
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <unistd.h>
 #include <va/va.h>
 #include <va/va_drm.h>
 #include <va/va_drmcommon.h>
@@ -423,33 +420,6 @@ va_save_image(struct va *va, const VAImage *img, const char *filename)
     fclose(fp);
 
     va_unmap_buffer(va, img->buf);
-}
-
-static inline const void *
-va_map_file(struct va *va, const char *filename, size_t *out_size)
-{
-    const int fd = open(filename, O_RDONLY);
-    if (fd < 0)
-        va_die("failed to open %s", filename);
-
-    const off_t size = lseek(fd, 0, SEEK_END);
-    if (size < 0)
-        va_die("failed to seek file");
-
-    const void *ptr = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
-    if (ptr == MAP_FAILED)
-        va_die("failed to map file");
-
-    close(fd);
-
-    *out_size = size;
-    return ptr;
-}
-
-static inline void
-va_unmap_file(struct va *va, const void *ptr, size_t size)
-{
-    munmap((void *)ptr, size);
 }
 
 #endif /* VAUTIL_H */

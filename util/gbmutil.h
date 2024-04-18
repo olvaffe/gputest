@@ -8,10 +8,8 @@
 
 #include "util.h"
 
-#include <fcntl.h>
 #include <gbm.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 struct gbm_format_info {
     uint32_t format;

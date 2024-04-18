@@ -11,8 +11,6 @@
 #include "xdg-shell-protocol.h"
 
 #include <linux/input.h>
-#include <sys/mman.h>
-#include <unistd.h>
 #include <wayland-client.h>
 
 struct wl_init_params {

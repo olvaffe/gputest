@@ -8,8 +8,6 @@
 
 #include "vkutil.h"
 
-#include <unistd.h>
-
 /* limited by VK_IMAGE_ASPECT_MEMORY_PLANE_x_BIT_EXT */
 #define VK_ALLOCATOR_MEMORY_PLANE_MAX 4
 

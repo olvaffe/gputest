@@ -18,9 +18,7 @@
 #include <GLES2/gl2ext.h>
 /* clang-format on */
 #include <dlfcn.h>
-#include <fcntl.h>
 #include <strings.h>
-#include <unistd.h>
 
 #ifdef __ANDROID__
 #define LIBEGL_NAME "libEGL.so"

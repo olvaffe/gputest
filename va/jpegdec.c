@@ -441,7 +441,7 @@ jpegdec_test_decode_file(struct jpegdec_test *test, const char *filename)
 {
     struct va *va = &test->va;
 
-    test->file.ptr = va_map_file(va, filename, &test->file.size);
+    test->file.ptr = u_map_file(filename, &test->file.size);
     jpegdec_test_parse_file(test);
 
     jpegdec_test_prepare(test);
@@ -459,7 +459,7 @@ jpegdec_test_decode_file(struct jpegdec_test *test, const char *filename)
     va_destroy_surface(va, test->surface);
     va_destroy_context(va, test->context);
 
-    va_unmap_file(va, test->file.ptr, test->file.size);
+    u_unmap_file(test->file.ptr, test->file.size);
     memset(&test->file, 0, sizeof(test->file));
 }
 
