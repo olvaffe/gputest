@@ -7,6 +7,7 @@
 
 #include <glslang/Public/resource_limits_c.h>
 #include <memory>
+#include <spirv-tools/libspirv.h>
 #include <sstream>
 #include <string>
 
@@ -176,4 +177,25 @@ spv_destroy_program(struct spv *spv, struct spv_program *prog)
     glslang_program_delete(prog->glsl_prog);
 
     free(prog);
+}
+
+void
+spv_disasm_program(struct spv *spv, struct spv_program *prog)
+{
+    spv_context ctx = spvContextCreate(SPV_ENV_VULKAN_1_2);
+
+    spv_text txt;
+    spv_diagnostic diag;
+    spv_result_t res =
+        spvBinaryToText(ctx, (const uint32_t *)prog->spirv, prog->size / 4,
+                        SPV_BINARY_TO_TEXT_OPTION_COLOR | SPV_BINARY_TO_TEXT_OPTION_INDENT |
+                            SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES,
+                        &txt, &diag);
+    if (res != SPV_SUCCESS)
+        spv_die("failed to disasm prog");
+
+    spv_log("spirv disassembly:\n%s", txt->str);
+
+    spvTextDestroy(txt);
+    spvContextDestroy(ctx);
 }

@@ -40,6 +40,7 @@ compile_test_compile(struct compile_test *test)
 
     const glslang_stage_t stage = spv_guess_stage(spv, test->filename);
     struct spv_program *prog = spv_create_program_from_shader(spv, stage, test->filename);
+    spv_disasm_program(spv, prog);
     spv_destroy_program(spv, prog);
 }
 

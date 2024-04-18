@@ -61,6 +61,9 @@ spv_create_program_from_shader(struct spv *spv, glslang_stage_t stage, const cha
 void
 spv_destroy_program(struct spv *spv, struct spv_program *prog);
 
+void
+spv_disasm_program(struct spv *spv, struct spv_program *prog);
+
 #if defined(__cplusplus)
 }
 #endif
