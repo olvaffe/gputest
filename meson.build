@@ -64,16 +64,15 @@ endif
 # for spvutil
 dep_glslang = cpp.find_library(
     'glslang',
-    has_headers: ['glslang/Public/ShaderLang.h'],
+    has_headers: [
+      'glslang/Public/ResourceLimits.h',
+      'glslang/Public/ShaderLang.h',
+      'glslang/SPIRV/GlslangToSpv.h',
+      'glslang/SPIRV/disassemble.h',
+    ],
+    required: false,
 )
-dep_glslang_res = cpp.find_library(
-    'glslang-default-resource-limits',
-    has_headers: ['glslang/Public/ResourceLimits.h'],
-)
-dep_spirv = cpp.find_library(
-    'SPIRV',
-    has_headers: ['glslang/SPIRV/GlslangToSpv.h'],
-)
+dep_spirv_tools = dependency('SPIRV-Tools', required: false)
 
 # for vautil
 dep_libva = dependency('libva', required: false)

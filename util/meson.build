@@ -87,10 +87,11 @@ endif
 util_summary += {'skutil': idep_skutil}
 
 idep_spvutil = dep_not_found
-if dep_glslang.found() and dep_spirv.found()
+if dep_glslang.found() and dep_spirv_tools.found()
   idep_spvutil = declare_dependency(
     sources: ['spvutil.cpp', 'spvutil.h'],
-    dependencies: [idep_util, dep_glslang, dep_glslang_res, dep_spirv],
+    dependencies: [idep_util, dep_glslang, dep_spirv_tools],
+    link_args: ['-lglslang-default-resource-limits', '-lMachineIndependent', '-lGenericCodeGen', '-lSPIRV'],
   )
 endif
 util_summary += {'spvutil': idep_spvutil}
