@@ -77,7 +77,7 @@ clspv_path = get_option('clspv-path')
 clspv_path = fs.expanduser(clspv_path)
 if fs.is_absolute(clspv_path) and fs.is_dir(clspv_path)
   dep_clspv = cpp.find_library(
-    'clspv_combined',
+    'clspv_core',
     dirs: [clspv_path / 'out' / 'lib'],
     has_headers: ['clspv/Compiler.h'],
     header_include_directories: include_directories(clspv_path / 'include'),

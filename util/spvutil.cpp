@@ -8,11 +8,8 @@
 #include <glslang/Include/Types.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Public/resource_limits_c.h>
-#include <memory>
 #include <spirv-tools/libspirv.h>
-#include <sstream>
 #include <string>
-#include <vector>
 
 #ifdef HAVE_CLSPV
 #include <clspv/Compiler.h>
@@ -197,10 +194,7 @@ spv_create_program_from_kernel(struct spv *spv, const char *filename)
     if (!prog)
         spv_die("failed to alloc prog");
 
-    size_t file_size;
-    const void *file_data = u_map_file(filename, &file_size);
-    std::string src((const char *)file_data, (const char *)file_data + file_size);
-    u_unmap_file(file_data, file_size);
+    prog->stage = GLSLANG_STAGE_COMPUTE;
 
     std::string opts = "-cl-std=CL3.0 -inline-entry-points";
     opts += " -cl-single-precision-constant";
@@ -219,22 +213,20 @@ spv_create_program_from_kernel(struct spv *spv, const char *filename)
     opts += " -module-constants-in-storage-buffer";
     opts += " -cl-arm-non-uniform-work-group-size";
 
-    std::vector<uint32_t> spirv;
-    std::string info_log;
+    size_t file_size;
+    const void *file_data = u_map_file(filename, &file_size);
 
 #ifdef HAVE_CLSPV
-    if (clspv::CompileFromSourceString(src, std::string(), opts, &spirv, &info_log))
-        spv_die("failed to compile kernel:\n%s", info_log.c_str());
+    char *info_log = NULL;
+    if (clspvCompileFromSourcesString(1, &file_size, (const char **)&file_data, opts.c_str(),
+                                      (char **)&prog->spirv, &prog->size, &info_log))
+        spv_die("failed to compile kernel:\n%s", info_log);
+    free(info_log);
 #else
     spv_die("no clspv support");
 #endif
 
-    prog->stage = GLSLANG_STAGE_COMPUTE;
-    prog->size = spirv.size() * 4;
-    prog->spirv = malloc(prog->size);
-    if (!prog->spirv)
-        spv_die("failed to alloc spirv");
-    memcpy((void *)prog->spirv, spirv.data(), prog->size);
+    u_unmap_file(file_data, file_size);
 
     return prog;
 }
@@ -261,6 +253,9 @@ spv_destroy_program(struct spv *spv, struct spv_program *prog)
 void
 spv_reflect_program(struct spv *spv, struct spv_program *prog)
 {
+    if (!prog->glsl_prog)
+        return;
+
     /* this is a hack */
     auto *hack = *(glslang::TProgram **)prog->glsl_prog;
 

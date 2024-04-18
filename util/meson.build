@@ -95,7 +95,6 @@ if dep_glslang.found() and dep_spirv_tools.found()
   if dep_clspv.found()
     include_dirs += [clspv_path / 'include']
     compile_args += ['-DHAVE_CLSPV']
-    link_args += ['-lz', '-lzstd', '-lncurses']
   endif
 
   idep_spvutil = declare_dependency(
