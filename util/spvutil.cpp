@@ -10,6 +10,11 @@
 #include <spirv-tools/libspirv.h>
 #include <sstream>
 #include <string>
+#include <vector>
+
+#ifdef HAVE_CLSPV
+#include <clspv/Compiler.h>
+#endif
 
 static inline void
 spv_init_glslang(struct spv *spv)
@@ -41,6 +46,18 @@ void
 spv_cleanup(struct spv *spv)
 {
     glslang_finalize_process();
+}
+
+bool
+spv_guess_shader(struct spv *spv, const char *filename)
+{
+    const char *suffix = strrchr(filename, '.');
+    if (!suffix)
+        spv_die("%s has no suffix", filename);
+    suffix++;
+
+    const std::string name(suffix);
+    return name != "cl";
 }
 
 glslang_stage_t
@@ -117,7 +134,7 @@ spv_create_glslang_shader(struct spv *spv, glslang_stage_t stage, const char *fi
     if (!sh)
         spv_die("failed to create shader");
     if (!glslang_shader_preprocess(sh, &input) || !glslang_shader_parse(sh, &input))
-        spv_die("failed to parse shader: %s", glslang_shader_get_info_log(sh));
+        spv_die("failed to parse shader:\n%s", glslang_shader_get_info_log(sh));
 
     free(glsl);
 
@@ -134,7 +151,7 @@ spv_create_glslang_program(struct spv *spv, glslang_shader_t *sh)
     glslang_program_add_shader(prog, sh);
 
     if (!glslang_program_link(prog, spv->params.messages))
-        spv_die("failed to link program: %s", glslang_program_get_info_log(prog));
+        spv_die("failed to link program:\n%s", glslang_program_get_info_log(prog));
 
     glslang_program_map_io(prog);
 
@@ -150,7 +167,7 @@ spv_transpile_glslang_program(struct spv *spv,
     glslang_program_SPIRV_generate(prog, stage);
     const char *info_log = glslang_program_SPIRV_get_messages(prog);
     if (info_log)
-        spv_die("failed to transpile program: %s", info_log);
+        spv_die("failed to transpile program:\n%s", info_log);
 
     *out_size = glslang_program_SPIRV_get_size(prog) * 4;
     return glslang_program_SPIRV_get_ptr(prog);
@@ -170,11 +187,63 @@ spv_create_program_from_shader(struct spv *spv, glslang_stage_t stage, const cha
     return prog;
 }
 
+struct spv_program *
+spv_create_program_from_kernel(struct spv *spv, const char *filename)
+{
+    struct spv_program *prog = (struct spv_program *)calloc(1, sizeof(*prog));
+    if (!prog)
+        spv_die("failed to alloc prog");
+
+    size_t file_size;
+    const void *file_data = u_map_file(filename, &file_size);
+    std::string src((const char *)file_data, (const char *)file_data + file_size);
+    u_unmap_file(file_data, file_size);
+
+    std::string opts = "-cl-std=CL3.0 -inline-entry-points";
+    opts += " -cl-single-precision-constant";
+    opts += " -cl-kernel-arg-info";
+    opts += " -rounding-mode-rte=16,32,64";
+    opts += " -rewrite-packed-structs";
+    opts += " -std430-ubo-layout";
+    opts += " -decorate-nonuniform";
+    opts += " -hack-convert-to-float";
+    opts += " -arch=spir";
+    opts += " -spv-version=1.5";
+    opts += " -max-pushconstant-size=128";
+    opts += " -max-ubo-size=16384";
+    opts += " -global-offset";
+    opts += " -long-vector";
+    opts += " -module-constants-in-storage-buffer";
+    opts += " -cl-arm-non-uniform-work-group-size";
+
+    std::vector<uint32_t> spirv;
+    std::string info_log;
+
+#ifdef HAVE_CLSPV
+    if (clspv::CompileFromSourceString(src, std::string(), opts, &spirv, &info_log))
+        spv_die("failed to compile kernel:\n%s", info_log.c_str());
+#else
+    spv_die("no clspv support");
+#endif
+
+    prog->size = spirv.size() * 4;
+    prog->spirv = malloc(prog->size);
+    if (!prog->spirv)
+        spv_die("failed to alloc spirv");
+    memcpy((void *)prog->spirv, spirv.data(), prog->size);
+
+    return prog;
+}
+
 void
 spv_destroy_program(struct spv *spv, struct spv_program *prog)
 {
-    glslang_shader_delete(prog->glsl_sh);
-    glslang_program_delete(prog->glsl_prog);
+    if (prog->glsl_prog) {
+        glslang_shader_delete(prog->glsl_sh);
+        glslang_program_delete(prog->glsl_prog);
+    } else {
+        free((void *)prog->spirv);
+    }
 
     free(prog);
 }

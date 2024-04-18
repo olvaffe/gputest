@@ -88,10 +88,22 @@ util_summary += {'skutil': idep_skutil}
 
 idep_spvutil = dep_not_found
 if dep_glslang.found() and dep_spirv_tools.found()
+  include_dirs = []
+  compile_args = []
+  link_args = ['-lglslang-default-resource-limits', '-lMachineIndependent', '-lGenericCodeGen', '-lSPIRV']
+
+  if dep_clspv.found()
+    include_dirs += [clspv_path / 'include']
+    compile_args += ['-DHAVE_CLSPV']
+    link_args += ['-lz', '-lzstd', '-lncurses']
+  endif
+
   idep_spvutil = declare_dependency(
     sources: ['spvutil.cpp', 'spvutil.h'],
-    dependencies: [idep_util, dep_glslang, dep_spirv_tools],
-    link_args: ['-lglslang-default-resource-limits', '-lMachineIndependent', '-lGenericCodeGen', '-lSPIRV'],
+    dependencies: [idep_util, dep_glslang, dep_spirv_tools, dep_clspv],
+    link_args: link_args,
+    compile_args: compile_args,
+    include_directories: include_dirs,
   )
 endif
 util_summary += {'spvutil': idep_spvutil}

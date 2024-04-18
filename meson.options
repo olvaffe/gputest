@@ -2,6 +2,13 @@
 # SPDX-License-Identifier: MIT
 
 option(
+  'clspv-path',
+  type: 'string',
+  value: 'clspv',
+  description: 'Path to clspv',
+)
+
+option(
   'skia-path',
   type: 'string',
   value: 'skia',

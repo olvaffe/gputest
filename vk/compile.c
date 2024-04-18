@@ -38,9 +38,16 @@ compile_test_compile(struct compile_test *test)
 {
     struct spv *spv = &test->spv;
 
-    const glslang_stage_t stage = spv_guess_stage(spv, test->filename);
-    struct spv_program *prog = spv_create_program_from_shader(spv, stage, test->filename);
+    struct spv_program *prog;
+    if (spv_guess_shader(spv, test->filename)) {
+        const glslang_stage_t stage = spv_guess_stage(spv, test->filename);
+        prog = spv_create_program_from_shader(spv, stage, test->filename);
+    } else {
+        prog = spv_create_program_from_kernel(spv, test->filename);
+    }
+
     spv_disasm_program(spv, prog);
+
     spv_destroy_program(spv, prog);
 }
 

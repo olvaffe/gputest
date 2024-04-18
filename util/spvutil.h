@@ -52,11 +52,17 @@ spv_init(struct spv *spv, const struct spv_init_params *params);
 void
 spv_cleanup(struct spv *spv);
 
+bool
+spv_guess_shader(struct spv *spv, const char *filename);
+
 glslang_stage_t
 spv_guess_stage(struct spv *spv, const char *filename);
 
 struct spv_program *
 spv_create_program_from_shader(struct spv *spv, glslang_stage_t stage, const char *filename);
+
+struct spv_program *
+spv_create_program_from_kernel(struct spv *spv, const char *filename);
 
 void
 spv_destroy_program(struct spv *spv, struct spv_program *prog);

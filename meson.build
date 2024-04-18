@@ -72,6 +72,18 @@ dep_glslang = cpp.find_library(
 )
 dep_spirv_tools = dependency('SPIRV-Tools', required: false)
 
+dep_clspv = dep_not_found
+clspv_path = get_option('clspv-path')
+clspv_path = fs.expanduser(clspv_path)
+if fs.is_absolute(clspv_path) and fs.is_dir(clspv_path)
+  dep_clspv = cpp.find_library(
+    'clspv_combined',
+    dirs: [clspv_path / 'out' / 'lib'],
+    has_headers: ['clspv/Compiler.h'],
+    header_include_directories: include_directories(clspv_path / 'include'),
+  )
+endif
+
 # for vautil
 dep_libva = dependency('libva', required: false)
 dep_libva_drm = dependency('libva-drm', required: false)
