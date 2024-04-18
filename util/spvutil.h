@@ -22,9 +22,29 @@ struct spv {
     struct spv_init_params params;
 };
 
+struct spv_program_reflection_binding {
+    uint32_t binding;
+    int storage;
+    uint32_t count;
+    glslang_stage_mask_t stages;
+};
+
+struct spv_program_reflection_set {
+    uint32_t binding_count;
+    struct spv_program_reflection_binding *bindings;
+};
+
+struct spv_program_reflection {
+    uint32_t set_count;
+    struct spv_program_reflection_set *sets;
+};
+
 struct spv_program {
+    glslang_stage_t stage;
     glslang_shader_t *glsl_sh;
     glslang_program_t *glsl_prog;
+
+    struct spv_program_reflection reflection;
 
     const void *spirv;
     size_t size;
@@ -66,6 +86,9 @@ spv_create_program_from_kernel(struct spv *spv, const char *filename);
 
 void
 spv_destroy_program(struct spv *spv, struct spv_program *prog);
+
+void
+spv_reflect_program(struct spv *spv, struct spv_program *prog);
 
 void
 spv_disasm_program(struct spv *spv, struct spv_program *prog);

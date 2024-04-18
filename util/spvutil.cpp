@@ -5,6 +5,8 @@
 
 #include "spvutil.h"
 
+#include <glslang/Include/Types.h>
+#include <glslang/Public/ShaderLang.h>
 #include <glslang/Public/resource_limits_c.h>
 #include <memory>
 #include <spirv-tools/libspirv.h>
@@ -180,6 +182,7 @@ spv_create_program_from_shader(struct spv *spv, glslang_stage_t stage, const cha
     if (!prog)
         spv_die("failed to alloc prog");
 
+    prog->stage = stage;
     prog->glsl_sh = spv_create_glslang_shader(spv, stage, filename);
     prog->glsl_prog = spv_create_glslang_program(spv, prog->glsl_sh);
     prog->spirv = spv_transpile_glslang_program(spv, prog->glsl_prog, stage, &prog->size);
@@ -226,6 +229,7 @@ spv_create_program_from_kernel(struct spv *spv, const char *filename)
     spv_die("no clspv support");
 #endif
 
+    prog->stage = GLSLANG_STAGE_COMPUTE;
     prog->size = spirv.size() * 4;
     prog->spirv = malloc(prog->size);
     if (!prog->spirv)
@@ -238,6 +242,12 @@ spv_create_program_from_kernel(struct spv *spv, const char *filename)
 void
 spv_destroy_program(struct spv *spv, struct spv_program *prog)
 {
+    for (uint32_t i = 0; i < prog->reflection.set_count; i++) {
+        struct spv_program_reflection_set *set = &prog->reflection.sets[i];
+        free(set->bindings);
+    }
+    free(prog->reflection.sets);
+
     if (prog->glsl_prog) {
         glslang_shader_delete(prog->glsl_sh);
         glslang_program_delete(prog->glsl_prog);
@@ -246,6 +256,64 @@ spv_destroy_program(struct spv *spv, struct spv_program *prog)
     }
 
     free(prog);
+}
+
+void
+spv_reflect_program(struct spv *spv, struct spv_program *prog)
+{
+    /* this is a hack */
+    auto *hack = *(glslang::TProgram **)prog->glsl_prog;
+
+    hack->buildReflection(EShReflectionDefault);
+
+    uint32_t max_set = 0;
+    uint32_t max_binding = 0;
+    for (int i = 0; i < hack->getNumUniformBlocks(); i++) {
+        const glslang::TObjectReflection &obj = hack->getUniformBlock(i);
+        const glslang::TType *ty = obj.getType();
+        const glslang::TQualifier &qual = ty->getQualifier();
+
+        if (qual.layoutPushConstant)
+            spv_die("no push const support");
+
+        if (qual.hasSet() && max_set < qual.layoutSet)
+            max_set = qual.layoutSet;
+        if (qual.hasBinding() && max_binding < qual.layoutBinding)
+            max_binding = qual.layoutBinding;
+    }
+
+    const uint32_t set_count = max_set + 1;
+    const uint32_t binding_count = max_binding + 1;
+    struct spv_program_reflection_set *sets =
+        (struct spv_program_reflection_set *)calloc(set_count, sizeof(*sets));
+    if (!sets)
+        spv_die("failed to alloc set");
+
+    for (int i = 0; i < hack->getNumUniformBlocks(); i++) {
+        const glslang::TObjectReflection &obj = hack->getUniformBlock(i);
+        const glslang::TType *ty = obj.getType();
+        const glslang::TQualifier &qual = ty->getQualifier();
+
+        const uint32_t layout_set = qual.hasSet() ? qual.layoutSet : 0;
+        const uint32_t layout_binding = qual.hasBinding() ? qual.layoutBinding : 0;
+
+        struct spv_program_reflection_set *set = &sets[layout_set];
+        if (!set->bindings) {
+            set->bindings = (struct spv_program_reflection_binding *)calloc(
+                binding_count, sizeof(*set->bindings));
+            if (!set->bindings)
+                spv_die("failed to alloc bindings");
+        }
+
+        struct spv_program_reflection_binding *binding = &set->bindings[set->binding_count++];
+        binding->binding = layout_binding;
+        binding->storage = qual.storage;
+        binding->count = 1;
+        binding->stages = (glslang_stage_mask_t)obj.stages;
+    }
+
+    prog->reflection.set_count = set_count;
+    prog->reflection.sets = sets;
 }
 
 void
