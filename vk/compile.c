@@ -34,37 +34,29 @@ compile_test_cleanup(struct compile_test *test)
     spv_cleanup(spv);
 }
 
-static void
-compile_test_compile(struct compile_test *test)
+static VkPipelineLayout
+compile_test_create_pipeline_layout(struct compile_test *test, struct spv_program *prog)
 {
+    const VkShaderStageFlags stage = VK_SHADER_STAGE_COMPUTE_BIT;
     struct spv *spv = &test->spv;
     struct vk *vk = &test->vk;
 
-    struct spv_program *prog;
-    if (spv_guess_shader(spv, test->filename)) {
-        const glslang_stage_t stage = spv_guess_stage(spv, test->filename);
-        prog = spv_create_program_from_shader(spv, stage, test->filename);
-    } else {
-        prog = spv_create_program_from_kernel(spv, test->filename);
-    }
+    spv_reflect_program(spv, prog);
 
-    if (test->disasm)
-        spv_disasm_program(spv, prog);
+    VkDescriptorSetLayout *set_layouts =
+        malloc(sizeof(*set_layouts) * prog->reflection.set_count);
+    if (!set_layouts)
+        vk_die("failed to alloc set layouts");
 
-    if (prog->stage == GLSLANG_STAGE_COMPUTE) {
-        const VkShaderStageFlags stages = VK_SHADER_STAGE_COMPUTE_BIT;
+    for (uint32_t i = 0; i < prog->reflection.set_count; i++) {
+        const struct spv_program_reflection_set *set = &prog->reflection.sets[i];
 
-        spv_reflect_program(spv, prog);
-        const struct spv_program_reflection *reflection = &prog->reflection;
+        VkDescriptorSetLayoutBinding *bindings = malloc(sizeof(*bindings) * set->binding_count);
+        if (!bindings)
+            vk_die("failed to alloc bindings");
 
-        struct vk_pipeline *pipeline = vk_create_pipeline(vk);
-        vk_add_pipeline_shader(vk, pipeline, stages, prog->spirv, prog->size);
-
-        for (uint32_t i = 0; i < reflection->set_count; i++) {
-            const struct spv_program_reflection_set *set = &reflection->sets[i];
-            const struct spv_program_reflection_binding *binding = &set->bindings[0];
-            if (set->binding_count > 1 || binding->binding)
-                vk_die("bad bindings");
+        for (uint32_t j = 0; j < set->binding_count; j++) {
+            const struct spv_program_reflection_binding *binding = &set->bindings[j];
 
             VkDescriptorType type;
             switch (binding->storage) {
@@ -79,13 +71,87 @@ compile_test_compile(struct compile_test *test)
                 break;
             }
 
-            vk_add_pipeline_set_layout(vk, pipeline, type, binding->count, stages, NULL);
+            bindings[j] = (VkDescriptorSetLayoutBinding){
+                .binding = binding->binding,
+                .descriptorType = type,
+                .descriptorCount = binding->count,
+                .stageFlags = stage,
+            };
         }
 
-        vk_setup_pipeline(vk, pipeline, NULL);
-        vk_compile_pipeline(vk, pipeline);
-        vk_destroy_pipeline(vk, pipeline);
+        const VkDescriptorSetLayoutCreateInfo set_layout_info = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = set->binding_count,
+            .pBindings = bindings,
+        };
+        vk->result =
+            vk->CreateDescriptorSetLayout(vk->dev, &set_layout_info, NULL, &set_layouts[i]);
+        vk_check(vk, "failed to create set layout");
+
+        free(bindings);
     }
+
+    const VkPipelineLayoutCreateInfo pipeline_layout_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = prog->reflection.set_count,
+        .pSetLayouts = set_layouts,
+    };
+    VkPipelineLayout pipeline_layout;
+    vk->result = vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL, &pipeline_layout);
+    vk_check(vk, "failed to create pipeline layout");
+
+    for (uint32_t i = 0; i < prog->reflection.set_count; i++)
+        vk->DestroyDescriptorSetLayout(vk->dev, set_layouts[i], NULL);
+    free(set_layouts);
+
+    return pipeline_layout;
+}
+
+static void
+compile_test_compile_compute_pipeline(struct compile_test *test, struct spv_program *prog)
+{
+    const VkShaderStageFlags stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    struct vk *vk = &test->vk;
+
+    const VkComputePipelineCreateInfo pipeline_info = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .stage = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = stage,
+            .module = vk_create_shader_module(vk, prog->spirv, prog->size),
+            .pName = "main",
+        },
+        .layout = compile_test_create_pipeline_layout(test, prog),
+    };
+    VkPipeline pipeline;
+    vk->result =
+        vk->CreateComputePipelines(vk->dev, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &pipeline);
+    vk_check(vk, "failed to create pipeline");
+
+    vk->DestroyShaderModule(vk->dev, pipeline_info.stage.module, NULL);
+    vk->DestroyPipelineLayout(vk->dev, pipeline_info.layout, NULL);
+
+    vk->DestroyPipeline(vk->dev, pipeline, NULL);
+}
+
+static void
+compile_test_compile(struct compile_test *test)
+{
+    struct spv *spv = &test->spv;
+
+    struct spv_program *prog;
+    if (spv_guess_shader(spv, test->filename)) {
+        const glslang_stage_t stage = spv_guess_stage(spv, test->filename);
+        prog = spv_create_program_from_shader(spv, stage, test->filename);
+    } else {
+        prog = spv_create_program_from_kernel(spv, test->filename);
+    }
+
+    if (test->disasm)
+        spv_disasm_program(spv, prog);
+
+    if (prog->stage == GLSLANG_STAGE_COMPUTE)
+        compile_test_compile_compute_pipeline(test, prog);
 
     spv_destroy_program(spv, prog);
 }
