@@ -15,7 +15,7 @@ tests = [
   'image',
   'info',
   'ktx',
-  'memory',
+  'mem',
   'msaa',
   'pipeline_stats',
   'push_const',
@@ -34,6 +34,9 @@ tests = [
   'ycbcr',
 ]
 
+if idep_spvutil.found()
+  tests += ['compile']
+endif
 if dep_sdl2.found()
   tests += ['sdl']
 endif
@@ -74,7 +77,9 @@ foreach t : tests
   test_deps = [idep_vkutil]
   test_args = []
 
-  if t == 'ktx'
+  if t == 'compile'
+    test_deps += [idep_spvutil]
+  elif t == 'ktx'
     if dep_ktx.found()
       test_deps += [dep_ktx]
     else

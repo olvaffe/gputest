@@ -86,6 +86,15 @@ if dep_skia.found()
 endif
 util_summary += {'skutil': idep_skutil}
 
+idep_spvutil = dep_not_found
+if dep_glslang.found() and dep_spirv.found()
+  idep_spvutil = declare_dependency(
+    sources: ['spvutil.cpp', 'spvutil.h'],
+    dependencies: [idep_util, dep_glslang, dep_glslang_res, dep_spirv],
+  )
+endif
+util_summary += {'spvutil': idep_spvutil}
+
 idep_v4l2util = dep_not_found
 if cc.has_header('linux/videodev2.h')
   idep_v4l2util = declare_dependency(

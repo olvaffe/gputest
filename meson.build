@@ -61,6 +61,20 @@ if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
   dep_glesv2 = dependency('glesv2')
 endif
 
+# for spvutil
+dep_glslang = cpp.find_library(
+    'glslang',
+    has_headers: ['glslang/Public/ShaderLang.h'],
+)
+dep_glslang_res = cpp.find_library(
+    'glslang-default-resource-limits',
+    has_headers: ['glslang/Public/ResourceLimits.h'],
+)
+dep_spirv = cpp.find_library(
+    'SPIRV',
+    has_headers: ['glslang/SPIRV/GlslangToSpv.h'],
+)
+
 # for vautil
 dep_libva = dependency('libva', required: false)
 dep_libva_drm = dependency('libva-drm', required: false)
