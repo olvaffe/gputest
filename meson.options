@@ -14,3 +14,10 @@ option(
   value: 'skia',
   description: 'Path to skia',
 )
+
+option(
+  'spirv-reflect-path',
+  type: 'string',
+  value: 'SPIRV-Reflect',
+  description: 'Path to SPIRV-Reflect',
+)

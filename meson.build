@@ -84,6 +84,18 @@ if fs.is_absolute(clspv_path) and fs.is_dir(clspv_path)
   )
 endif
 
+dep_spirv_reflect = dep_not_found
+spirv_reflect_path = get_option('spirv-reflect-path')
+spirv_reflect_path = fs.expanduser(spirv_reflect_path)
+if fs.is_absolute(spirv_reflect_path) and fs.is_dir(spirv_reflect_path)
+  dep_spirv_reflect = cpp.find_library(
+    'spirv-reflect-static',
+    dirs: [spirv_reflect_path / 'out'],
+    has_headers: ['spirv_reflect.h'],
+    header_include_directories: include_directories(spirv_reflect_path),
+  )
+endif
+
 # for vautil
 dep_libva = dependency('libva', required: false)
 dep_libva_drm = dependency('libva-drm', required: false)

@@ -13,6 +13,7 @@
 
 #ifdef HAVE_CLSPV
 #include <clspv/Compiler.h>
+#include <spirv_reflect.h>
 #endif
 
 static inline void
@@ -244,18 +245,16 @@ spv_destroy_program(struct spv *spv, struct spv_program *prog)
         glslang_shader_delete(prog->glsl_sh);
         glslang_program_delete(prog->glsl_prog);
     } else {
+        free((void *)prog->reflection.entrypoint);
         free((void *)prog->spirv);
     }
 
     free(prog);
 }
 
-void
-spv_reflect_program(struct spv *spv, struct spv_program *prog)
+static void
+spv_reflect_glslang_program(struct spv *spv, struct spv_program *prog)
 {
-    if (!prog->glsl_prog)
-        return;
-
     /* this is a hack */
     auto *hack = *(glslang::TProgram **)prog->glsl_prog;
 
@@ -307,8 +306,78 @@ spv_reflect_program(struct spv *spv, struct spv_program *prog)
         binding->stages = (glslang_stage_mask_t)obj.stages;
     }
 
+    prog->reflection.entrypoint = "main";
     prog->reflection.set_count = set_count;
     prog->reflection.sets = sets;
+}
+
+static void
+spv_reflect_clspv_program(struct spv *spv, struct spv_program *prog)
+{
+#ifdef HAVE_CLSPV
+    SpvReflectShaderModule mod;
+    SpvReflectResult res = spvReflectCreateShaderModule(prog->size, prog->spirv, &mod);
+    if (res != SPV_REFLECT_RESULT_SUCCESS)
+        spv_die("failed to reflect spirv");
+
+    uint32_t max_set = 0;
+    for (uint32_t i = 0; i < mod.descriptor_set_count; i++) {
+        const SpvReflectDescriptorSet *set = &mod.descriptor_sets[i];
+        if (max_set < set->set)
+            max_set = set->set;
+    }
+
+    const uint32_t set_count = max_set + 1;
+    struct spv_program_reflection_set *sets =
+        (struct spv_program_reflection_set *)calloc(set_count, sizeof(*sets));
+    if (!sets)
+        spv_die("failed to alloc sets");
+
+    for (uint32_t i = 0; i < mod.descriptor_set_count; i++) {
+        const SpvReflectDescriptorSet *src = &mod.descriptor_sets[i];
+        struct spv_program_reflection_set *dst = &sets[src->set];
+
+        dst->bindings = (struct spv_program_reflection_binding *)calloc(src->binding_count,
+                                                                        sizeof(*dst->bindings));
+        if (!dst->bindings)
+            spv_die("failed to alloc bindings");
+
+        for (uint32_t j = 0; j < src->binding_count; j++) {
+            const SpvReflectDescriptorBinding *s = src->bindings[j];
+            struct spv_program_reflection_binding *d = &dst->bindings[j];
+            d->binding = s->binding;
+            switch (s->descriptor_type) {
+            case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+                d->storage = (int)glslang::EvqUniform;
+                break;
+            case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+                d->storage = (int)glslang::EvqBuffer;
+                break;
+            default:
+                spv_die("unsupported descriptor type");
+            }
+            d->count = s->count;
+            d->stages = GLSLANG_STAGE_COMPUTE_MASK;
+        }
+    }
+
+    prog->reflection.entrypoint = strdup(mod.entry_point_name);
+    prog->reflection.set_count = set_count;
+    prog->reflection.sets = sets;
+
+    spvReflectDestroyShaderModule(&mod);
+#else
+    spv_die("no spirv-reflect support");
+#endif
+}
+
+void
+spv_reflect_program(struct spv *spv, struct spv_program *prog)
+{
+    if (prog->glsl_prog)
+        spv_reflect_glslang_program(spv, prog);
+    else
+        spv_reflect_clspv_program(spv, prog);
 }
 
 void

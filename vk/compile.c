@@ -38,10 +38,7 @@ static VkPipelineLayout
 compile_test_create_pipeline_layout(struct compile_test *test, struct spv_program *prog)
 {
     const VkShaderStageFlags stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    struct spv *spv = &test->spv;
     struct vk *vk = &test->vk;
-
-    spv_reflect_program(spv, prog);
 
     VkDescriptorSetLayout *set_layouts =
         malloc(sizeof(*set_layouts) * prog->reflection.set_count);
@@ -112,6 +109,9 @@ compile_test_compile_compute_pipeline(struct compile_test *test, struct spv_prog
 {
     const VkShaderStageFlags stage = VK_SHADER_STAGE_COMPUTE_BIT;
     struct vk *vk = &test->vk;
+    struct spv *spv = &test->spv;
+
+    spv_reflect_program(spv, prog);
 
     const VkComputePipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
@@ -119,7 +119,7 @@ compile_test_compile_compute_pipeline(struct compile_test *test, struct spv_prog
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = stage,
             .module = vk_create_shader_module(vk, prog->spirv, prog->size),
-            .pName = "main",
+            .pName = prog->reflection.entrypoint,
         },
         .layout = compile_test_create_pipeline_layout(test, prog),
     };

@@ -92,14 +92,14 @@ if dep_glslang.found() and dep_spirv_tools.found()
   compile_args = []
   link_args = ['-lglslang-default-resource-limits', '-lMachineIndependent', '-lGenericCodeGen', '-lSPIRV']
 
-  if dep_clspv.found()
-    include_dirs += [clspv_path / 'include']
+  if dep_clspv.found() and dep_spirv_reflect.found()
+    include_dirs += [clspv_path / 'include', spirv_reflect_path]
     compile_args += ['-DHAVE_CLSPV']
   endif
 
   idep_spvutil = declare_dependency(
     sources: ['spvutil.cpp', 'spvutil.h'],
-    dependencies: [idep_util, dep_glslang, dep_spirv_tools, dep_clspv],
+    dependencies: [idep_util, dep_glslang, dep_spirv_tools, dep_clspv, dep_spirv_reflect],
     link_args: link_args,
     compile_args: compile_args,
     include_directories: include_dirs,

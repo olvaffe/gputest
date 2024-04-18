@@ -35,6 +35,8 @@ struct spv_program_reflection_set {
 };
 
 struct spv_program_reflection {
+    const char *entrypoint;
+
     uint32_t set_count;
     struct spv_program_reflection_set *sets;
 };
