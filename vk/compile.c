@@ -9,14 +9,14 @@
 struct compile_test {
     const char *filename;
 
-    struct u_spv spv;
+    struct spv spv;
     struct vk vk;
 };
 
 static void
 compile_test_init(struct compile_test *test)
 {
-    struct u_spv *spv = &test->spv;
+    struct spv *spv = &test->spv;
     struct vk *vk = &test->vk;
 
     spv_init(spv, NULL);
@@ -26,7 +26,7 @@ compile_test_init(struct compile_test *test)
 static void
 compile_test_cleanup(struct compile_test *test)
 {
-    struct u_spv *spv = &test->spv;
+    struct spv *spv = &test->spv;
     struct vk *vk = &test->vk;
 
     vk_cleanup(vk);
@@ -36,15 +36,11 @@ compile_test_cleanup(struct compile_test *test)
 static void
 compile_test_compile(struct compile_test *test)
 {
-    struct u_spv *spv = &test->spv;
+    struct spv *spv = &test->spv;
 
-    size_t size;
-    void *spirv = spv_compile_file(spv, test->filename, &size);
-
-    spv_log("dumping spirv:");
-    spv_dump(spv, spirv, size);
-
-    free(spirv);
+    const glslang_stage_t stage = spv_guess_stage(spv, test->filename);
+    struct spv_program *prog = spv_create_program_from_shader(spv, stage, test->filename);
+    spv_destroy_program(spv, prog);
 }
 
 int

@@ -5,140 +5,175 @@
 
 #include "spvutil.h"
 
-#include <glslang/Public/ResourceLimits.h>
-#include <glslang/Public/ShaderLang.h>
-#include <glslang/SPIRV/GlslangToSpv.h>
-#include <glslang/SPIRV/disassemble.h>
+#include <glslang/Public/resource_limits_c.h>
 #include <memory>
 #include <sstream>
 #include <string>
 
-namespace {
-
-void
-spv_init_glslang(struct u_spv *spv)
+static inline void
+spv_init_glslang(struct spv *spv)
 {
-    glslang::InitializeProcess();
-    *GetResources() = *GetDefaultResources();
+    glslang_initialize_process();
+
+    glslang_resource_t *res = glslang_resource();
+    *res = *glslang_default_resource();
 }
 
-EShLanguage
-spv_get_stage(const std::string &name)
-{
-    if (name == "vert")
-        return EShLangVertex;
-    else if (name == "tesc")
-        return EShLangTessControl;
-    else if (name == "tese")
-        return EShLangTessEvaluation;
-    else if (name == "geom")
-        return EShLangGeometry;
-    else if (name == "frag")
-        return EShLangFragment;
-    else if (name == "comp")
-        return EShLangCompute;
-    else if (name == "rgen")
-        return EShLangRayGen;
-    else if (name == "rint")
-        return EShLangIntersect;
-    else if (name == "rahit")
-        return EShLangAnyHit;
-    else if (name == "rchit")
-        return EShLangClosestHit;
-    else if (name == "rmiss")
-        return EShLangMiss;
-    else if (name == "rcall")
-        return EShLangCallable;
-    else if (name == "task")
-        return EShLangTask;
-    else if (name == "mesh")
-        return EShLangMesh;
-    else
-        spv_die("bad stage name %s", name.c_str());
-}
-
-} // namespace
-
 void
-spv_init(struct u_spv *spv, const struct spv_init_params *params)
+spv_init(struct spv *spv, const struct spv_init_params *params)
 {
     memset(spv, 0, sizeof(*spv));
+
     if (params)
         spv->params = *params;
+
+    if (!spv->params.messages) {
+        spv->params.messages =
+            (glslang_messages_t)(GLSLANG_MSG_DEFAULT_BIT | GLSLANG_MSG_SPV_RULES_BIT |
+                                 GLSLANG_MSG_VULKAN_RULES_BIT);
+    }
 
     spv_init_glslang(spv);
 }
 
 void
-spv_cleanup(struct u_spv *spv)
+spv_cleanup(struct spv *spv)
 {
-    glslang::FinalizeProcess();
+    glslang_finalize_process();
 }
 
-void *
-spv_compile_file(struct u_spv *spv, const char *filename, size_t *size)
+glslang_stage_t
+spv_guess_stage(struct spv *spv, const char *filename)
 {
-    const glslang::EShSource lang = glslang::EShSourceGlsl;
-    const glslang::EShClient client = glslang::EShClientVulkan;
-    const glslang::EShTargetClientVersion client_ver = glslang::EShTargetVulkan_1_2;
-    const int dialect_ver = 100;
-    const glslang::EShTargetLanguage target_lang = glslang::EShTargetSpv;
-    const glslang::EShTargetLanguageVersion target_ver = glslang::EShTargetSpv_1_5;
-    const EShMessages messages =
-        static_cast<EShMessages>(EShMsgDefault | EShMsgSpvRules | EShMsgVulkanRules);
-
-    size_t src_size;
-    const char *src_ptr = static_cast<const char *>(u_map_file(filename, &src_size));
-
     const char *suffix = strrchr(filename, '.');
     if (!suffix)
         spv_die("%s has no suffix", filename);
-    const EShLanguage stage = spv_get_stage(++suffix);
+    suffix++;
 
-    glslang::TShader sh(stage);
-    sh.setEnvInput(lang, stage, client, dialect_ver);
-    sh.setEnvClient(client, client_ver);
-    sh.setEnvTarget(target_lang, target_ver);
-    sh.setStringsWithLengthsAndNames(&src_ptr, NULL, &filename, 1);
+    const std::string name(suffix);
+    if (name == "vert")
+        return GLSLANG_STAGE_VERTEX;
+    else if (name == "tesc")
+        return GLSLANG_STAGE_TESSCONTROL;
+    else if (name == "tese")
+        return GLSLANG_STAGE_TESSEVALUATION;
+    else if (name == "geom")
+        return GLSLANG_STAGE_GEOMETRY;
+    else if (name == "frag")
+        return GLSLANG_STAGE_FRAGMENT;
+    else if (name == "comp")
+        return GLSLANG_STAGE_COMPUTE;
+    else if (name == "rgen")
+        return GLSLANG_STAGE_RAYGEN;
+    else if (name == "rint")
+        return GLSLANG_STAGE_INTERSECT;
+    else if (name == "rahit")
+        return GLSLANG_STAGE_ANYHIT;
+    else if (name == "rchit")
+        return GLSLANG_STAGE_CLOSESTHIT;
+    else if (name == "rmiss")
+        return GLSLANG_STAGE_MISS;
+    else if (name == "rcall")
+        return GLSLANG_STAGE_CALLABLE;
+    else if (name == "task")
+        return GLSLANG_STAGE_TASK;
+    else if (name == "mesh")
+        return GLSLANG_STAGE_MESH;
+    else
+        spv_die("bad stage name %s", name.c_str());
+}
 
-    if (!sh.parse(GetResources(), dialect_ver, true, messages))
-        spv_die("failed to parse %s: %s", filename, sh.getInfoLog());
+static glslang_shader_t *
+spv_create_glslang_shader(struct spv *spv, glslang_stage_t stage, const char *filename)
+{
+    size_t file_size;
+    const void *file_data = u_map_file(filename, &file_size);
 
-    u_unmap_file(src_ptr, src_size);
+    char *glsl = (char *)malloc(file_size + 1);
+    if (!glsl)
+        spv_die("failed to alloc glsl");
+    memcpy(glsl, file_data, file_size);
+    glsl[file_size] = '\0';
 
-    glslang::TProgram prog;
-    prog.addShader(&sh);
+    u_unmap_file(file_data, file_size);
 
-    if (!prog.link(messages))
-        spv_die("failed to link %s: %s", filename, prog.getInfoLog());
+    const glslang_input_t input = {
+        .language = GLSLANG_SOURCE_GLSL,
+        .stage = stage,
+        .client = GLSLANG_CLIENT_VULKAN,
+        .client_version = GLSLANG_TARGET_VULKAN_1_2,
+        .target_language = GLSLANG_TARGET_SPV,
+        .target_language_version = GLSLANG_TARGET_SPV_1_2,
+        .code = glsl,
+        .default_version = 100,
+        .default_profile = GLSLANG_NO_PROFILE,
+        .forward_compatible = true,
+        .messages = spv->params.messages,
+        .resource = glslang_resource(),
+    };
 
-    prog.mapIO();
+    glslang_shader_t *sh = glslang_shader_create(&input);
+    if (!sh)
+        spv_die("failed to create shader");
+    if (!glslang_shader_preprocess(sh, &input) || !glslang_shader_parse(sh, &input))
+        spv_die("failed to parse shader: %s", glslang_shader_get_info_log(sh));
 
-    std::vector<unsigned int> spirv;
-    spv::SpvBuildLogger logger;
-    glslang::SpvOptions opts;
+    free(glsl);
 
-    glslang::GlslangToSpv(*prog.getIntermediate(stage), spirv, &logger, &opts);
-    const std::string info_log = logger.getAllMessages();
-    if (!info_log.empty())
-        spv_die("failed to transpile to spirv: %s", info_log.c_str());
+    return sh;
+}
 
-    *size = sizeof(spirv[0]) * spirv.size();
-    void *out = malloc(*size);
-    if (!out)
-        spv_die("failed to alloc spirv");
-    memcpy(out, spirv.data(), *size);
+static glslang_program_t *
+spv_create_glslang_program(struct spv *spv, glslang_shader_t *sh)
+{
+    glslang_program_t *prog = glslang_program_create();
+    if (!sh)
+        spv_die("failed to create program");
 
-    return out;
+    glslang_program_add_shader(prog, sh);
+
+    if (!glslang_program_link(prog, spv->params.messages))
+        spv_die("failed to link program: %s", glslang_program_get_info_log(prog));
+
+    glslang_program_map_io(prog);
+
+    return prog;
+}
+
+static const void *
+spv_transpile_glslang_program(struct spv *spv,
+                              glslang_program_t *prog,
+                              glslang_stage_t stage,
+                              size_t *out_size)
+{
+    glslang_program_SPIRV_generate(prog, stage);
+    const char *info_log = glslang_program_SPIRV_get_messages(prog);
+    if (info_log)
+        spv_die("failed to transpile program: %s", info_log);
+
+    *out_size = glslang_program_SPIRV_get_size(prog) * 4;
+    return glslang_program_SPIRV_get_ptr(prog);
+}
+
+struct spv_program *
+spv_create_program_from_shader(struct spv *spv, glslang_stage_t stage, const char *filename)
+{
+    struct spv_program *prog = (struct spv_program *)calloc(1, sizeof(*prog));
+    if (!prog)
+        spv_die("failed to alloc prog");
+
+    prog->glsl_sh = spv_create_glslang_shader(spv, stage, filename);
+    prog->glsl_prog = spv_create_glslang_program(spv, prog->glsl_sh);
+    prog->spirv = spv_transpile_glslang_program(spv, prog->glsl_prog, stage, &prog->size);
+
+    return prog;
 }
 
 void
-spv_dump(struct u_spv *spv, const void *spirv, size_t size)
+spv_destroy_program(struct spv *spv, struct spv_program *prog)
 {
-    std::vector<unsigned int> src(static_cast<const unsigned int *>(spirv),
-                                  static_cast<const unsigned int *>(spirv + size));
+    glslang_shader_delete(prog->glsl_sh);
+    glslang_program_delete(prog->glsl_prog);
 
-    std::ostringstream disasm;
-    spv::Disassemble(disasm, src);
-    spv_log("%s", disasm.str().c_str());
+    free(prog);
 }

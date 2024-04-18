@@ -65,10 +65,8 @@ endif
 dep_glslang = cpp.find_library(
     'glslang',
     has_headers: [
-      'glslang/Public/ResourceLimits.h',
-      'glslang/Public/ShaderLang.h',
-      'glslang/SPIRV/GlslangToSpv.h',
-      'glslang/SPIRV/disassemble.h',
+      'glslang/Include/glslang_c_interface.h',
+      'glslang/Public/resource_limits_c.h',
     ],
     required: false,
 )

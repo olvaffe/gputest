@@ -8,16 +8,26 @@
 
 #include "util.h"
 
+#include <glslang/Include/glslang_c_interface.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
 struct spv_init_params {
-    int unused;
+    glslang_messages_t messages;
 };
 
-struct u_spv {
+struct spv {
     struct spv_init_params params;
+};
+
+struct spv_program {
+    glslang_shader_t *glsl_sh;
+    glslang_program_t *glsl_prog;
+
+    const void *spirv;
+    size_t size;
 };
 
 static inline void PRINTFLIKE(1, 2) spv_log(const char *format, ...)
@@ -37,16 +47,19 @@ static inline void PRINTFLIKE(1, 2) NORETURN spv_die(const char *format, ...)
 }
 
 void
-spv_init(struct u_spv *spv, const struct spv_init_params *params);
+spv_init(struct spv *spv, const struct spv_init_params *params);
 
 void
-spv_cleanup(struct u_spv *spv);
+spv_cleanup(struct spv *spv);
 
-void *
-spv_compile_file(struct u_spv *spv, const char *filename, size_t *size);
+glslang_stage_t
+spv_guess_stage(struct spv *spv, const char *filename);
+
+struct spv_program *
+spv_create_program_from_shader(struct spv *spv, glslang_stage_t stage, const char *filename);
 
 void
-spv_dump(struct u_spv *spv, const void *spirv, size_t size);
+spv_destroy_program(struct spv *spv, struct spv_program *prog);
 
 #if defined(__cplusplus)
 }
