@@ -347,9 +347,11 @@ spv_reflect_clspv_program(struct spv *spv, struct spv_program *prog)
             struct spv_program_reflection_binding *d = &dst->bindings[j];
             d->binding = s->binding;
             switch (s->descriptor_type) {
+            case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
             case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
                 d->storage = (int)glslang::EvqUniform;
                 break;
+            case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
             case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
                 d->storage = (int)glslang::EvqBuffer;
                 break;
