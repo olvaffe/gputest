@@ -40,11 +40,11 @@ void main()
 
     data1 = src_ubo.data[idx % UBO_ARRAY_SIZE];
     data2 = src_ssbo.data[idx];
-    data3 = texelFetch(src_tbo, int(idx));
-    data4 = imageLoad(src_ibo, int(idx));
+    data3 = DATA_TYPE(texelFetch(src_tbo, int(idx)));
+    data4 = DATA_TYPE(imageLoad(src_ibo, int(idx)));
 
     const DATA_TYPE result = data1 + data2 + data3 + data4;
 
     dst_ssbo.data[idx] = result;
-    imageStore(dst_ibo, int(idx), result);
+    imageStore(dst_ibo, int(idx), vec4(result));
 }
