@@ -19,7 +19,7 @@ layout(set = 0, binding = 1) readonly buffer SRC_SSBO {
     DATA_TYPE data[];
 } src_ssbo;
 
-layout(set = 0, binding = 2) uniform samplerBuffer src_tbo;
+layout(set = 0, binding = 2) uniform textureBuffer src_tbo;
 
 layout(set = 0, binding = 3, IBO_TYPE) readonly uniform imageBuffer src_ibo;
 
@@ -27,7 +27,7 @@ layout(set = 0, binding = 4) buffer DST_SSBO {
     DATA_TYPE data[];
 } dst_ssbo;
 
-layout(set = 0, binding = 5) writeonly uniform imageBuffer dst_ibo;
+layout(set = 0, binding = 5, IBO_TYPE) writeonly uniform imageBuffer dst_ibo;
 
 void main()
 {
