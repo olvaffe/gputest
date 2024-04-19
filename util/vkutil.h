@@ -1521,6 +1521,18 @@ vk_set_pipeline_sample_count(struct vk *vk,
 }
 
 static inline void
+vk_add_pipeline_set_layout_from_info(struct vk *vk,
+                                     struct vk_pipeline *pipeline,
+                                     const VkDescriptorSetLayoutCreateInfo *create_info)
+{
+    assert(pipeline->set_layout_count < ARRAY_SIZE(pipeline->set_layouts));
+
+    vk->result = vk->CreateDescriptorSetLayout(
+        vk->dev, create_info, NULL, &pipeline->set_layouts[pipeline->set_layout_count++]);
+    vk_check(vk, "failed to create descriptor set layout");
+}
+
+static inline void
 vk_add_pipeline_set_layout(struct vk *vk,
                            struct vk_pipeline *pipeline,
                            VkDescriptorType type,
@@ -1528,8 +1540,6 @@ vk_add_pipeline_set_layout(struct vk *vk,
                            VkShaderStageFlags stages,
                            const VkSampler *immutable_samplers)
 {
-    assert(pipeline->set_layout_count < ARRAY_SIZE(pipeline->set_layouts));
-
     const VkDescriptorSetLayoutBinding binding = {
         .binding = 0,
         .descriptorType = type,
@@ -1543,9 +1553,7 @@ vk_add_pipeline_set_layout(struct vk *vk,
         .pBindings = &binding,
     };
 
-    vk->result = vk->CreateDescriptorSetLayout(
-        vk->dev, &set_layout_info, NULL, &pipeline->set_layouts[pipeline->set_layout_count++]);
-    vk_check(vk, "failed to create descriptor set layout");
+    vk_add_pipeline_set_layout_from_info(vk, pipeline, &set_layout_info);
 }
 
 static inline void

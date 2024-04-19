@@ -1,0 +1,50 @@
+#version 460 core
+
+/*
+ * Copyright 2024 Google LLC
+ * SPDX-License-Identifier: MIT
+ */
+
+#define DATA_TYPE vec4
+#define IBO_TYPE rgba32f
+#define UBO_ARRAY_SIZE 1024
+
+layout(local_size_x = 64) in;
+
+layout(set = 0, binding = 0) uniform SRC_UBO {
+    DATA_TYPE data[UBO_ARRAY_SIZE];
+} src_ubo;
+
+layout(set = 0, binding = 1) readonly buffer SRC_SSBO {
+    DATA_TYPE data[];
+} src_ssbo;
+
+layout(set = 0, binding = 2) uniform samplerBuffer src_tbo;
+
+layout(set = 0, binding = 3, IBO_TYPE) readonly uniform imageBuffer src_ibo;
+
+layout(set = 0, binding = 4) buffer DST_SSBO {
+    DATA_TYPE data[];
+} dst_ssbo;
+
+layout(set = 0, binding = 5) writeonly uniform imageBuffer dst_ibo;
+
+void main()
+{
+    const uint idx = gl_GlobalInvocationID.x;
+
+    DATA_TYPE data1 = DATA_TYPE(0);
+    DATA_TYPE data2 = DATA_TYPE(0);
+    DATA_TYPE data3 = DATA_TYPE(0);
+    DATA_TYPE data4 = DATA_TYPE(0);
+
+    data1 = src_ubo.data[idx % UBO_ARRAY_SIZE];
+    data2 = src_ssbo.data[idx];
+    data3 = texelFetch(src_tbo, int(idx));
+    data4 = imageLoad(src_ibo, int(idx));
+
+    const DATA_TYPE result = data1 + data2 + data3 + data4;
+
+    dst_ssbo.data[idx] = result;
+    imageStore(dst_ibo, int(idx), result);
+}

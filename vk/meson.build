@@ -8,6 +8,7 @@ tests = [
   'clear_depth',
   'compute',
   'depth_resolve',
+  'desc_buf',
   'dynamic_rendering',
   'external',
   'formats',
