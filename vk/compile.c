@@ -56,15 +56,21 @@ compile_test_create_pipeline_layout(struct compile_test *test, struct spv_progra
             const struct spv_program_reflection_binding *binding = &set->bindings[j];
 
             VkDescriptorType type;
-            switch (binding->storage) {
-            case 5: /* EvqUniform */
+            switch (binding->type) {
+            case 4: /* SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER */
+                type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+                break;
+            case 5: /* SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER */
+                type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+                break;
+            case 6: /* SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER */
                 type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 break;
-            case 6: /* EvqBuffer */
+            case 7: /* SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER */
                 type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 break;
             default:
-                vk_die("bad storage");
+                vk_die("bad type");
                 break;
             }
 

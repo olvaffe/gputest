@@ -72,18 +72,6 @@ dep_glslang = cpp.find_library(
 )
 dep_spirv_tools = dependency('SPIRV-Tools', required: false)
 
-dep_clspv = dep_not_found
-clspv_path = get_option('clspv-path')
-clspv_path = fs.expanduser(clspv_path)
-if fs.is_absolute(clspv_path) and fs.is_dir(clspv_path)
-  dep_clspv = cpp.find_library(
-    'clspv_core',
-    dirs: [clspv_path / 'out' / 'lib'],
-    has_headers: ['clspv/Compiler.h'],
-    header_include_directories: include_directories(clspv_path / 'include'),
-  )
-endif
-
 dep_spirv_reflect = dep_not_found
 spirv_reflect_path = get_option('spirv-reflect-path')
 spirv_reflect_path = fs.expanduser(spirv_reflect_path)
@@ -93,6 +81,18 @@ if fs.is_absolute(spirv_reflect_path) and fs.is_dir(spirv_reflect_path)
     dirs: [spirv_reflect_path / 'out'],
     has_headers: ['spirv_reflect.h'],
     header_include_directories: include_directories(spirv_reflect_path),
+  )
+endif
+
+dep_clspv = dep_not_found
+clspv_path = get_option('clspv-path')
+clspv_path = fs.expanduser(clspv_path)
+if fs.is_absolute(clspv_path) and fs.is_dir(clspv_path)
+  dep_clspv = cpp.find_library(
+    'clspv_core',
+    dirs: [clspv_path / 'out' / 'lib'],
+    has_headers: ['clspv/Compiler.h'],
+    header_include_directories: include_directories(clspv_path / 'include'),
   )
 endif
 

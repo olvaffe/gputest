@@ -24,9 +24,8 @@ struct spv {
 
 struct spv_program_reflection_binding {
     uint32_t binding;
-    int storage;
+    int type;
     uint32_t count;
-    glslang_stage_mask_t stages;
 };
 
 struct spv_program_reflection_set {
@@ -35,7 +34,7 @@ struct spv_program_reflection_set {
 };
 
 struct spv_program_reflection {
-    const char *entrypoint;
+    char *entrypoint;
 
     uint32_t set_count;
     struct spv_program_reflection_set *sets;
