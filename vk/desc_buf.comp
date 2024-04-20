@@ -5,14 +5,14 @@
  * SPDX-License-Identifier: MIT
  */
 
+#define GLOBAL_SIZE (64 * 1024)
 #define DATA_TYPE vec4
 #define IBO_TYPE rgba32f
-#define UBO_ARRAY_SIZE 1024
 
 layout(local_size_x = 64) in;
 
 layout(set = 0, binding = 0) uniform SRC_UBO {
-    DATA_TYPE data[UBO_ARRAY_SIZE];
+    DATA_TYPE data[GLOBAL_SIZE];
 } src_ubo;
 
 layout(set = 0, binding = 1) readonly buffer SRC_SSBO {
@@ -38,7 +38,7 @@ void main()
     DATA_TYPE data3 = DATA_TYPE(0);
     DATA_TYPE data4 = DATA_TYPE(0);
 
-    data1 = src_ubo.data[idx % UBO_ARRAY_SIZE];
+    data1 = src_ubo.data[idx];
     data2 = src_ssbo.data[idx];
     data3 = DATA_TYPE(texelFetch(src_tbo, int(idx)));
     data4 = DATA_TYPE(imageLoad(src_ibo, int(idx)));
