@@ -176,6 +176,14 @@ struct vk_query {
     VkQueryPool pool;
 };
 
+struct vk_stopwatch {
+    struct vk_query *query;
+    uint32_t query_max;
+    uint32_t query_count;
+
+    uint64_t *ts;
+};
+
 struct vk_swapchain {
     VkSwapchainCreateInfoKHR info;
     VkSwapchainKHR swapchain;
@@ -1807,6 +1815,65 @@ vk_destroy_query(struct vk *vk, struct vk_query *query)
 {
     vk->DestroyQueryPool(vk->dev, query->pool, NULL);
     free(query);
+}
+
+static inline struct vk_stopwatch *
+vk_create_stopwatch(struct vk *vk, uint32_t count)
+{
+    struct vk_stopwatch *stopwatch = calloc(1, sizeof(*stopwatch));
+    if (!stopwatch)
+        vk_die("failed to alloc stopwatch");
+
+    stopwatch->query = vk_create_query(vk, VK_QUERY_TYPE_TIMESTAMP, count);
+    stopwatch->query_max = count;
+    stopwatch->query_count = 0;
+
+    return stopwatch;
+}
+
+static inline void
+vk_destroy_stopwatch(struct vk *vk, struct vk_stopwatch *stopwatch)
+{
+    free(stopwatch->ts);
+    vk_destroy_query(vk, stopwatch->query);
+    free(stopwatch);
+}
+
+static inline void
+vk_write_stopwatch(struct vk *vk, struct vk_stopwatch *stopwatch, VkCommandBuffer cmd)
+{
+    if (stopwatch->query_count >= stopwatch->query_max)
+        vk_die("not enough queries");
+    if (stopwatch->ts)
+        vk_die("cannot write anymore");
+
+    if (!stopwatch->query_count)
+        vk->CmdResetQueryPool(cmd, stopwatch->query->pool, 0, stopwatch->query_max);
+
+    vk->CmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, stopwatch->query->pool,
+                          stopwatch->query_count++);
+}
+
+static inline uint64_t
+vk_read_stopwatch(struct vk *vk, struct vk_stopwatch *stopwatch, uint32_t idx)
+{
+    if (!stopwatch->ts) {
+        stopwatch->ts = malloc(sizeof(*stopwatch->ts) * stopwatch->query_count);
+        if (!stopwatch->ts)
+            vk_die("failed to alloc ts");
+
+        vk->result = vk->GetQueryPoolResults(
+            vk->dev, stopwatch->query->pool, 0, stopwatch->query_count,
+            sizeof(*stopwatch->ts) * stopwatch->query_count, stopwatch->ts,
+            sizeof(*stopwatch->ts), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+        vk_check(vk, "failed to get stopwatch results");
+    }
+
+    if (idx + 1 >= stopwatch->query_count)
+        vk_die("bad idx");
+
+    const uint64_t cycles = stopwatch->ts[idx + 1] - stopwatch->ts[idx];
+    return cycles * (uint64_t)vk->props.properties.limits.timestampPeriod;
 }
 
 static inline VkCommandBuffer

@@ -43,6 +43,8 @@ struct desc_buf_test {
 
     struct vk_pipeline *pipeline;
     struct vk_descriptor_set *set;
+
+    struct vk_stopwatch *stopwatch;
 };
 
 static void
@@ -259,12 +261,16 @@ desc_buf_test_init(struct desc_buf_test *test)
     desc_buf_test_init_buffer(test);
     desc_buf_test_init_pipeline(test);
     desc_buf_test_init_descriptor_set(test);
+
+    test->stopwatch = vk_create_stopwatch(vk, 2);
 }
 
 static void
 desc_buf_test_cleanup(struct desc_buf_test *test)
 {
     struct vk *vk = &test->vk;
+
+    vk_destroy_stopwatch(vk, test->stopwatch);
 
     vk_destroy_descriptor_set(vk, test->set);
     vk_destroy_pipeline(vk, test->pipeline);
@@ -292,8 +298,14 @@ desc_buf_test_dispatch(struct desc_buf_test *test, bool warmup)
         vk_die("bad global/local sizes");
     const uint32_t group_count = test->global_size / test->local_size;
 
-    for (uint32_t i = 0; i < (warmup ? 1 : test->loop); i++)
+    if (warmup) {
         vk->CmdDispatch(cmd, group_count, 1, 1);
+    } else {
+        vk_write_stopwatch(vk, test->stopwatch, cmd);
+        for (uint32_t i = 0; i < test->loop; i++)
+            vk->CmdDispatch(cmd, group_count, 1, 1);
+        vk_write_stopwatch(vk, test->stopwatch, cmd);
+    }
 
     vk_end_cmd(vk);
 
@@ -302,9 +314,11 @@ desc_buf_test_dispatch(struct desc_buf_test *test, bool warmup)
     const uint64_t wait_end = u_now();
 
     if (!warmup) {
-        const float ms = (float)(wait_end - wait_begin) / 1000000.0f;
-        vk_log("%dM threads, cpu wait time %.1fms",
-               (test->global_size * test->loop) / 1000 / 1000, ms);
+        const float ns_per_ms = 1000000.0f;
+        const float gpu_ms = (float)vk_read_stopwatch(vk, test->stopwatch, 0) / ns_per_ms;
+        const float cpu_ms = (float)(wait_end - wait_begin) / ns_per_ms;
+        vk_log("%dM threads, gpu time %.1fms, cpu wait time %.1fms",
+               (test->global_size * test->loop) / 1000 / 1000, gpu_ms, cpu_ms);
     }
 }
 
