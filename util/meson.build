@@ -20,13 +20,10 @@ if dep_nativewindow.found()
 endif
 util_summary += {'androidutil': idep_androidutil}
 
-idep_clutil = dep_not_found
-if cc.has_header('CL/cl.h')
-  idep_clutil = declare_dependency(
-    sources: ['clutil.h'],
-    dependencies: [idep_util, dep_dl],
-  )
-endif
+idep_clutil = declare_dependency(
+  sources: ['clutil.h'],
+  dependencies: [idep_util, dep_dl],
+)
 util_summary += {'clutil': idep_clutil}
 
 idep_drmutil = dep_not_found

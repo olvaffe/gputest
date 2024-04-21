@@ -14,7 +14,7 @@
 #define CL_NO_PROTOTYPES
 #include <CL/cl.h>
 #include <CL/cl_ext.h>
-#include <CL/cl_icd.h>
+#include <CL/cl_function_types.h>
 
 #define LIBOPENCL_NAME "libOpenCL.so.1"
 
@@ -177,11 +177,7 @@ struct cl {
 
     struct {
         void *handle;
-#ifdef OPENCL_CL_FUNCTION_TYPES_H_
 #define PFN(name) cl##name##_fn name;
-#else
-#define PFN(name) cl_api_cl##name name;
-#endif
 #include "clutil_entrypoints.inc"
     };
 
@@ -382,11 +378,7 @@ cl_init_library(struct cl *cl)
     if (!cl->handle)
         cl_die("failed to load %s: %s", LIBOPENCL_NAME, dlerror());
 
-#ifdef OPENCL_CL_FUNCTION_TYPES_H_
 #define PFN(name) cl->name = (cl##name##_fn)dlsym(cl->handle, "cl" #name);
-#else
-#define PFN(name) cl->name = (cl_api_cl##name)dlsym(cl->handle, "cl" #name);
-#endif
 #include "clutil_entrypoints.inc"
 
 #define PFN(name)                                                                                \
