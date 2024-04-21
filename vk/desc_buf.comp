@@ -7,7 +7,8 @@
 
 #define GLOBAL_SIZE (64 * 1024)
 #define DATA_TYPE vec4
-#define IBO_TYPE rgba32f
+
+#extension GL_EXT_shader_image_load_formatted : enable
 
 layout(local_size_x = 64) in;
 
@@ -21,13 +22,13 @@ layout(set = 0, binding = 1) readonly buffer SRC_SSBO {
 
 layout(set = 0, binding = 2) uniform textureBuffer src_tbo;
 
-layout(set = 0, binding = 3, IBO_TYPE) readonly uniform imageBuffer src_ibo;
+layout(set = 0, binding = 3) readonly uniform imageBuffer src_ibo;
 
 layout(set = 0, binding = 4) buffer DST_SSBO {
     DATA_TYPE data[];
 } dst_ssbo;
 
-layout(set = 0, binding = 5, IBO_TYPE) writeonly uniform imageBuffer dst_ibo;
+layout(set = 0, binding = 5) writeonly uniform imageBuffer dst_ibo;
 
 void main()
 {
