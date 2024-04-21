@@ -124,13 +124,10 @@ if dep_drm.found() and dep_libva.found() and dep_libva_drm.found()
 endif
 util_summary += {'vautil': idep_vautil}
 
-idep_vkutil = dep_not_found
-if cc.has_header('vulkan/vulkan.h')
-  idep_vkutil = declare_dependency(
-    sources: ['vkutil.h'],
-    dependencies: [idep_util, dep_dl],
-  )
-endif
+idep_vkutil = declare_dependency(
+  sources: ['vkutil.h'],
+  dependencies: [idep_util, dep_dl],
+)
 util_summary += {'vkutil': idep_vkutil}
 
 idep_wlutil = dep_not_found

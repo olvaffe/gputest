@@ -13,8 +13,10 @@
 #include <strings.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
+/* clang-format off */
 #include <vulkan/vulkan_android.h>
+/* clang-format on */
 
 #ifdef __ANDROID__
 #define LIBVULKAN_NAME "libvulkan.so"
