@@ -16,7 +16,7 @@ endif
 if idep_gbmutil.found()
   tests += ['multithread']
 endif
-if dep_sdl2.found()
+if idep_sdlutil.found()
   tests += ['sdl']
 endif
 
@@ -46,7 +46,7 @@ foreach t : tests
   elif t == 'multithread'
     test_deps += [idep_gbmutil]
   elif t == 'sdl'
-    test_deps += [dep_sdl2]
+    test_deps += [idep_sdlutil]
   endif
 
   executable(

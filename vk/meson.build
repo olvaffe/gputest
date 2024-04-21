@@ -38,7 +38,7 @@ tests = [
 if idep_spvutil.found()
   tests += ['compile']
 endif
-if dep_sdl2.found()
+if idep_sdlutil.found()
   tests += ['sdl']
 endif
 if idep_wlutil.found()
@@ -87,7 +87,7 @@ foreach t : tests
       test_args += ['-DFAKEKTX']
     endif
   elif t == 'sdl'
-    test_deps += [dep_sdl2]
+    test_deps += [idep_sdlutil]
   elif t == 'wl'
     test_deps += [idep_wlutil]
   endif

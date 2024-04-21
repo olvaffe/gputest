@@ -12,10 +12,10 @@ idep_util = declare_dependency(
 )
 
 idep_androidutil = dep_not_found
-if cc.has_header('android/hardware_buffer.h')
+if dep_nativewindow.found()
   idep_androidutil = declare_dependency(
     sources: ['androidutil.h'],
-    dependencies: [idep_util],
+    dependencies: [idep_util, dep_nativewindow],
   )
 endif
 util_summary += {'androidutil': idep_androidutil}
@@ -38,13 +38,10 @@ if dep_drm.found()
 endif
 util_summary += {'drmutil': idep_drmutil}
 
-idep_eglutil = dep_not_found
-if dep_gbm.found() or dep_nativewindow.found()
-  idep_eglutil = declare_dependency(
-    sources: ['eglutil.h'],
-    dependencies: [idep_util, dep_dl, dep_gbm, dep_nativewindow],
-  )
-endif
+idep_eglutil = declare_dependency(
+  sources: ['eglutil.h'],
+  dependencies: [idep_util, dep_dl],
+)
 util_summary += {'eglutil': idep_eglutil}
 
 idep_ffutil = dep_not_found

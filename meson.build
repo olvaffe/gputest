@@ -31,17 +31,26 @@ dep_dl = cc.find_library('dl')
 dep_m = cc.find_library('m', required: false)
 dep_rt = cc.find_library('rt', required: false)
 
+# for androidutil
+dep_nativewindow = cc.find_library(
+  'nativewindow',
+  has_headers: ['android/hardware_buffer.h'],
+  required: false
+)
+
 # for drmutil and vautil
 dep_drm = dependency('libdrm', required: false)
-
-# for eglutil and gbmutil
-dep_gbm = dependency('gbm', required: false)
-dep_nativewindow = cc.find_library('nativewindow', required: false)
 
 # for ffutil
 dep_libavcodec = dependency('libavcodec', required: false)
 dep_libavformat = dependency('libavformat', required: false)
 dep_libavutil = dependency('libavutil', required: false)
+
+# for gbmutil
+dep_gbm = dependency('gbm', required: false)
+
+# for sdlutil
+dep_sdl2 = dependency('sdl2', required: false)
 
 # for skutil
 dep_skia = dep_not_found
@@ -105,7 +114,6 @@ dep_wl_client = dependency('wayland-client', required: false)
 dep_wl_protocols = dependency('wayland-protocols', required: false)
 dep_wl_scanner = dependency('wayland-scanner', required: false)
 
-dep_sdl2 = dependency('sdl2', required: false)
 dep_ktx = dependency('Ktx', method: 'cmake', required: false)
 
 inc_include = include_directories('include')
