@@ -211,7 +211,7 @@ tflite_depthwise_conv_test_dispatch(struct tflite_depthwise_conv_test *test)
         cl_event ev;
 
         cl_enqueue_pipeline(cl, test->pipeline, test->dst_width, test->dst_height,
-                            test->slice_count, &ev);
+                            test->slice_count, 0, 0, 0, &ev);
         cl_wait_event(cl, ev);
 
         cl_ulong start_ns;

@@ -110,7 +110,7 @@ bench_copy_dispatch(struct bench_copy *test)
     for (uint32_t i = 0; i < loops; i++) {
         cl_event ev;
 
-        cl_enqueue_pipeline(cl, test->pipeline, count, 0, 0, &ev);
+        cl_enqueue_pipeline(cl, test->pipeline, count, 0, 0, 0, 0, 0, &ev);
         cl_wait_event(cl, ev);
 
         cl_ulong start_ns;

@@ -1185,16 +1185,21 @@ cl_set_pipeline_arg(
 static inline void
 cl_enqueue_pipeline(struct cl *cl,
                     struct cl_pipeline *pipeline,
-                    size_t width,
-                    size_t height,
-                    size_t depth,
+                    size_t global_width,
+                    size_t global_height,
+                    size_t global_depth,
+                    size_t local_width,
+                    size_t local_height,
+                    size_t local_depth,
                     cl_event *ev)
 {
-    const cl_uint dim = depth ? 3 : height ? 2 : 1;
-    const size_t global_work_size[] = { width, height, depth };
+    const size_t global_work_size[] = { global_width, global_height, global_depth };
+    const size_t local_work_size[] = { local_width, local_height, local_depth };
+    const cl_uint dim = global_depth ? 3 : global_height ? 2 : 1;
+    const bool has_explicit_local = local_width || local_height || local_depth;
 
     cl->err = cl->EnqueueNDRangeKernel(cl->cmdq, pipeline->kern, dim, NULL, global_work_size,
-                                       NULL, 0, NULL, ev);
+                                       has_explicit_local ? local_work_size : NULL, 0, NULL, ev);
     cl_check(cl, "failed to enqueue kernel");
 }
 

@@ -117,7 +117,7 @@ tflite_bhwc_to_tensor_test_dispatch(struct tflite_bhwc_to_tensor_test *test)
     for (uint32_t i = 0; i < loops; i++) {
         cl_event ev;
 
-        cl_enqueue_pipeline(cl, test->pipeline, test->width, test->height, 0, &ev);
+        cl_enqueue_pipeline(cl, test->pipeline, test->width, test->height, 0, 0, 0, 0, &ev);
         cl_wait_event(cl, ev);
 
         cl_ulong start_ns;

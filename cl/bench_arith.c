@@ -179,7 +179,7 @@ bench_arith_dispatch(struct bench_arith *test)
     for (uint32_t i = 0; i < loops; i++) {
         cl_event ev;
 
-        cl_enqueue_pipeline(cl, test->pipeline, test->global_work_size, 0, 0, &ev);
+        cl_enqueue_pipeline(cl, test->pipeline, test->global_work_size, 0, 0, 0, 0, 0, &ev);
         cl_wait_event(cl, ev);
 
         cl_ulong start_ns;

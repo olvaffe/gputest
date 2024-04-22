@@ -58,7 +58,7 @@ copy_test_dispatch(struct copy_test *test)
     cl_set_pipeline_arg(cl, test->pipeline, 0, &test->dst->mem, sizeof(test->dst->mem));
     cl_set_pipeline_arg(cl, test->pipeline, 1, &test->src->mem, sizeof(test->src->mem));
 
-    cl_enqueue_pipeline(cl, test->pipeline, count, 0, 0, NULL);
+    cl_enqueue_pipeline(cl, test->pipeline, count, 0, 0, 0, 0, 0, NULL);
 
     ptr = cl_map_buffer(cl, test->dst, CL_MAP_READ);
     for (uint32_t i = 0; i < count; i++) {
