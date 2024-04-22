@@ -67,6 +67,7 @@ struct cl_device {
     cl_uint mem_base_addr_align;
     cl_device_fp_config single_fp_config;
     cl_device_fp_config double_fp_config;
+    cl_device_fp_config half_fp_config;
     cl_device_mem_cache_type global_mem_cache_type;
     cl_uint global_mem_cacheline_size;
     cl_ulong global_mem_cache_size;
@@ -671,6 +672,8 @@ cl_init_devices(struct cl *cl, uint32_t idx)
                            sizeof(dev->single_fp_config));
         cl_get_device_info(cl, dev->id, CL_DEVICE_DOUBLE_FP_CONFIG, &dev->double_fp_config,
                            sizeof(dev->double_fp_config));
+        cl_get_device_info(cl, dev->id, CL_DEVICE_HALF_FP_CONFIG, &dev->double_fp_config,
+                           sizeof(dev->half_fp_config));
         cl_get_device_info(cl, dev->id, CL_DEVICE_GLOBAL_MEM_CACHE_TYPE,
                            &dev->global_mem_cache_type, sizeof(dev->global_mem_cache_type));
         cl_get_device_info(cl, dev->id, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE,

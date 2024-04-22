@@ -72,6 +72,8 @@ info_dump_device(struct cl *cl, uint32_t plat_idx, uint32_t dev_idx)
            cl_device_fp_config_to_str(dev->single_fp_config, str, sizeof(str)));
     cl_log("  double_fp_config: %s",
            cl_device_fp_config_to_str(dev->double_fp_config, str, sizeof(str)));
+    cl_log("  half_fp_config: %s",
+           cl_device_fp_config_to_str(dev->half_fp_config, str, sizeof(str)));
     cl_log("  global_mem_cache_type: %s",
            cl_device_mem_cache_type_to_str(dev->global_mem_cache_type));
     cl_log("  global_mem_cacheline_size: %u", dev->global_mem_cacheline_size);
