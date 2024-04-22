@@ -18,23 +18,6 @@
 
 #define LIBOPENCL_NAME "libOpenCL.so.1"
 
-#ifndef CL_VERSION_3_0
-
-#define CL_MAKE_VERSION(major, minor, patch) ((major) << 22 | (minor) << 12 | (patch))
-#define CL_VERSION_MAJOR(version) ((version) >> 22)
-#define CL_VERSION_MINOR(version) (((version) >> 12) & 0x3ff)
-#define CL_VERSION_PATCH(version) ((version) & 0xfff)
-
-typedef cl_uint cl_version;
-typedef cl_bitfield cl_device_atomic_capabilities;
-typedef cl_bitfield cl_device_device_enqueue_capabilities;
-typedef struct {
-    cl_version version;
-    char name[64];
-} cl_name_version;
-
-#endif /* CL_VERSION_3_0 */
-
 struct cl_device {
     cl_device_id id;
 
@@ -355,7 +338,6 @@ cl_device_atomic_capabilities_to_str(cl_device_atomic_capabilities val, char *st
     /* clang-format off */
     static const struct u_bitmask_desc descs[] = {
 #define DESC(v) { .bitmask = CL_DEVICE_ATOMIC_ ##v, .str = #v }
-#ifdef CL_VERSION_3_0
         DESC(ORDER_RELAXED),
         DESC(ORDER_ACQ_REL),
         DESC(ORDER_SEQ_CST),
@@ -363,7 +345,6 @@ cl_device_atomic_capabilities_to_str(cl_device_atomic_capabilities val, char *st
         DESC(SCOPE_WORK_GROUP),
         DESC(SCOPE_DEVICE),
         DESC(SCOPE_ALL_DEVICES),
-#endif
 #undef DESC
     };
     /* clang-format on */
@@ -483,28 +464,31 @@ cl_init_platforms(struct cl *cl)
 
         plat->profile = cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_PROFILE, NULL);
         plat->version_str = cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_VERSION, NULL);
-#ifdef CL_VERSION_3_0
-        cl_get_platform_info(cl, plat->id, CL_PLATFORM_NUMERIC_VERSION, &plat->version,
-                             sizeof(plat->version));
-#else
+
         int ver_major;
         int ver_minor;
         sscanf(plat->version_str, "OpenCL %d.%d ", &ver_major, &ver_minor);
-        plat->version = CL_MAKE_VERSION(ver_major, ver_minor, 0);
-#endif
+        if (ver_major >= 3) {
+            cl_get_platform_info(cl, plat->id, CL_PLATFORM_NUMERIC_VERSION, &plat->version,
+                                 sizeof(plat->version));
+        } else {
+            plat->version = CL_MAKE_VERSION(ver_major, ver_minor, 0);
+        }
+
         plat->name = cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_NAME, NULL);
         plat->vendor = cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_VENDOR, NULL);
 
-#ifdef CL_VERSION_3_0
-        size_t size;
-        plat->extensions =
-            cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_EXTENSIONS_WITH_VERSION, &size);
-        plat->extension_count = size / sizeof(*plat->extensions);
-#else
-        char *ext_str = cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_EXTENSIONS, NULL);
-        plat->extensions = cl_parse_extension_string(ext_str, &plat->extension_count);
-        free(ext_str);
-#endif
+        if (CL_VERSION_MAJOR(plat->version) >= 3) {
+            size_t size;
+            plat->extensions = cl_get_platform_info_alloc(
+                cl, plat->id, CL_PLATFORM_EXTENSIONS_WITH_VERSION, &size);
+            plat->extension_count = size / sizeof(*plat->extensions);
+        } else {
+            char *ext_str =
+                cl_get_platform_info_alloc(cl, plat->id, CL_PLATFORM_EXTENSIONS, NULL);
+            plat->extensions = cl_parse_extension_string(ext_str, &plat->extension_count);
+            free(ext_str);
+        }
         qsort(plat->extensions, plat->extension_count, sizeof(*plat->extensions),
               cl_sort_name_versions);
 
@@ -566,6 +550,17 @@ cl_init_devices(struct cl *cl, uint32_t idx)
         size_t size;
 
         dev->id = ids[i];
+
+        dev->version_str = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_VERSION, NULL);
+        int ver_major;
+        int ver_minor;
+        sscanf(dev->version_str, "OpenCL %d.%d ", &ver_major, &ver_minor);
+        if (ver_major >= 3) {
+            cl_get_device_info(cl, dev->id, CL_DEVICE_NUMERIC_VERSION, &dev->version,
+                               sizeof(dev->version));
+        } else {
+            dev->version = CL_MAKE_VERSION(ver_major, ver_minor, 0);
+        }
 
         cl_get_device_info(cl, dev->id, CL_DEVICE_TYPE, &dev->type, sizeof(dev->type));
         cl_get_device_info(cl, dev->id, CL_DEVICE_VENDOR_ID, &dev->vendor_id,
@@ -634,10 +629,10 @@ cl_init_devices(struct cl *cl, uint32_t idx)
                            &dev->max_read_write_image_args,
                            sizeof(dev->max_read_write_image_args));
 
-#ifdef CL_VERSION_3_0
-        dev->ils = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_ILS_WITH_VERSION, &size);
-        dev->il_count = size / sizeof(*dev->ils);
-#endif
+        if (CL_VERSION_MAJOR(dev->version) >= 3) {
+            dev->ils = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_ILS_WITH_VERSION, &size);
+            dev->il_count = size / sizeof(*dev->ils);
+        }
 
         cl_get_device_info(cl, dev->id, CL_DEVICE_IMAGE2D_MAX_WIDTH, &dev->image2d_max_width,
                            sizeof(dev->image2d_max_width));
@@ -727,11 +722,11 @@ cl_init_devices(struct cl *cl, uint32_t idx)
         cl_get_device_info(cl, dev->id, CL_DEVICE_MAX_ON_DEVICE_EVENTS,
                            &dev->max_on_device_events, sizeof(dev->max_on_device_events));
 
-#ifdef CL_VERSION_3_0
-        dev->built_in_kernels =
-            cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_BUILT_IN_KERNELS_WITH_VERSION, &size);
-        dev->built_in_kernel_count = size / sizeof(*dev->built_in_kernels);
-#endif
+        if (CL_VERSION_MAJOR(dev->version) >= 3) {
+            dev->built_in_kernels = cl_get_device_info_alloc(
+                cl, dev->id, CL_DEVICE_BUILT_IN_KERNELS_WITH_VERSION, &size);
+            dev->built_in_kernel_count = size / sizeof(*dev->built_in_kernels);
+        }
 
         cl_get_device_info(cl, dev->id, CL_DEVICE_PLATFORM, &dev->platform,
                            sizeof(dev->platform));
@@ -740,43 +735,35 @@ cl_init_devices(struct cl *cl, uint32_t idx)
         dev->vendor = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_VENDOR, NULL);
         dev->driver_version = cl_get_device_info_alloc(cl, dev->id, CL_DRIVER_VERSION, NULL);
         dev->profile = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_PROFILE, NULL);
-        dev->version_str = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_VERSION, NULL);
 
-#ifdef CL_VERSION_3_0
-        cl_get_device_info(cl, dev->id, CL_DEVICE_NUMERIC_VERSION, &dev->version,
-                           sizeof(dev->version));
+        if (CL_VERSION_MAJOR(dev->version) >= 3) {
+            dev->opencl_c_versions =
+                cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_OPENCL_C_ALL_VERSIONS, &size);
+            dev->opencl_c_version_count = size / sizeof(*dev->opencl_c_versions);
 
-        dev->opencl_c_versions =
-            cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_OPENCL_C_ALL_VERSIONS, &size);
-        dev->opencl_c_version_count = size / sizeof(*dev->opencl_c_versions);
+            dev->opencl_c_features =
+                cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_OPENCL_C_FEATURES, &size);
+            dev->opencl_c_feature_count = size / sizeof(*dev->opencl_c_features);
+            qsort(dev->opencl_c_features, dev->opencl_c_feature_count,
+                  sizeof(*dev->opencl_c_features), cl_sort_name_versions);
 
-        dev->opencl_c_features =
-            cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_OPENCL_C_FEATURES, &size);
-        dev->opencl_c_feature_count = size / sizeof(*dev->opencl_c_features);
-        qsort(dev->opencl_c_features, dev->opencl_c_feature_count,
-              sizeof(*dev->opencl_c_features), cl_sort_name_versions);
+            dev->extensions =
+                cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_EXTENSIONS_WITH_VERSION, &size);
+            dev->extension_count = size / sizeof(*dev->extensions);
+        } else {
+            char *c_ver_str =
+                cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_OPENCL_C_VERSION, NULL);
+            sscanf(c_ver_str, "OpenCL C %d.%d ", &ver_major, &ver_minor);
+            dev->opencl_c_versions = calloc(1, sizeof(*dev->opencl_c_versions));
+            dev->opencl_c_versions->version = CL_MAKE_VERSION(ver_major, ver_minor, 0);
+            memcpy(dev->opencl_c_versions->name, "OpenCL C", 9);
+            dev->opencl_c_version_count = 1;
+            free(c_ver_str);
 
-        dev->extensions =
-            cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_EXTENSIONS_WITH_VERSION, &size);
-        dev->extension_count = size / sizeof(*dev->extensions);
-#else
-        int ver_major;
-        int ver_minor;
-        sscanf(dev->version_str, "OpenCL %d.%d ", &ver_major, &ver_minor);
-        dev->version = CL_MAKE_VERSION(ver_major, ver_minor, 0);
-
-        char *c_ver_str = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_OPENCL_C_VERSION, NULL);
-        sscanf(c_ver_str, "OpenCL C %d.%d ", &ver_major, &ver_minor);
-        dev->opencl_c_versions = calloc(1, sizeof(*dev->opencl_c_versions));
-        dev->opencl_c_versions->version = CL_MAKE_VERSION(ver_major, ver_minor, 0);
-        memcpy(dev->opencl_c_versions->name, "OpenCL C", 9);
-        dev->opencl_c_version_count = 1;
-        free(c_ver_str);
-
-        char *ext_str = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_EXTENSIONS, NULL);
-        dev->extensions = cl_parse_extension_string(ext_str, &dev->extension_count);
-        free(ext_str);
-#endif
+            char *ext_str = cl_get_device_info_alloc(cl, dev->id, CL_DEVICE_EXTENSIONS, NULL);
+            dev->extensions = cl_parse_extension_string(ext_str, &dev->extension_count);
+            free(ext_str);
+        }
         qsort(dev->extensions, dev->extension_count, sizeof(*dev->extensions),
               cl_sort_name_versions);
 
@@ -816,41 +803,42 @@ cl_init_devices(struct cl *cl, uint32_t idx)
         cl_get_device_info(cl, dev->id, CL_DEVICE_PREFERRED_LOCAL_ATOMIC_ALIGNMENT,
                            &dev->preferred_local_atomic_alignment,
                            sizeof(dev->preferred_local_atomic_alignment));
-#ifdef CL_VERSION_3_0
-        /* these two belong to 2.1 but might not be supported by 2.1 implementations */
-        cl_get_device_info(cl, dev->id, CL_DEVICE_MAX_NUM_SUB_GROUPS, &dev->max_num_sub_groups,
-                           sizeof(dev->max_num_sub_groups));
-        cl_get_device_info(cl, dev->id, CL_DEVICE_SUB_GROUP_INDEPENDENT_FORWARD_PROGRESS,
-                           &dev->sub_group_independent_forward_progress,
-                           sizeof(dev->sub_group_independent_forward_progress));
 
-        cl_get_device_info(cl, dev->id, CL_DEVICE_ATOMIC_MEMORY_CAPABILITIES,
-                           &dev->atomic_memory_capabilities,
-                           sizeof(dev->atomic_memory_capabilities));
-        cl_get_device_info(cl, dev->id, CL_DEVICE_ATOMIC_FENCE_CAPABILITIES,
-                           &dev->atomic_fence_capabilities,
-                           sizeof(dev->atomic_fence_capabilities));
-        cl_get_device_info(cl, dev->id, CL_DEVICE_NON_UNIFORM_WORK_GROUP_SUPPORT,
-                           &dev->non_uniform_work_group_support,
-                           sizeof(dev->non_uniform_work_group_support));
-        cl_get_device_info(cl, dev->id, CL_DEVICE_WORK_GROUP_COLLECTIVE_FUNCTIONS_SUPPORT,
-                           &dev->work_group_collective_functions_support,
-                           sizeof(dev->work_group_collective_functions_support));
-        cl_get_device_info(cl, dev->id, CL_DEVICE_GENERIC_ADDRESS_SPACE_SUPPORT,
-                           &dev->generic_address_space_support,
-                           sizeof(dev->generic_address_space_support));
-        cl_get_device_info(cl, dev->id, CL_DEVICE_DEVICE_ENQUEUE_CAPABILITIES,
-                           &dev->device_enqueue_capabilities,
-                           sizeof(dev->device_enqueue_capabilities));
-        cl_get_device_info(cl, dev->id, CL_DEVICE_PIPE_SUPPORT, &dev->pipe_support,
-                           sizeof(dev->pipe_support));
-        cl_get_device_info(cl, dev->id, CL_DEVICE_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
-                           &dev->preferred_work_group_size_multiple,
-                           sizeof(dev->preferred_work_group_size_multiple));
+        if (CL_VERSION_MAJOR(dev->version) >= 3) {
+            /* these two belong to 2.1 but might not be supported by 2.1 implementations */
+            cl_get_device_info(cl, dev->id, CL_DEVICE_MAX_NUM_SUB_GROUPS,
+                               &dev->max_num_sub_groups, sizeof(dev->max_num_sub_groups));
+            cl_get_device_info(cl, dev->id, CL_DEVICE_SUB_GROUP_INDEPENDENT_FORWARD_PROGRESS,
+                               &dev->sub_group_independent_forward_progress,
+                               sizeof(dev->sub_group_independent_forward_progress));
 
-        dev->latest_conformance_version_passed = cl_get_device_info_alloc(
-            cl, dev->id, CL_DEVICE_LATEST_CONFORMANCE_VERSION_PASSED, NULL);
-#endif
+            cl_get_device_info(cl, dev->id, CL_DEVICE_ATOMIC_MEMORY_CAPABILITIES,
+                               &dev->atomic_memory_capabilities,
+                               sizeof(dev->atomic_memory_capabilities));
+            cl_get_device_info(cl, dev->id, CL_DEVICE_ATOMIC_FENCE_CAPABILITIES,
+                               &dev->atomic_fence_capabilities,
+                               sizeof(dev->atomic_fence_capabilities));
+            cl_get_device_info(cl, dev->id, CL_DEVICE_NON_UNIFORM_WORK_GROUP_SUPPORT,
+                               &dev->non_uniform_work_group_support,
+                               sizeof(dev->non_uniform_work_group_support));
+            cl_get_device_info(cl, dev->id, CL_DEVICE_WORK_GROUP_COLLECTIVE_FUNCTIONS_SUPPORT,
+                               &dev->work_group_collective_functions_support,
+                               sizeof(dev->work_group_collective_functions_support));
+            cl_get_device_info(cl, dev->id, CL_DEVICE_GENERIC_ADDRESS_SPACE_SUPPORT,
+                               &dev->generic_address_space_support,
+                               sizeof(dev->generic_address_space_support));
+            cl_get_device_info(cl, dev->id, CL_DEVICE_DEVICE_ENQUEUE_CAPABILITIES,
+                               &dev->device_enqueue_capabilities,
+                               sizeof(dev->device_enqueue_capabilities));
+            cl_get_device_info(cl, dev->id, CL_DEVICE_PIPE_SUPPORT, &dev->pipe_support,
+                               sizeof(dev->pipe_support));
+            cl_get_device_info(cl, dev->id, CL_DEVICE_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
+                               &dev->preferred_work_group_size_multiple,
+                               sizeof(dev->preferred_work_group_size_multiple));
+
+            dev->latest_conformance_version_passed = cl_get_device_info_alloc(
+                cl, dev->id, CL_DEVICE_LATEST_CONFORMANCE_VERSION_PASSED, NULL);
+        }
     }
 }
 
@@ -969,11 +957,10 @@ cl_create_buffer(struct cl *cl, cl_mem_flags flags, size_t size)
     if (!buf)
         cl_die("failed to alloc buf");
 
-#ifdef CL_VERSION_3_0
-    buf->mem = cl->CreateBufferWithProperties(cl->ctx, NULL, flags, size, NULL, &cl->err);
-#else
-    buf->mem = cl->CreateBuffer(cl->ctx, flags, size, NULL, &cl->err);
-#endif
+    if (CL_VERSION_MAJOR(cl->dev->version) >= 3)
+        buf->mem = cl->CreateBufferWithProperties(cl->ctx, NULL, flags, size, NULL, &cl->err);
+    else
+        buf->mem = cl->CreateBuffer(cl->ctx, flags, size, NULL, &cl->err);
     cl_check(cl, "failed to create buffer");
 
     buf->size = size;
@@ -1057,11 +1044,12 @@ cl_create_pipeline(struct cl *cl, const char *code, const char *main)
     cl_program prog = cl->CreateProgramWithSource(cl->ctx, 1, &code, NULL, &cl->err);
     cl_check(cl, "failed to create program");
 
-#ifdef CL_VERSION_3_0
-    const char options[] = "-cl-std=CL3.0";
-#else
-    const char options[] = "-cl-std=CL2.0";
-#endif
+    const char *options;
+    if (CL_VERSION_MAJOR(cl->dev->version) >= 3)
+        options = "-cl-std=CL3.0";
+    else
+        options = "-cl-std=CL2.0";
+
     cl->err = cl->BuildProgram(prog, 1, &cl->dev->id, options, NULL, NULL);
     if (cl->err != CL_SUCCESS) {
         cl_build_status status;
