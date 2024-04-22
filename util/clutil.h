@@ -184,6 +184,10 @@ struct cl_buffer {
     void *mem_ptr;
 };
 
+struct cl_image {
+    cl_mem mem;
+};
+
 struct cl_pipeline {
     cl_program prog;
     cl_kernel kern;
@@ -965,9 +969,10 @@ cl_create_buffer(struct cl *cl, cl_mem_flags flags, size_t size, const void *dat
         cl_die("failed to alloc buf");
 
     if (CL_VERSION_MAJOR(cl->dev->version) >= 3)
-        buf->mem = cl->CreateBufferWithProperties(cl->ctx, NULL, flags, size, NULL, &cl->err);
+        buf->mem =
+            cl->CreateBufferWithProperties(cl->ctx, NULL, flags, size, (void *)data, &cl->err);
     else
-        buf->mem = cl->CreateBuffer(cl->ctx, flags, size, NULL, &cl->err);
+        buf->mem = cl->CreateBuffer(cl->ctx, flags, size, (void *)data, &cl->err);
     cl_check(cl, "failed to create buffer");
 
     buf->size = size;
@@ -982,6 +987,29 @@ cl_destroy_buffer(struct cl *cl, struct cl_buffer *buf)
     cl_check(cl, "failed to destroy buffer");
 
     free(buf);
+}
+
+static inline struct cl_buffer *
+cl_suballoc_buffer(
+    struct cl *cl, struct cl_buffer *buf, cl_mem_flags flags, size_t offset, size_t size)
+{
+    if (offset + size > buf->size)
+        cl_die("bad suballoc size");
+
+    struct cl_buffer *sub = calloc(1, sizeof(*sub));
+    if (!sub)
+        cl_die("failed to alloc buf");
+
+    const cl_buffer_region region = {
+        .origin = offset,
+        .size = size,
+    };
+    sub->mem =
+        cl->CreateSubBuffer(buf->mem, flags, CL_BUFFER_CREATE_TYPE_REGION, &region, &cl->err);
+    cl_check(cl, "failed to suballoc buffer");
+
+    sub->size = size;
+    return sub;
 }
 
 static inline void
@@ -1022,6 +1050,52 @@ cl_unmap_buffer(struct cl *cl, struct cl_buffer *buf)
 {
     cl->err = cl->EnqueueUnmapMemObject(cl->cmdq, buf->mem, buf->mem_ptr, 0, NULL, NULL);
     cl_check(cl, "failed to unmap buffer");
+}
+
+static inline struct cl_image *
+cl_create_image(struct cl *cl,
+                cl_mem_flags flags,
+                cl_channel_order ch_order,
+                cl_channel_type ch_type,
+                cl_mem_object_type img_type,
+                size_t width,
+                size_t height,
+                cl_mem mem,
+                const void *data)
+{
+    const cl_image_format img_format = {
+        .image_channel_order = ch_order,
+        .image_channel_data_type = ch_type,
+    };
+    const cl_image_desc img_desc = {
+        .image_type = img_type,
+        .image_width = width,
+        .image_height = height,
+        .mem_object = mem,
+    };
+
+    struct cl_image *img = calloc(1, sizeof(*img));
+    if (!img)
+        cl_die("failed to alloc img");
+
+    if (CL_VERSION_MAJOR(cl->dev->version) >= 3)
+        img->mem = cl->CreateImageWithProperties(cl->ctx, NULL, flags, &img_format, &img_desc,
+                                                 (void *)data, &cl->err);
+    else
+        img->mem =
+            cl->CreateImage(cl->ctx, flags, &img_format, &img_desc, (void *)data, &cl->err);
+    cl_check(cl, "failed to create image");
+
+    return img;
+}
+
+static inline void
+cl_destroy_image(struct cl *cl, struct cl_image *img)
+{
+    cl->err = cl->ReleaseMemObject(img->mem);
+    cl_check(cl, "failed to destroy image");
+
+    free(img);
 }
 
 static inline void
