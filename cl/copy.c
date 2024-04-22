@@ -28,8 +28,8 @@ copy_test_init(struct copy_test *test)
 
     cl_init(cl, NULL);
 
-    test->src = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size);
-    test->dst = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size);
+    test->src = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
+    test->dst = cl_create_buffer(cl, CL_MEM_ALLOC_HOST_PTR, test->size, NULL);
     test->pipeline = cl_create_pipeline(cl, copy_test_cs, "memcpy32");
 }
 

@@ -955,8 +955,11 @@ cl_cleanup(struct cl *cl)
 }
 
 static inline struct cl_buffer *
-cl_create_buffer(struct cl *cl, cl_mem_flags flags, size_t size)
+cl_create_buffer(struct cl *cl, cl_mem_flags flags, size_t size, const void *data)
 {
+    if (data && !(flags & CL_MEM_COPY_HOST_PTR))
+        cl_die("bad buffer flags");
+
     struct cl_buffer *buf = calloc(1, sizeof(*buf));
     if (!buf)
         cl_die("failed to alloc buf");

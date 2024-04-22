@@ -53,8 +53,8 @@ bench_copy_init_buffers(struct bench_copy *test)
     const cl_mem_flags dst_flags =
         CL_MEM_WRITE_ONLY | (test->verify ? CL_MEM_ALLOC_HOST_PTR : CL_MEM_HOST_NO_ACCESS);
 
-    test->src = cl_create_buffer(cl, src_flags, test->size);
-    test->dst = cl_create_buffer(cl, dst_flags, test->size);
+    test->src = cl_create_buffer(cl, src_flags, test->size, NULL);
+    test->dst = cl_create_buffer(cl, dst_flags, test->size, NULL);
 
     const cl_uint val = 0x12345678;
     cl_fill_buffer(cl, test->src, &val, sizeof(val));

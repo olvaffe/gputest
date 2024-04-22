@@ -67,8 +67,8 @@ tflite_bhwc_to_tensor_test_init(struct tflite_bhwc_to_tensor_test *test)
     const size_t item_count = test->width * test->height * test->slices * test->batches;
     const size_t src_size = item_count * 4 * sizeof(cl_float);
     const size_t dst_size = item_count * 4 * sizeof(cl_half);
-    test->src = cl_create_buffer(cl, CL_MEM_READ_WRITE, src_size);
-    test->dst = cl_create_buffer(cl, CL_MEM_READ_WRITE, dst_size);
+    test->src = cl_create_buffer(cl, CL_MEM_READ_WRITE, src_size, NULL);
+    test->dst = cl_create_buffer(cl, CL_MEM_READ_WRITE, dst_size, NULL);
     test->pipeline = cl_create_pipeline(cl, tflite_bhwc_to_tensor_test_cs, "bhwc_to_tensor");
 
     test->random_input_size = item_count * test->channels * sizeof(cl_float);

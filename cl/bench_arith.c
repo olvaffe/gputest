@@ -108,8 +108,8 @@ bench_arith_init_buffer(struct bench_arith *test)
 {
     struct cl *cl = &test->cl;
 
-    test->buf = cl_create_buffer(cl, CL_MEM_WRITE_ONLY,
-                                 test->global_work_size * test->type_size * test->type_width);
+    test->buf = cl_create_buffer(
+        cl, CL_MEM_WRITE_ONLY, test->global_work_size * test->type_size * test->type_width, NULL);
 }
 
 static void

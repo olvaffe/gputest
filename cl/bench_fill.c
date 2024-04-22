@@ -52,7 +52,7 @@ bench_fill_init_buffer(struct bench_fill *test)
     const cl_mem_flags flags =
         CL_MEM_WRITE_ONLY | (test->verify ? CL_MEM_ALLOC_HOST_PTR : CL_MEM_HOST_NO_ACCESS);
 
-    test->buf = cl_create_buffer(cl, flags, test->size);
+    test->buf = cl_create_buffer(cl, flags, test->size, NULL);
 
     if (test->verify) {
         const cl_uint magic = 0xdeadbeef;
