@@ -8,6 +8,7 @@ cl_tests = [
   'clinfo',
   'copy',
   'tflite_bhwc_to_tensor',
+  'tflite_depthwise_conv',
 ]
 
 foreach t : cl_tests
