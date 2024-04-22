@@ -7,6 +7,7 @@ cl_tests = [
   'bench_fill',
   'clinfo',
   'copy',
+  'tflite_bhwc_to_tensor',
 ]
 
 foreach t : cl_tests

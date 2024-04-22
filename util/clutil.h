@@ -992,6 +992,16 @@ cl_fill_buffer(struct cl *cl, struct cl_buffer *buf, const void *pattern, size_t
     cl_check(cl, "failed to fill buffer");
 }
 
+static inline void
+cl_write_buffer(struct cl *cl, struct cl_buffer *buf, const void *data, size_t size)
+{
+    if (size > buf->size)
+        cl_die("bad write size");
+
+    cl->err = cl->EnqueueWriteBuffer(cl->cmdq, buf->mem, true, 0, buf->size, data, 0, NULL, NULL);
+    cl_check(cl, "failed to write buffer");
+}
+
 static inline void *
 cl_map_buffer(struct cl *cl, struct cl_buffer *buf, cl_map_flags flags)
 {
