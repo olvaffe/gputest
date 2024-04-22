@@ -68,15 +68,14 @@ main_function(global half4 *biases_buffer,                                 \n\
 }";
 
 struct tflite_depthwise_conv_test {
-    size_t buf_size;
-    size_t src_offset;
-    size_t src_size;
-    size_t dst_offset;
-    size_t dst_size;
+    cl_int src_width;
+    cl_int src_height;
+    cl_int dst_width;
+    cl_int dst_height;
+    cl_int slice_count;
 
-    cl_int weight_width;
-    cl_int weight_height;
-
+    cl_int kernel_width;
+    cl_int kernel_height;
     cl_int padding_x;
     cl_int padding_y;
     cl_int stride_x;
@@ -84,11 +83,11 @@ struct tflite_depthwise_conv_test {
     cl_int dilation_x;
     cl_int dilation_y;
 
-    cl_int src_tensor_width;
-    cl_int src_tensor_height;
-    cl_int dst_tensor_width;
-    cl_int dst_tensor_height;
-    cl_int dst_tensor_slices;
+    size_t buf_size;
+    size_t src_offset;
+    size_t src_size;
+    size_t dst_offset;
+    size_t dst_size;
 
     struct cl cl;
 
@@ -116,23 +115,31 @@ tflite_depthwise_conv_test_init(struct tflite_depthwise_conv_test *test)
 
     test->buf = cl_create_buffer(cl, CL_MEM_READ_WRITE, test->buf_size, NULL);
 
+    const size_t src_count = test->src_width * test->src_height * test->slice_count;
+    if (test->src_size != sizeof(cl_half4) * src_count)
+        cl_die("bad src size");
+
     test->src_buf =
         cl_suballoc_buffer(cl, test->buf, CL_MEM_READ_WRITE, test->src_offset, test->src_size);
-    test->src_img = cl_create_image(
-        cl, CL_MEM_READ_WRITE, CL_RGBA, CL_HALF_FLOAT, CL_MEM_OBJECT_IMAGE1D_BUFFER,
-        test->src_size / sizeof(cl_half4), 0, test->src_buf->mem, NULL);
+    test->src_img =
+        cl_create_image(cl, CL_MEM_READ_WRITE, CL_RGBA, CL_HALF_FLOAT,
+                        CL_MEM_OBJECT_IMAGE1D_BUFFER, src_count, 0, test->src_buf->mem, NULL);
+
+    const size_t dst_count = test->dst_width * test->dst_height * test->slice_count;
+    if (test->dst_size != sizeof(cl_half4) * dst_count)
+        cl_die("bad dst size");
 
     test->dst_buf =
         cl_suballoc_buffer(cl, test->buf, CL_MEM_READ_WRITE, test->dst_offset, test->dst_size);
 
-    const size_t bias_size = sizeof(cl_half4) * test->dst_tensor_slices;
+    const size_t bias_size = sizeof(cl_half4) * test->slice_count;
     cl_half4 *biases = calloc(1, bias_size);
     test->bias_buf =
         cl_create_buffer(cl, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, bias_size, biases);
     free(biases);
 
     const size_t weight_size =
-        sizeof(cl_half4) * test->dst_tensor_slices * test->weight_width * test->weight_height;
+        sizeof(cl_half4) * test->slice_count * test->kernel_width * test->kernel_height;
     cl_half4 *weights = calloc(1, weight_size);
     test->weight_buf =
         cl_create_buffer(cl, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, weight_size, weights);
@@ -175,20 +182,20 @@ tflite_depthwise_conv_test_dispatch(struct tflite_depthwise_conv_test *test)
         [0] = {
             .x = test->dilation_x,
             .y = test->dilation_y,
-            .z = test->dst_tensor_height,
-            .w = test->dst_tensor_slices,
+            .z = test->dst_height,
+            .w = test->slice_count,
         },
         [1] = {
-            .x = test->dst_tensor_width,
-            .y = test->weight_width,
-            .z = test->weight_height,
-            .w = test->weight_width * test->weight_height,
+            .x = test->dst_width,
+            .y = test->kernel_width,
+            .z = test->kernel_height,
+            .w = test->kernel_width * test->kernel_height,
         },
         [2] = {
             .x = test->padding_x,
             .y = test->padding_y,
-            .z = test->src_tensor_height,
-            .w = test->src_tensor_width,
+            .z = test->src_height,
+            .w = test->src_width,
         },
         [3] = {
             .x = test->stride_x,
@@ -203,8 +210,8 @@ tflite_depthwise_conv_test_dispatch(struct tflite_depthwise_conv_test *test)
     for (uint32_t i = 0; i < loops; i++) {
         cl_event ev;
 
-        cl_enqueue_pipeline(cl, test->pipeline, test->dst_tensor_width, test->dst_tensor_height,
-                            test->dst_tensor_slices, &ev);
+        cl_enqueue_pipeline(cl, test->pipeline, test->dst_width, test->dst_height,
+                            test->slice_count, &ev);
         cl_wait_event(cl, ev);
 
         cl_ulong start_ns;
@@ -223,15 +230,14 @@ int
 main(void)
 {
     struct tflite_depthwise_conv_test test = {
-        .buf_size = 14155776,
-        .src_offset = 11796480,
-        .src_size = 2359296,
-        .dst_offset = 7077888,
-        .dst_size = 589824,
+        .src_width = 512,
+        .src_height = 288,
+        .dst_width = 256,
+        .dst_height = 144,
+        .slice_count = 2,
 
-        .weight_width = 4,
-        .weight_height = 4,
-
+        .kernel_width = 4,
+        .kernel_height = 4,
         .padding_x = -1,
         .padding_y = -1,
         .stride_x = 2,
@@ -239,11 +245,11 @@ main(void)
         .dilation_x = 1,
         .dilation_y = 1,
 
-        .src_tensor_width = 512,
-        .src_tensor_height = 288,
-        .dst_tensor_width = 256,
-        .dst_tensor_height = 144,
-        .dst_tensor_slices = 2,
+        .buf_size = 14155776,
+        .src_offset = 11796480,
+        .src_size = 2359296,
+        .dst_offset = 7077888,
+        .dst_size = 589824,
     };
 
     tflite_depthwise_conv_test_init(&test);
