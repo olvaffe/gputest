@@ -27,11 +27,11 @@ struct cl_device {
     cl_uint max_work_item_dimensions;
     size_t *max_work_item_sizes;
     size_t max_work_group_size;
-    cl_uint preferred_vector_width_short;
     cl_uint preferred_vector_width_char;
+    cl_uint preferred_vector_width_short;
     cl_uint preferred_vector_width_int;
-    cl_uint preferred_vector_width_float;
     cl_uint preferred_vector_width_long;
+    cl_uint preferred_vector_width_float;
     cl_uint preferred_vector_width_double;
     cl_uint preferred_vector_width_half;
     cl_uint native_vector_width_char;

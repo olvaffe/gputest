@@ -24,11 +24,11 @@ info_dump_device(struct cl *cl, uint32_t plat_idx, uint32_t dev_idx)
         cl_log("    %zu", dev->max_work_item_sizes[i]);
 
     cl_log("  max_work_group_size: %zu", dev->max_work_group_size);
-    cl_log("  preferred_vector_width_short: %u", dev->preferred_vector_width_short);
     cl_log("  preferred_vector_width_char: %u", dev->preferred_vector_width_char);
+    cl_log("  preferred_vector_width_short: %u", dev->preferred_vector_width_short);
     cl_log("  preferred_vector_width_int: %u", dev->preferred_vector_width_int);
-    cl_log("  preferred_vector_width_float: %u", dev->preferred_vector_width_float);
     cl_log("  preferred_vector_width_long: %u", dev->preferred_vector_width_long);
+    cl_log("  preferred_vector_width_float: %u", dev->preferred_vector_width_float);
     cl_log("  preferred_vector_width_double: %u", dev->preferred_vector_width_double);
     cl_log("  preferred_vector_width_half: %u", dev->preferred_vector_width_half);
     cl_log("  native_vector_width_char: %u", dev->native_vector_width_char);
