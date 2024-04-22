@@ -365,6 +365,7 @@ cl_init_library(struct cl *cl)
 #define PFN(name)                                                                                \
     if (!cl->name)                                                                               \
         cl_die("no cl" #name);
+#define PFN_30(name)
 #include "clutil_entrypoints.inc"
 }
 

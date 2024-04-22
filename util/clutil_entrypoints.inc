@@ -1,4 +1,12 @@
-/* OpenCL 3.0 */
+#ifndef PFN
+#define PFN(name)
+#endif
+
+#ifndef PFN_30
+#define PFN_30(name) PFN(name)
+#endif
+
+/* OpenCL 1.0 */
 PFN(GetPlatformIDs)
 PFN(GetPlatformInfo)
 PFN(GetDeviceIDs)
@@ -54,6 +62,8 @@ PFN(EnqueueMapImage)
 PFN(EnqueueUnmapMemObject)
 PFN(EnqueueNDRangeKernel)
 PFN(EnqueueNativeKernel)
+
+/* OpenCL 1.1 */
 PFN(CreateSubBuffer)
 PFN(SetMemObjectDestructorCallback)
 PFN(CreateUserEvent)
@@ -62,6 +72,8 @@ PFN(SetEventCallback)
 PFN(EnqueueReadBufferRect)
 PFN(EnqueueWriteBufferRect)
 PFN(EnqueueCopyBufferRect)
+
+/* OpenCL 1.2 */
 PFN(CreateSubDevices)
 PFN(RetainDevice)
 PFN(ReleaseDevice)
@@ -77,6 +89,8 @@ PFN(EnqueueMigrateMemObjects)
 PFN(EnqueueMarkerWithWaitList)
 PFN(EnqueueBarrierWithWaitList)
 PFN(GetExtensionFunctionAddressForPlatform)
+
+/* OpenCL 2.0 */
 PFN(CreateCommandQueueWithProperties)
 PFN(CreatePipe)
 PFN(GetPipeInfo)
@@ -90,6 +104,8 @@ PFN(EnqueueSVMMemcpy)
 PFN(EnqueueSVMMemFill)
 PFN(EnqueueSVMMap)
 PFN(EnqueueSVMUnmap)
+
+/* OpenCL 2.1 */
 PFN(SetDefaultDeviceCommandQueue)
 PFN(GetDeviceAndHostTimer)
 PFN(GetHostTimer)
@@ -97,11 +113,14 @@ PFN(CreateProgramWithIL)
 PFN(CloneKernel)
 PFN(GetKernelSubGroupInfo)
 PFN(EnqueueSVMMigrateMem)
+
+/* OpenCL 2.2 */
 PFN(SetProgramSpecializationConstant)
-#ifdef CL_VERSION_3_0
-PFN(SetContextDestructorCallback)
-PFN(CreateBufferWithProperties)
-PFN(CreateImageWithProperties)
-#endif
+
+/* OpenCL 3.0 */
+PFN_30(SetContextDestructorCallback)
+PFN_30(CreateBufferWithProperties)
+PFN_30(CreateImageWithProperties)
 
 #undef PFN
+#undef PFN_30
