@@ -95,6 +95,7 @@ tflite_bhwc_to_tensor_test_dispatch(struct tflite_bhwc_to_tensor_test *test)
 {
     struct cl *cl = &test->cl;
     const uint32_t loops = 4;
+    const uint32_t dispatches = 100;
 
     cl_write_buffer(cl, test->src, test->random_input, test->random_input_size);
 
@@ -115,17 +116,26 @@ tflite_bhwc_to_tensor_test_dispatch(struct tflite_bhwc_to_tensor_test *test)
     cl_set_pipeline_arg(cl, test->pipeline, 3, &shared[1], sizeof(shared[1]));
 
     for (uint32_t i = 0; i < loops; i++) {
-        cl_event ev;
+        cl_event start_ev;
+        cl_event end_ev;
 
-        cl_enqueue_pipeline(cl, test->pipeline, test->width, test->height, 0, 256, 1, 1, &ev);
-        cl_wait_event(cl, ev);
+        for (uint32_t j = 0; j < dispatches; j++) {
+            cl_event *ev = j == 0 ? &start_ev : j == dispatches - 1 ? &end_ev : NULL;
+            cl_enqueue_pipeline(cl, test->pipeline, test->width, test->height, 0, 256, 1, 1, ev);
+        }
+        if (dispatches == 1)
+            end_ev = cl_retain_event(cl, start_ev);
+
+        cl_finish(cl);
 
         cl_ulong start_ns;
         cl_ulong end_ns;
-        cl_get_event_profiling_info(cl, ev, CL_PROFILING_COMMAND_START, &start_ns,
+        cl_get_event_profiling_info(cl, start_ev, CL_PROFILING_COMMAND_START, &start_ns,
                                     sizeof(start_ns));
-        cl_get_event_profiling_info(cl, ev, CL_PROFILING_COMMAND_END, &end_ns, sizeof(end_ns));
-        cl_destroy_event(cl, ev);
+        cl_get_event_profiling_info(cl, end_ev, CL_PROFILING_COMMAND_END, &end_ns,
+                                    sizeof(end_ns));
+        cl_destroy_event(cl, start_ev);
+        cl_destroy_event(cl, end_ev);
 
         const float dur_ms = (float)(end_ns - start_ns) / 1000000;
         cl_log("iter %d took %.3f ms", i, dur_ms);

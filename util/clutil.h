@@ -1232,6 +1232,14 @@ cl_destroy_event(struct cl *cl, cl_event ev)
     cl_check(cl, "failed to destroy event");
 }
 
+static inline cl_event
+cl_retain_event(struct cl *cl, cl_event ev)
+{
+    cl->err = cl->RetainEvent(ev);
+    cl_check(cl, "failed to retain event");
+    return ev;
+}
+
 static inline void
 cl_get_event_profiling_info(
     struct cl *cl, cl_event ev, cl_profiling_info param, void *buf, size_t size)

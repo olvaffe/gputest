@@ -171,6 +171,7 @@ tflite_depthwise_conv_test_dispatch(struct tflite_depthwise_conv_test *test)
 {
     struct cl *cl = &test->cl;
     const uint32_t loops = 4;
+    const uint32_t dispatches = 100;
 
     cl_set_pipeline_arg(cl, test->pipeline, 0, &test->bias_buf->mem, sizeof(test->bias_buf->mem));
     cl_set_pipeline_arg(cl, test->pipeline, 1, &test->dst_buf->mem, sizeof(test->dst_buf->mem));
@@ -208,18 +209,27 @@ tflite_depthwise_conv_test_dispatch(struct tflite_depthwise_conv_test *test)
     cl_set_pipeline_arg(cl, test->pipeline, 7, &shared[3], sizeof(shared[3]));
 
     for (uint32_t i = 0; i < loops; i++) {
-        cl_event ev;
+        cl_event start_ev;
+        cl_event end_ev;
 
-        cl_enqueue_pipeline(cl, test->pipeline, test->dst_width, test->dst_height,
-                            test->slice_count, 128, 1, 2, &ev);
-        cl_wait_event(cl, ev);
+        for (uint32_t j = 0; j < dispatches; j++) {
+            cl_event *ev = j == 0 ? &start_ev : j == dispatches - 1 ? &end_ev : NULL;
+            cl_enqueue_pipeline(cl, test->pipeline, test->dst_width, test->dst_height,
+                                test->slice_count, 128, 1, 2, ev);
+        }
+        if (dispatches == 1)
+            end_ev = cl_retain_event(cl, start_ev);
+
+        cl_finish(cl);
 
         cl_ulong start_ns;
         cl_ulong end_ns;
-        cl_get_event_profiling_info(cl, ev, CL_PROFILING_COMMAND_START, &start_ns,
+        cl_get_event_profiling_info(cl, start_ev, CL_PROFILING_COMMAND_START, &start_ns,
                                     sizeof(start_ns));
-        cl_get_event_profiling_info(cl, ev, CL_PROFILING_COMMAND_END, &end_ns, sizeof(end_ns));
-        cl_destroy_event(cl, ev);
+        cl_get_event_profiling_info(cl, end_ev, CL_PROFILING_COMMAND_END, &end_ns,
+                                    sizeof(end_ns));
+        cl_destroy_event(cl, start_ev);
+        cl_destroy_event(cl, end_ev);
 
         const float dur_ms = (float)(end_ns - start_ns) / 1000000;
         cl_log("iter %d took %.3f ms", i, dur_ms);
