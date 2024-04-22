@@ -998,7 +998,7 @@ cl_write_buffer(struct cl *cl, struct cl_buffer *buf, const void *data, size_t s
     if (size > buf->size)
         cl_die("bad write size");
 
-    cl->err = cl->EnqueueWriteBuffer(cl->cmdq, buf->mem, true, 0, buf->size, data, 0, NULL, NULL);
+    cl->err = cl->EnqueueWriteBuffer(cl->cmdq, buf->mem, true, 0, size, data, 0, NULL, NULL);
     cl_check(cl, "failed to write buffer");
 }
 
