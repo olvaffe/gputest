@@ -52,35 +52,30 @@ convert(global half4 *dst_buf,
                 img_vals[3][3] = read_imageh(src_img, base + width * (ky + 3) + (kx + 3));
 #endif
 
-                const int weight_base =
-                    (kernel_width * (kernel_height * ss + y) + x) * REDUCE_WIDTH;
-                half4 weights[REDUCE_WIDTH];
-                weights[0] = weight_buf[weight_base + 0];
-                weights[1] = weight_buf[weight_base + 1];
-                weights[2] = weight_buf[weight_base + 2];
-                weights[3] = weight_buf[weight_base + 3];
+                const int weight_off = kernel_width * (kernel_height * ss + y) + x;
+                const half4 weight = weight_buf[weight_off];
 
-                tmp_vals[0][0] += weights[0] * img_vals[0][0];
-                tmp_vals[0][1] += weights[1] * img_vals[0][1];
-                tmp_vals[0][2] += weights[2] * img_vals[0][2];
-                tmp_vals[0][3] += weights[3] * img_vals[0][3];
+                tmp_vals[0][0] += weight * img_vals[0][0];
+                tmp_vals[0][1] += weight * img_vals[0][1];
+                tmp_vals[0][2] += weight * img_vals[0][2];
+                tmp_vals[0][3] += weight * img_vals[0][3];
 #if REDUCE_HEIGHT >= 2
-                tmp_vals[1][0] += weights[0] * img_vals[1][0];
-                tmp_vals[1][1] += weights[1] * img_vals[1][1];
-                tmp_vals[1][2] += weights[2] * img_vals[1][2];
-                tmp_vals[1][3] += weights[3] * img_vals[1][3];
+                tmp_vals[1][0] += weight * img_vals[1][0];
+                tmp_vals[1][1] += weight * img_vals[1][1];
+                tmp_vals[1][2] += weight * img_vals[1][2];
+                tmp_vals[1][3] += weight * img_vals[1][3];
 #endif
 #if REDUCE_HEIGHT >= 3
-                tmp_vals[2][0] += weights[0] * img_vals[2][0];
-                tmp_vals[2][1] += weights[1] * img_vals[2][1];
-                tmp_vals[2][2] += weights[2] * img_vals[2][2];
-                tmp_vals[2][3] += weights[3] * img_vals[2][3];
+                tmp_vals[2][0] += weight * img_vals[2][0];
+                tmp_vals[2][1] += weight * img_vals[2][1];
+                tmp_vals[2][2] += weight * img_vals[2][2];
+                tmp_vals[2][3] += weight * img_vals[2][3];
 #endif
 #if REDUCE_HEIGHT >= 4
-                tmp_vals[3][0] += weights[0] * img_vals[3][0];
-                tmp_vals[3][1] += weights[1] * img_vals[3][1];
-                tmp_vals[3][2] += weights[2] * img_vals[3][2];
-                tmp_vals[3][3] += weights[3] * img_vals[3][3];
+                tmp_vals[3][0] += weight * img_vals[3][0];
+                tmp_vals[3][1] += weight * img_vals[3][1];
+                tmp_vals[3][2] += weight * img_vals[3][2];
+                tmp_vals[3][3] += weight * img_vals[3][3];
 #endif
             }
         }
