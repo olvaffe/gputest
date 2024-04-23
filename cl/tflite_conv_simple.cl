@@ -52,82 +52,35 @@ convert(global half4 *dst_buf,
                 img_vals[3][3] = read_imageh(src_img, base + width * (ky + 3) + (kx + 3));
 #endif
 
-                const int weight_base = (kernel_width * (kernel_height * ss + y) + x) * 4;
-                half4 weights[4];
+                const int weight_base =
+                    (kernel_width * (kernel_height * ss + y) + x) * REDUCE_WIDTH;
+                half4 weights[REDUCE_WIDTH];
                 weights[0] = weight_buf[weight_base + 0];
                 weights[1] = weight_buf[weight_base + 1];
                 weights[2] = weight_buf[weight_base + 2];
                 weights[3] = weight_buf[weight_base + 3];
 
-                tmp_vals[0][0] += weights[0] * img_vals[0][0].x;
-                tmp_vals[0][0] += weights[1] * img_vals[0][0].y;
-                tmp_vals[0][0] += weights[2] * img_vals[0][0].z;
-                tmp_vals[0][0] += weights[3] * img_vals[0][0].w;
-                tmp_vals[0][1] += weights[0] * img_vals[0][1].x;
-                tmp_vals[0][1] += weights[1] * img_vals[0][1].y;
-                tmp_vals[0][1] += weights[2] * img_vals[0][1].z;
-                tmp_vals[0][1] += weights[3] * img_vals[0][1].w;
-                tmp_vals[0][2] += weights[0] * img_vals[0][2].x;
-                tmp_vals[0][2] += weights[1] * img_vals[0][2].y;
-                tmp_vals[0][2] += weights[2] * img_vals[0][2].z;
-                tmp_vals[0][2] += weights[3] * img_vals[0][2].w;
-                tmp_vals[0][3] += weights[0] * img_vals[0][3].x;
-                tmp_vals[0][3] += weights[1] * img_vals[0][3].y;
-                tmp_vals[0][3] += weights[2] * img_vals[0][3].z;
-                tmp_vals[0][3] += weights[3] * img_vals[0][3].w;
+                tmp_vals[0][0] += weights[0] * img_vals[0][0];
+                tmp_vals[0][1] += weights[1] * img_vals[0][1];
+                tmp_vals[0][2] += weights[2] * img_vals[0][2];
+                tmp_vals[0][3] += weights[3] * img_vals[0][3];
 #if REDUCE_HEIGHT >= 2
-                tmp_vals[1][0] += weights[0] * img_vals[1][0].x;
-                tmp_vals[1][0] += weights[1] * img_vals[1][0].y;
-                tmp_vals[1][0] += weights[2] * img_vals[1][0].z;
-                tmp_vals[1][0] += weights[3] * img_vals[1][0].w;
-                tmp_vals[1][1] += weights[0] * img_vals[1][1].x;
-                tmp_vals[1][1] += weights[1] * img_vals[1][1].y;
-                tmp_vals[1][1] += weights[2] * img_vals[1][1].z;
-                tmp_vals[1][1] += weights[3] * img_vals[1][1].w;
-                tmp_vals[1][2] += weights[0] * img_vals[1][2].x;
-                tmp_vals[1][2] += weights[1] * img_vals[1][2].y;
-                tmp_vals[1][2] += weights[2] * img_vals[1][2].z;
-                tmp_vals[1][2] += weights[3] * img_vals[1][2].w;
-                tmp_vals[1][3] += weights[0] * img_vals[1][3].x;
-                tmp_vals[1][3] += weights[1] * img_vals[1][3].y;
-                tmp_vals[1][3] += weights[2] * img_vals[1][3].z;
-                tmp_vals[1][3] += weights[3] * img_vals[1][3].w;
+                tmp_vals[1][0] += weights[0] * img_vals[1][0];
+                tmp_vals[1][1] += weights[1] * img_vals[1][1];
+                tmp_vals[1][2] += weights[2] * img_vals[1][2];
+                tmp_vals[1][3] += weights[3] * img_vals[1][3];
 #endif
 #if REDUCE_HEIGHT >= 3
-                tmp_vals[2][0] += weights[0] * img_vals[2][0].x;
-                tmp_vals[2][0] += weights[1] * img_vals[2][0].y;
-                tmp_vals[2][0] += weights[2] * img_vals[2][0].z;
-                tmp_vals[2][0] += weights[3] * img_vals[2][0].w;
-                tmp_vals[2][1] += weights[0] * img_vals[2][1].x;
-                tmp_vals[2][1] += weights[1] * img_vals[2][1].y;
-                tmp_vals[2][1] += weights[2] * img_vals[2][1].z;
-                tmp_vals[2][1] += weights[3] * img_vals[2][1].w;
-                tmp_vals[2][2] += weights[0] * img_vals[2][2].x;
-                tmp_vals[2][2] += weights[1] * img_vals[2][2].y;
-                tmp_vals[2][2] += weights[2] * img_vals[2][2].z;
-                tmp_vals[2][2] += weights[3] * img_vals[2][2].w;
-                tmp_vals[2][3] += weights[0] * img_vals[2][3].x;
-                tmp_vals[2][3] += weights[1] * img_vals[2][3].y;
-                tmp_vals[2][3] += weights[2] * img_vals[2][3].z;
-                tmp_vals[2][3] += weights[3] * img_vals[2][3].w;
+                tmp_vals[2][0] += weights[0] * img_vals[2][0];
+                tmp_vals[2][1] += weights[1] * img_vals[2][1];
+                tmp_vals[2][2] += weights[2] * img_vals[2][2];
+                tmp_vals[2][3] += weights[3] * img_vals[2][3];
 #endif
 #if REDUCE_HEIGHT >= 4
-                tmp_vals[3][0] += weights[0] * img_vals[3][0].x;
-                tmp_vals[3][0] += weights[1] * img_vals[3][0].y;
-                tmp_vals[3][0] += weights[2] * img_vals[3][0].z;
-                tmp_vals[3][0] += weights[3] * img_vals[3][0].w;
-                tmp_vals[3][1] += weights[0] * img_vals[3][1].x;
-                tmp_vals[3][1] += weights[1] * img_vals[3][1].y;
-                tmp_vals[3][1] += weights[2] * img_vals[3][1].z;
-                tmp_vals[3][1] += weights[3] * img_vals[3][1].w;
-                tmp_vals[3][2] += weights[0] * img_vals[3][2].x;
-                tmp_vals[3][2] += weights[1] * img_vals[3][2].y;
-                tmp_vals[3][2] += weights[2] * img_vals[3][2].z;
-                tmp_vals[3][2] += weights[3] * img_vals[3][2].w;
-                tmp_vals[3][3] += weights[0] * img_vals[3][3].x;
-                tmp_vals[3][3] += weights[1] * img_vals[3][3].y;
-                tmp_vals[3][3] += weights[2] * img_vals[3][3].z;
-                tmp_vals[3][3] += weights[3] * img_vals[3][3].w;
+                tmp_vals[3][0] += weights[0] * img_vals[3][0];
+                tmp_vals[3][1] += weights[1] * img_vals[3][1];
+                tmp_vals[3][2] += weights[2] * img_vals[3][2];
+                tmp_vals[3][3] += weights[3] * img_vals[3][3];
 #endif
             }
         }

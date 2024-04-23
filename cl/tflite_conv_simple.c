@@ -52,7 +52,8 @@ tflite_conv_simple_test_init(struct tflite_conv_simple_test *test)
     const size_t dst_size = sizeof(cl_half4) * dst_count;
     test->dst_buf = cl_create_buffer(cl, CL_MEM_READ_WRITE, dst_size, NULL);
 
-    const size_t weight_count = test->kernel_width * test->kernel_height * test->slice_count * 4;
+    const size_t weight_count =
+        test->kernel_width * test->kernel_height * test->slice_count * test->reduce_width;
     const size_t weight_size = sizeof(cl_half4) * weight_count;
     test->weight_buf = cl_create_buffer(cl, CL_MEM_READ_WRITE, weight_size, NULL);
 
