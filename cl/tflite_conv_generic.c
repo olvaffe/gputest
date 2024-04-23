@@ -645,10 +645,11 @@ tflite_conv_generic_test_dispatch(struct tflite_conv_generic_test *test)
 int
 main(void)
 {
+    const cl_int src_slice_count = 6;
     struct tflite_conv_generic_test test = {
         .src_width = 512,
         .src_height = 288,
-        .src_slice_count = 6,
+        .src_slice_count = src_slice_count,
         .dst_width = 512,
         .dst_height = 288,
         .dst_slice_count = 2,
@@ -664,7 +665,7 @@ main(void)
 
         .buf_size = 14155776,
         .src_offset = 0,
-        .src_size = 7077888,
+        .src_size = 1179648 * src_slice_count,
         .dst_offset = 7077888,
         .dst_size = 2359296,
     };
