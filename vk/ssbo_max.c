@@ -9,11 +9,11 @@
 
 #include "vkutil.h"
 
-static const uint32_t compute_test_cs[] = {
-#include "compute_test.comp.inc"
+static const uint32_t ssbo_max_test_cs[] = {
+#include "ssbo_max_test.comp.inc"
 };
 
-struct compute_test {
+struct ssbo_max_test {
     uint32_t local_size;
 
     struct vk vk;
@@ -25,7 +25,7 @@ struct compute_test {
 };
 
 static void
-compute_test_init_descriptor_set(struct compute_test *test)
+ssbo_max_test_init_descriptor_set(struct ssbo_max_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -35,14 +35,14 @@ compute_test_init_descriptor_set(struct compute_test *test)
 }
 
 static void
-compute_test_init_pipeline(struct compute_test *test)
+ssbo_max_test_init_pipeline(struct ssbo_max_test *test)
 {
     struct vk *vk = &test->vk;
 
     test->pipeline = vk_create_pipeline(vk);
 
-    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_COMPUTE_BIT, compute_test_cs,
-                           sizeof(compute_test_cs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_COMPUTE_BIT, ssbo_max_test_cs,
+                           sizeof(ssbo_max_test_cs));
 
     vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
                                VK_SHADER_STAGE_COMPUTE_BIT, NULL);
@@ -52,7 +52,7 @@ compute_test_init_pipeline(struct compute_test *test)
 }
 
 static void
-compute_test_init_ssbo(struct compute_test *test)
+ssbo_max_test_init_ssbo(struct ssbo_max_test *test)
 {
     struct vk *vk = &test->vk;
     const VkPhysicalDeviceLimits *limits = &vk->props.properties.limits;
@@ -65,19 +65,19 @@ compute_test_init_ssbo(struct compute_test *test)
 }
 
 static void
-compute_test_init(struct compute_test *test)
+ssbo_max_test_init(struct ssbo_max_test *test)
 {
     struct vk *vk = &test->vk;
 
     vk_init(vk, NULL);
-    compute_test_init_ssbo(test);
+    ssbo_max_test_init_ssbo(test);
 
-    compute_test_init_pipeline(test);
-    compute_test_init_descriptor_set(test);
+    ssbo_max_test_init_pipeline(test);
+    ssbo_max_test_init_descriptor_set(test);
 }
 
 static void
-compute_test_cleanup(struct compute_test *test)
+ssbo_max_test_cleanup(struct ssbo_max_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -90,7 +90,7 @@ compute_test_cleanup(struct compute_test *test)
 }
 
 static void
-compute_test_dispatch_ssbo(struct compute_test *test, VkCommandBuffer cmd)
+ssbo_max_test_dispatch_ssbo(struct ssbo_max_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
@@ -115,13 +115,13 @@ compute_test_dispatch_ssbo(struct compute_test *test, VkCommandBuffer cmd)
 }
 
 static void
-compute_test_dispatch(struct compute_test *test)
+ssbo_max_test_dispatch(struct ssbo_max_test *test)
 {
     struct vk *vk = &test->vk;
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
-    compute_test_dispatch_ssbo(test, cmd);
+    ssbo_max_test_dispatch_ssbo(test, cmd);
 
     vk_end_cmd(vk);
     vk_wait(vk);
@@ -142,13 +142,13 @@ compute_test_dispatch(struct compute_test *test)
 int
 main(void)
 {
-    struct compute_test test = {
+    struct ssbo_max_test test = {
         .local_size = 8,
     };
 
-    compute_test_init(&test);
-    compute_test_dispatch(&test);
-    compute_test_cleanup(&test);
+    ssbo_max_test_init(&test);
+    ssbo_max_test_dispatch(&test);
+    ssbo_max_test_cleanup(&test);
 
     return 0;
 }
