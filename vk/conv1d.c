@@ -9,21 +9,22 @@ static const uint32_t conv1d_test_cs[] = {
 #include "conv1d_test.comp.inc"
 };
 
+struct conv1d_test_push_consts {
+    uint32_t repeat;
+};
+
 struct conv1d_test {
-    uint32_t width;
+    uint32_t buf_width;
+    uint32_t local_size;
+    uint32_t kernel_size;
+    uint32_t op_count;
     uint32_t type_size;
     uint32_t type_width;
-    uint32_t local_size;
-    struct conv1d_test_params {
-        uint32_t kernel_size;
-        uint32_t repeat;
-    } params;
 
     struct vk vk;
 
     struct vk_buffer *src;
     struct vk_buffer *dst;
-    VkDeviceSize buf_size;
 
     struct vk_pipeline *pipeline;
     struct vk_descriptor_set *set;
@@ -45,7 +46,7 @@ conv1d_test_init_descriptor_set(struct conv1d_test *test)
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .pBufferInfo = &(VkDescriptorBufferInfo){
                 .buffer = test->src->buf,
-                .range = test->buf_size,
+                .range = VK_WHOLE_SIZE,
             },
         },
         [1] = {
@@ -56,7 +57,7 @@ conv1d_test_init_descriptor_set(struct conv1d_test *test)
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .pBufferInfo = &(VkDescriptorBufferInfo){
                 .buffer = test->dst->buf,
-                .range = test->buf_size,
+                .range = VK_WHOLE_SIZE,
             },
         },
     };
@@ -95,7 +96,7 @@ conv1d_test_init_pipeline(struct conv1d_test *test)
     vk_add_pipeline_set_layout_from_info(vk, test->pipeline, &set_layout_info);
 
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_COMPUTE_BIT,
-                               sizeof(test->params));
+                               sizeof(struct conv1d_test_push_consts));
 
     vk_setup_pipeline(vk, test->pipeline, NULL);
     vk_compile_pipeline(vk, test->pipeline);
@@ -106,10 +107,11 @@ conv1d_test_init_buffers(struct conv1d_test *test)
 {
     struct vk *vk = &test->vk;
 
-    const VkDeviceSize buf_size = test->width * test->type_size * test->type_width;
-    test->src = vk_create_buffer(vk, 0, buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    test->dst = vk_create_buffer(vk, 0, buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    test->buf_size = buf_size;
+    const VkDeviceSize src_buf_size =
+        (test->buf_width + test->kernel_size - 1) * test->type_size * test->type_width;
+    const VkDeviceSize dst_buf_size = test->buf_width * test->type_size * test->type_width;
+    test->src = vk_create_buffer(vk, 0, src_buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    test->dst = vk_create_buffer(vk, 0, dst_buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 }
 
 static void
@@ -149,16 +151,15 @@ conv1d_test_dispatch(struct conv1d_test *test, bool warmup)
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                               test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
 
-    struct conv1d_test_params params = test->params;
-    if (warmup)
-        params.repeat = 1;
-
+    const struct conv1d_test_push_consts consts = {
+        .repeat = warmup ? 1 : 100000,
+    };
     vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                         sizeof(params), &params);
+                         sizeof(consts), &consts);
 
     if (stopwatch)
         vk_write_stopwatch(vk, stopwatch, cmd);
-    vk->CmdDispatch(cmd, test->width / test->local_size, 1, 1);
+    vk->CmdDispatch(cmd, test->buf_width / test->local_size, 1, 1);
     if (stopwatch)
         vk_write_stopwatch(vk, stopwatch, cmd);
 
@@ -168,8 +169,13 @@ conv1d_test_dispatch(struct conv1d_test *test, bool warmup)
     if (stopwatch) {
         const float ns_per_ms = 1000000.0f;
         const float gpu_ms = (float)vk_read_stopwatch(vk, stopwatch, 0) / ns_per_ms;
-        vk_log("buf width %d, type size %dx%d, kernel size %d, repeat %d: %.1fms", test->width,
-               test->type_size, test->type_width, params.kernel_size, params.repeat, gpu_ms);
+        const uint64_t op_count = (uint64_t)test->buf_width * consts.repeat * test->kernel_size *
+                                  test->op_count * test->type_width;
+        const float gops = op_count / gpu_ms / 1000000.0f;
+        vk_log("buf width %d, repeat %d, kernel size %d, type size %d type width %d: gpu %.1fms "
+               "(%.1fGOPS)",
+               test->buf_width, consts.repeat, test->kernel_size, test->type_size,
+               test->type_width, gpu_ms, gops);
 
         vk_destroy_stopwatch(vk, stopwatch);
     }
@@ -179,14 +185,12 @@ int
 main(void)
 {
     struct conv1d_test test = {
-        .width = 64 * 64,
+        .buf_width = 64 * 64,
+        .local_size = 64,
+        .kernel_size = 16,
+        .op_count = 1,
         .type_size = 2,
         .type_width = 2,
-        .local_size = 8,
-        .params = {
-            .kernel_size = 8,
-            .repeat = 10000,
-        },
     };
 
     conv1d_test_init(&test);

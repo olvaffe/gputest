@@ -5,12 +5,13 @@
  * SPDX-License-Identifier: MIT
  */
 
-#define DATA_TYPE f16vec2
-#define KERNEL_MAX 32
-
+#extension GL_EXT_control_flow_attributes : enable
 #extension GL_EXT_shader_explicit_arithmetic_types : enable
 
-layout(local_size_x = 8, local_size_y = 8) in;
+#define DATA_TYPE f16vec2
+#define KERNEL_SIZE 16
+
+layout(local_size_x = 64) in;
 
 layout(set = 0, binding = 0) buffer SRC {
     DATA_TYPE data[];
@@ -21,22 +22,21 @@ layout(set = 0, binding = 0) buffer DST {
 } dst;
 
 layout(push_constant) uniform CONSTS {
-    uint kernel_size;
     uint repeat;
-} params;
+} consts;
 
 void main()
 {
     const uint idx = gl_GlobalInvocationID.x;
 
-    DATA_TYPE src_vals[KERNEL_MAX];
-    for (uint i = 0; i < params.kernel_size; i++)
+    DATA_TYPE src_vals[KERNEL_SIZE];
+    for (uint i = 0; i < KERNEL_SIZE; i++)
         src_vals[i] = src.data[idx + i];
 
     DATA_TYPE dst_val = DATA_TYPE(0);
-    for (uint i = 0; i < params.repeat; i++) {
-       for (uint j = 0; j < params.kernel_size; j++)
-           dst_val += src_vals[i];
+    for (uint i = 0; i < consts.repeat; i++) {
+        [[unroll]] for (uint j = 0; j < KERNEL_SIZE; j++)
+            dst_val += src_vals[j];
     }
 
     dst.data[idx] = dst_val;
