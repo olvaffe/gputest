@@ -25,6 +25,7 @@ struct conv1d_test {
 
     struct vk_buffer *src;
     struct vk_buffer *dst;
+    struct vk_buffer *weight;
 
     struct vk_pipeline *pipeline;
     struct vk_descriptor_set *set;
@@ -60,6 +61,17 @@ conv1d_test_init_descriptor_set(struct conv1d_test *test)
                 .range = VK_WHOLE_SIZE,
             },
         },
+        [2] = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = test->set->set,
+            .dstBinding = 2,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pBufferInfo = &(VkDescriptorBufferInfo){
+                .buffer = test->weight->buf,
+                .range = VK_WHOLE_SIZE,
+            },
+        },
     };
     vk->UpdateDescriptorSets(vk->dev, ARRAY_SIZE(write_infos), write_infos, 0, NULL);
 }
@@ -83,6 +95,12 @@ conv1d_test_init_pipeline(struct conv1d_test *test)
         },
         [1] = {
             .binding = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        },
+        [2] = {
+            .binding = 2,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
@@ -112,6 +130,9 @@ conv1d_test_init_buffers(struct conv1d_test *test)
     const VkDeviceSize dst_buf_size = test->buf_width * test->type_size * test->type_width;
     test->src = vk_create_buffer(vk, 0, src_buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     test->dst = vk_create_buffer(vk, 0, dst_buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    const VkDeviceSize weight_buf_size = test->kernel_size * test->type_size * test->type_width;
+    test->weight = vk_create_buffer(vk, 0, weight_buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 }
 
 static void
@@ -133,6 +154,7 @@ conv1d_test_cleanup(struct conv1d_test *test)
 
     vk_destroy_descriptor_set(vk, test->set);
     vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_buffer(vk, test->weight);
     vk_destroy_buffer(vk, test->dst);
     vk_destroy_buffer(vk, test->src);
 

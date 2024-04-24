@@ -21,6 +21,10 @@ layout(set = 0, binding = 0) buffer DST {
     DATA_TYPE data[];
 } dst;
 
+layout(set = 0, binding = 0) buffer WEIGHT {
+    DATA_TYPE data[];
+} weight;
+
 layout(push_constant) uniform CONSTS {
     uint repeat;
 } consts;
@@ -36,7 +40,7 @@ void main()
     DATA_TYPE dst_val = DATA_TYPE(0);
     for (uint i = 0; i < consts.repeat; i++) {
         [[unroll]] for (uint j = 0; j < KERNEL_SIZE; j++)
-            dst_val += src_vals[j];
+            dst_val += src_vals[j] * weight.data[j];
     }
 
     dst.data[idx] = dst_val;
