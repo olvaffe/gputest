@@ -6,6 +6,7 @@ tests = [
   'cacheline',
   'clear',
   'clear_depth',
+  'conv1d',
   'depth_resolve',
   'desc_buf',
   'dynamic_rendering',

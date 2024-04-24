@@ -1,0 +1,43 @@
+#version 460 core
+
+/*
+ * Copyright 2024 Google LLC
+ * SPDX-License-Identifier: MIT
+ */
+
+#define DATA_TYPE f16vec2
+#define KERNEL_MAX 32
+
+#extension GL_EXT_shader_explicit_arithmetic_types : enable
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) buffer SRC {
+    DATA_TYPE data[];
+} src;
+
+layout(set = 0, binding = 0) buffer DST {
+    DATA_TYPE data[];
+} dst;
+
+layout(push_constant) uniform CONSTS {
+    uint kernel_size;
+    uint repeat;
+} params;
+
+void main()
+{
+    const uint idx = gl_GlobalInvocationID.x;
+
+    DATA_TYPE src_vals[KERNEL_MAX];
+    for (uint i = 0; i < params.kernel_size; i++)
+        src_vals[i] = src.data[idx + i];
+
+    DATA_TYPE dst_val = DATA_TYPE(0);
+    for (uint i = 0; i < params.repeat; i++) {
+       for (uint j = 0; j < params.kernel_size; j++)
+           dst_val += src_vals[i];
+    }
+
+    dst.data[idx] = dst_val;
+}
