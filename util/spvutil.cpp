@@ -279,6 +279,7 @@ spv_reflect_program(struct spv *spv, struct spv_program *prog)
         const SpvReflectDescriptorSet *src = &mod.descriptor_sets[i];
         struct spv_program_reflection_set *dst = &sets[src->set];
 
+        dst->binding_count = src->binding_count;
         dst->bindings = (struct spv_program_reflection_binding *)calloc(src->binding_count,
                                                                         sizeof(*dst->bindings));
         if (!dst->bindings)
