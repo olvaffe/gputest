@@ -213,9 +213,9 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
     clang::CompilerInstance c;
 
     const std::vector<const char *> opts = {
-        "-triple=spir-unknown-unknown",
+        "-triple=spir64-unknown-unknown",
         "-cl-std=CL3.0",
-        "-O0",
+        "-O2",
         filename,
     };
 
