@@ -6,15 +6,31 @@
 #include "spvutil.h"
 
 #include <glslang/Public/resource_limits_c.h>
+#include <limits.h>
 #include <spirv-tools/libspirv.h>
+#include <sstream>
 #include <string>
 
 #ifdef HAVE_SPIRV_REFLECT
 #include <spirv_reflect.h>
 #endif
 
-#ifdef HAVE_CLSPV
+#if defined(HAVE_CLSPV)
 #include <clspv/Compiler.h>
+#elif defined(HAVE_LLVM_SPIRV)
+#include <LLVMSPIRVLib/LLVMSPIRVLib.h>
+#include <clang/Basic/Diagnostic.h>
+#include <clang/Basic/TargetInfo.h>
+#include <clang/CodeGen/CodeGenAction.h>
+#include <clang/Config/config.h>
+#include <clang/Driver/Driver.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/TextDiagnosticPrinter.h>
+#include <clang/Lex/PreprocessorOptions.h>
+#include <dlfcn.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Support/raw_ostream.h>
 #endif
 
 static inline void
@@ -189,6 +205,79 @@ spv_create_program_from_shader(struct spv *spv, glslang_stage_t stage, const cha
     return prog;
 }
 
+#ifdef HAVE_LLVM_SPIRV
+
+static std::unique_ptr<llvm::Module>
+spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, const char *filename)
+{
+    clang::CompilerInstance c;
+
+    const std::vector<const char *> opts = {
+        "-triple=spir-unknown-unknown",
+        "-cl-std=CL3.0",
+        "-O0",
+        filename,
+    };
+
+    std::string diag_log;
+    llvm::raw_string_ostream diag_stream{ diag_log };
+    clang::DiagnosticsEngine diag_engine{ new clang::DiagnosticIDs, new clang::DiagnosticOptions,
+                                          new clang::TextDiagnosticPrinter{
+                                              diag_stream, &c.getDiagnosticOpts() } };
+
+    if (!clang::CompilerInvocation::CreateFromArgs(c.getInvocation(), opts, diag_engine) ||
+        diag_engine.hasErrorOccurred())
+        spv_die("failed to create invocation: %s", diag_log.c_str());
+
+    c.getDiagnosticOpts().ShowCarets = false;
+    c.createDiagnostics(new clang::TextDiagnosticPrinter{ diag_stream, &c.getDiagnosticOpts() });
+
+    c.getFrontendOpts().ProgramAction = clang::frontend::EmitLLVMOnly;
+
+    {
+        Dl_info lib_info;
+        if (!dladdr((const void *)clang::CompilerInvocation::CreateFromArgs, &lib_info))
+            spv_die("failed to query libclang-cpp: %s", dlerror());
+
+        char *lib_path = realpath(lib_info.dli_fname, NULL);
+        if (!lib_path)
+            spv_die("failed to get real path of %s", lib_info.dli_fname);
+        std::string res_path =
+            clang::driver::Driver::GetResourcesPath(lib_path, CLANG_RESOURCE_DIR);
+        free(lib_path);
+
+        c.getHeaderSearchOpts().AddPath(res_path + "/include", clang::frontend::Angled, false,
+                                        false);
+    }
+
+    c.getPreprocessorOpts().Includes.push_back("opencl-c.h");
+
+    clang::EmitLLVMOnlyAction act(ctx);
+    if (!c.ExecuteAction(act))
+        spv_die("failed to translate CLC:\n%s", diag_log.c_str());
+
+    return act.takeModule();
+}
+
+static void *
+spv_create_spirv_from_llvm_module(struct spv *spv, llvm::Module *mod, size_t *size)
+{
+    std::ostringstream spv_stream;
+    std::string log;
+    SPIRV::TranslatorOpts spirv_opts;
+    if (!llvm::writeSpirv(mod, spirv_opts, spv_stream, log))
+        spv_die("failed to translate to spirv: %s", log.c_str());
+
+    std::string spirv = spv_stream.str();
+    void *data = malloc(spirv.size());
+    memcpy(data, spirv.data(), spirv.size());
+    *size = spirv.size();
+
+    return data;
+}
+
+#endif /* HAVE_LLVM_SPIRV */
+
 struct spv_program *
 spv_create_program_from_kernel(struct spv *spv, const char *filename)
 {
@@ -198,6 +287,7 @@ spv_create_program_from_kernel(struct spv *spv, const char *filename)
 
     prog->stage = GLSLANG_STAGE_COMPUTE;
 
+#if defined(HAVE_CLSPV)
     std::string opts = "-cl-std=CL3.0 -inline-entry-points";
     opts += " -cl-single-precision-constant";
     opts += " -cl-kernel-arg-info";
@@ -218,17 +308,20 @@ spv_create_program_from_kernel(struct spv *spv, const char *filename)
     size_t file_size;
     const void *file_data = u_map_file(filename, &file_size);
 
-#ifdef HAVE_CLSPV
     char *info_log = NULL;
     if (clspvCompileFromSourcesString(1, &file_size, (const char **)&file_data, opts.c_str(),
                                       (char **)&prog->spirv, &prog->size, &info_log))
         spv_die("failed to compile kernel:\n%s", info_log);
     free(info_log);
-#else
-    spv_die("no clspv support");
-#endif
 
     u_unmap_file(file_data, file_size);
+#elif defined(HAVE_LLVM_SPIRV)
+    llvm::LLVMContext ctx;
+    std::unique_ptr<llvm::Module> mod = spv_create_llvm_module_from_kernel(spv, &ctx, filename);
+    prog->spirv = spv_create_spirv_from_llvm_module(spv, mod.get(), &prog->size);
+#else
+    spv_die("no opencl c support");
+#endif
 
     return prog;
 }

@@ -105,6 +105,14 @@ if fs.is_absolute(clspv_path) and fs.is_dir(clspv_path)
   )
 endif
 
+dep_llvm = dep_not_found
+dep_clang = dep_not_found
+dep_llvm_spirv = dependency('LLVMSPIRVLib', required: false)
+if dep_llvm_spirv.found()
+  dep_llvm = dependency('LLVM', version: '>= 16.0', method: 'cmake')
+  dep_clang = dependency('Clang', modules: ['clang-cpp'], method: 'cmake')
+endif
+
 # for vautil
 dep_libva = dependency('libva', required: false)
 dep_libva_drm = dependency('libva-drm', required: false)
