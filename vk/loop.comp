@@ -25,9 +25,20 @@ void main()
     const float16_t src_val2 = float16_t(idx + 1);
 
     float16_t dst_val = float16_t(0);
+#if 1
     [[dont_unroll]] for (uint i = 0; i < consts.repeat; i++) {
         dst_val += src_val1 * src_val2;
     }
+#else
+    /* llvm likes to optimize the for-loop above into this */
+    if (consts.repeat != 0) {
+        int i = 0;
+        do {
+            dst_val += src_val1 * src_val2;
+            i++;
+        } while (i < consts.repeat);
+    }
+#endif
 
     dst.data[idx] = dst_val;
 }
