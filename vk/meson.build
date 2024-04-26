@@ -16,6 +16,7 @@ tests = [
   'image',
   'info',
   'ktx',
+  'loop',
   'mem',
   'msaa',
   'pipeline_stats',

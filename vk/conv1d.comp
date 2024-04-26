@@ -17,11 +17,11 @@ layout(set = 0, binding = 0) buffer SRC {
     DATA_TYPE data[];
 } src;
 
-layout(set = 0, binding = 0) buffer DST {
+layout(set = 0, binding = 1) buffer DST {
     DATA_TYPE data[];
 } dst;
 
-layout(set = 0, binding = 0) buffer WEIGHT {
+layout(set = 0, binding = 2) buffer WEIGHT {
     DATA_TYPE data[];
 } weight;
 
