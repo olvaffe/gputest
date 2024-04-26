@@ -7,6 +7,7 @@ cl_tests = [
   'bench_fill',
   'clinfo',
   'copy',
+  'loop',
   'tflite_bhwc_to_tensor',
   'tflite_conv_generic',
   'tflite_conv_simple',
