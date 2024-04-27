@@ -30,14 +30,19 @@ void main()
         dst_val += src_val1 * src_val2;
     }
 #else
-    /* llvm likes to optimize the for-loop above into this */
-    if (consts.repeat != 0) {
-        int i = 0;
-        do {
-            dst_val += src_val1 * src_val2;
-            i++;
-        } while (i < consts.repeat);
-    }
+    /* When consts.repeat is known positive (e.g., a fixed value rather
+     * than a push constant), llvm optimizes the for-loop above into this
+     * to save one check.  But this confuses Mesa's opt_split_alu_of_phi.
+     */
+    const uint repeat = 100;
+    int i = 0;
+    [[dont_unroll]] do {
+        int j = i + 1;
+        dst_val += src_val1 * src_val2;
+        if (i >= repeat - 1)
+            break;
+        i = j;
+    } while (true);
 #endif
 
     dst.data[idx] = dst_val;
