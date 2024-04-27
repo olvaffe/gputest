@@ -325,18 +325,37 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
 static void *
 spv_create_spirv_from_llvm_module(struct spv *spv, llvm::Module *mod, size_t *out_size)
 {
-    std::ostringstream spv_stream;
-    std::string log;
-    SPIRV::TranslatorOpts spirv_opts;
-    if (!llvm::writeSpirv(mod, spirv_opts, spv_stream, log))
-        spv_die("failed to translate to spirv: %s", log.c_str());
+    SPIRV::VersionNumber ver;
+    switch (spv->params.glsl_client_version) {
+    case GLSLANG_TARGET_VULKAN_1_0:
+    default:
+        ver = SPIRV::VersionNumber::SPIRV_1_0;
+        break;
+    case GLSLANG_TARGET_VULKAN_1_1:
+        ver = SPIRV::VersionNumber::SPIRV_1_3;
+        break;
+    case GLSLANG_TARGET_VULKAN_1_2:
+        /* llvm-spirv lacks 1.5 and 1.6 support until v19 */
+        ver = SPIRV::VersionNumber::SPIRV_1_4;
+        break;
+    }
 
-    std::string spirv = spv_stream.str();
-    void *data = malloc(spirv.size());
-    memcpy(data, spirv.data(), spirv.size());
-    *out_size = spirv.size();
+    const SPIRV::TranslatorOpts opts(ver);
+    std::ostringstream spirv_ss;
+    std::string info_log;
+    if (!llvm::writeSpirv(mod, opts, spirv_ss, info_log))
+        spv_die("failed to translate to spirv: %s", info_log.c_str());
 
-    return data;
+    const std::string spirv_str = spirv_ss.str();
+    const size_t size = spirv_str.size();
+
+    void *spirv = malloc(size);
+    if (!spirv)
+        spv_die("failed to alloc spirv");
+    memcpy(spirv, spirv_str.data(), size);
+
+    *out_size = size;
+    return spirv;
 }
 
 #endif /* HAVE_CLSPV */

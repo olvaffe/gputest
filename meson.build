@@ -109,8 +109,16 @@ dep_llvm = dep_not_found
 dep_clang = dep_not_found
 dep_llvm_spirv = dependency('LLVMSPIRVLib', required: false)
 if dep_llvm_spirv.found()
-  dep_llvm = dependency('LLVM', version: '>= 16.0', method: 'cmake')
-  dep_clang = dependency('Clang', modules: ['clang-cpp'], method: 'cmake')
+  ver_arr = dep_llvm_spirv.version().split('.')
+  ver_maj = ver_arr[0].to_int()
+  ver_min = ver_arr[1].to_int()
+  version = [
+    '>= @0@.@1@'.format(ver_maj, ver_min),
+    '< @0@.@1@'.format(ver_maj, ver_min + 1)
+  ]
+
+  dep_llvm = dependency('LLVM', version: version, method: 'cmake')
+  dep_clang = dependency('Clang', version: version, modules: ['clang-cpp'], method: 'cmake')
 endif
 
 # for vautil
