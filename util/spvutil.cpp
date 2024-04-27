@@ -214,22 +214,42 @@ spv_transpile_glslang_program(struct spv *spv,
 static void *
 spv_create_clspv_spirv(struct spv *spv, const char *filename, size_t *out_size)
 {
-    std::string opts = "-cl-std=CL3.0 -inline-entry-points";
-    opts += " -cl-single-precision-constant";
-    opts += " -cl-kernel-arg-info";
-    opts += " -rounding-mode-rte=16,32,64";
-    opts += " -rewrite-packed-structs";
-    opts += " -std430-ubo-layout";
-    opts += " -decorate-nonuniform";
-    opts += " -hack-convert-to-float";
-    opts += " -arch=spir";
-    opts += " -spv-version=1.5";
-    opts += " -max-pushconstant-size=128";
-    opts += " -max-ubo-size=16384";
-    opts += " -global-offset";
-    opts += " -long-vector";
-    opts += " -module-constants-in-storage-buffer";
-    opts += " -cl-arm-non-uniform-work-group-size";
+    std::string spv_ver;
+    switch (spv->params.glsl_client_version) {
+    case GLSLANG_TARGET_VULKAN_1_0:
+    default:
+        spv_ver = "1.0";
+        break;
+    case GLSLANG_TARGET_VULKAN_1_1:
+        spv_ver = "1.3";
+        break;
+    case GLSLANG_TARGET_VULKAN_1_2:
+        spv_ver = "1.5";
+        break;
+    case GLSLANG_TARGET_VULKAN_1_3:
+        spv_ver = "1.6";
+        break;
+    }
+
+    std::string std_opts = "-cl-std=CL3.0";
+    std_opts += " -cl-single-precision-constant";
+    std_opts += " -cl-kernel-arg-info";
+
+    std::string clspv_opts = "-arch=spir";
+    clspv_opts += " -spv-version=" + spv_ver;
+    clspv_opts += " -inline-entry-points";
+    clspv_opts += " -rounding-mode-rte=16,32,64";
+    clspv_opts += " -rewrite-packed-structs";
+    clspv_opts += " -std430-ubo-layout";
+    clspv_opts += " -decorate-nonuniform";
+    clspv_opts += " -hack-convert-to-float";
+    clspv_opts += " -max-pushconstant-size=128";
+    clspv_opts += " -max-ubo-size=16384";
+    clspv_opts += " -global-offset";
+    clspv_opts += " -long-vector";
+    clspv_opts += " -module-constants-in-storage-buffer";
+
+    const std::string opts = std_opts + " " + clspv_opts;
 
     size_t file_size;
     const void *file_data = u_map_file(filename, &file_size);
