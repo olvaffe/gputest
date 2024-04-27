@@ -115,9 +115,6 @@ compile_test_compile_compute_pipeline(struct compile_test *test, struct spv_prog
 {
     const VkShaderStageFlags stage = VK_SHADER_STAGE_COMPUTE_BIT;
     struct vk *vk = &test->vk;
-    struct spv *spv = &test->spv;
-
-    spv_reflect_program(spv, prog);
 
     const VkComputePipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
@@ -145,19 +142,16 @@ compile_test_compile(struct compile_test *test)
 {
     struct spv *spv = &test->spv;
 
-    struct spv_program *prog;
-    if (spv_guess_shader(spv, test->filename)) {
-        const glslang_stage_t stage = spv_guess_stage(spv, test->filename);
-        prog = spv_create_program_from_shader(spv, stage, test->filename);
-    } else {
-        prog = spv_create_program_from_kernel(spv, test->filename);
-    }
+    struct spv_program *prog =
+        spv_create_program(spv, spv_guess_stage(spv, test->filename), test->filename);
 
     if (test->disasm)
         spv_disasm_program(spv, prog);
 
-    if (prog->stage == GLSLANG_STAGE_COMPUTE)
+    if (prog->stage == GLSLANG_STAGE_COMPUTE || prog->stage == SPV_STAGE_KERNEL) {
+        spv_reflect_program(spv, prog);
         compile_test_compile_compute_pipeline(test, prog);
+    }
 
     spv_destroy_program(spv, prog);
 }

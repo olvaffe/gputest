@@ -11,10 +11,6 @@
 #include <sstream>
 #include <string>
 
-#ifdef HAVE_SPIRV_REFLECT
-#include <spirv_reflect.h>
-#endif
-
 #if defined(HAVE_CLSPV)
 #include <clspv/Compiler.h>
 #elif defined(HAVE_LLVM_SPIRV)
@@ -31,6 +27,10 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/raw_ostream.h>
+#endif /* HAVE_CLSPV */
+
+#ifdef HAVE_SPIRV_REFLECT
+#include <spirv_reflect.h>
 #endif
 
 static inline void
@@ -65,19 +65,7 @@ spv_cleanup(struct spv *spv)
     glslang_finalize_process();
 }
 
-bool
-spv_guess_shader(struct spv *spv, const char *filename)
-{
-    const char *suffix = strrchr(filename, '.');
-    if (!suffix)
-        spv_die("%s has no suffix", filename);
-    suffix++;
-
-    const std::string name(suffix);
-    return name != "cl";
-}
-
-glslang_stage_t
+int
 spv_guess_stage(struct spv *spv, const char *filename)
 {
     const char *suffix = strrchr(filename, '.');
@@ -114,6 +102,8 @@ spv_guess_stage(struct spv *spv, const char *filename)
         return GLSLANG_STAGE_TASK;
     else if (name == "mesh")
         return GLSLANG_STAGE_MESH;
+    else if (name == "cl")
+        return SPV_STAGE_KERNEL;
     else
         spv_die("bad stage name %s", name.c_str());
 }
@@ -175,7 +165,7 @@ spv_create_glslang_program(struct spv *spv, glslang_shader_t *sh)
     return prog;
 }
 
-static const void *
+static void *
 spv_transpile_glslang_program(struct spv *spv,
                               glslang_program_t *prog,
                               glslang_stage_t stage,
@@ -186,26 +176,56 @@ spv_transpile_glslang_program(struct spv *spv,
     if (info_log)
         spv_die("failed to transpile program:\n%s", info_log);
 
-    *out_size = glslang_program_SPIRV_get_size(prog) * 4;
-    return glslang_program_SPIRV_get_ptr(prog);
+    const size_t size = glslang_program_SPIRV_get_size(prog) * 4;
+    void *spirv = malloc(size);
+    if (!spirv)
+        spv_die("failed to alloc spirv");
+    memcpy(spirv, glslang_program_SPIRV_get_ptr(prog), size);
+
+    *out_size = size;
+    return spirv;
 }
 
-struct spv_program *
-spv_create_program_from_shader(struct spv *spv, glslang_stage_t stage, const char *filename)
+#if defined(HAVE_CLSPV)
+
+static void *
+spv_create_clspv_spirv(struct spv *spv, const char *filename, size_t *out_size)
 {
-    struct spv_program *prog = (struct spv_program *)calloc(1, sizeof(*prog));
-    if (!prog)
-        spv_die("failed to alloc prog");
+    std::string opts = "-cl-std=CL3.0 -inline-entry-points";
+    opts += " -cl-single-precision-constant";
+    opts += " -cl-kernel-arg-info";
+    opts += " -rounding-mode-rte=16,32,64";
+    opts += " -rewrite-packed-structs";
+    opts += " -std430-ubo-layout";
+    opts += " -decorate-nonuniform";
+    opts += " -hack-convert-to-float";
+    opts += " -arch=spir";
+    opts += " -spv-version=1.5";
+    opts += " -max-pushconstant-size=128";
+    opts += " -max-ubo-size=16384";
+    opts += " -global-offset";
+    opts += " -long-vector";
+    opts += " -module-constants-in-storage-buffer";
+    opts += " -cl-arm-non-uniform-work-group-size";
 
-    prog->stage = stage;
-    prog->glsl_sh = spv_create_glslang_shader(spv, stage, filename);
-    prog->glsl_prog = spv_create_glslang_program(spv, prog->glsl_sh);
-    prog->spirv = spv_transpile_glslang_program(spv, prog->glsl_prog, stage, &prog->size);
+    size_t file_size;
+    const void *file_data = u_map_file(filename, &file_size);
 
-    return prog;
+    char *info_log = NULL;
+    char *spirv;
+    size_t size;
+    if (clspvCompileFromSourcesString(1, &file_size, (const char **)&file_data, opts.c_str(),
+                                      &spirv, &size, &info_log))
+        spv_die("failed to compile kernel:\n%s", info_log);
+    free(info_log);
+
+    u_unmap_file(file_data, file_size);
+
+    *out_size = size;
+    return spirv
 }
 
-#ifdef HAVE_LLVM_SPIRV
+#elif defined(HAVE_LLVM_SPIRV)
 
 static std::unique_ptr<llvm::Module>
 spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, const char *filename)
@@ -260,7 +280,7 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
 }
 
 static void *
-spv_create_spirv_from_llvm_module(struct spv *spv, llvm::Module *mod, size_t *size)
+spv_create_spirv_from_llvm_module(struct spv *spv, llvm::Module *mod, size_t *out_size)
 {
     std::ostringstream spv_stream;
     std::string log;
@@ -271,57 +291,44 @@ spv_create_spirv_from_llvm_module(struct spv *spv, llvm::Module *mod, size_t *si
     std::string spirv = spv_stream.str();
     void *data = malloc(spirv.size());
     memcpy(data, spirv.data(), spirv.size());
-    *size = spirv.size();
+    *out_size = spirv.size();
 
     return data;
 }
 
-#endif /* HAVE_LLVM_SPIRV */
+#endif /* HAVE_CLSPV */
 
 struct spv_program *
-spv_create_program_from_kernel(struct spv *spv, const char *filename)
+spv_create_program(struct spv *spv, int stage, const char *filename)
 {
     struct spv_program *prog = (struct spv_program *)calloc(1, sizeof(*prog));
     if (!prog)
         spv_die("failed to alloc prog");
 
-    prog->stage = GLSLANG_STAGE_COMPUTE;
+    prog->stage = stage;
 
+    if (stage == SPV_STAGE_KERNEL) {
 #if defined(HAVE_CLSPV)
-    std::string opts = "-cl-std=CL3.0 -inline-entry-points";
-    opts += " -cl-single-precision-constant";
-    opts += " -cl-kernel-arg-info";
-    opts += " -rounding-mode-rte=16,32,64";
-    opts += " -rewrite-packed-structs";
-    opts += " -std430-ubo-layout";
-    opts += " -decorate-nonuniform";
-    opts += " -hack-convert-to-float";
-    opts += " -arch=spir";
-    opts += " -spv-version=1.5";
-    opts += " -max-pushconstant-size=128";
-    opts += " -max-ubo-size=16384";
-    opts += " -global-offset";
-    opts += " -long-vector";
-    opts += " -module-constants-in-storage-buffer";
-    opts += " -cl-arm-non-uniform-work-group-size";
-
-    size_t file_size;
-    const void *file_data = u_map_file(filename, &file_size);
-
-    char *info_log = NULL;
-    if (clspvCompileFromSourcesString(1, &file_size, (const char **)&file_data, opts.c_str(),
-                                      (char **)&prog->spirv, &prog->size, &info_log))
-        spv_die("failed to compile kernel:\n%s", info_log);
-    free(info_log);
-
-    u_unmap_file(file_data, file_size);
+        prog->spirv = spv_create_clspv_spirv(spv, filename, &prog->size);
 #elif defined(HAVE_LLVM_SPIRV)
-    llvm::LLVMContext ctx;
-    std::unique_ptr<llvm::Module> mod = spv_create_llvm_module_from_kernel(spv, &ctx, filename);
-    prog->spirv = spv_create_spirv_from_llvm_module(spv, mod.get(), &prog->size);
+        llvm::LLVMContext ctx;
+        std::unique_ptr<llvm::Module> mod =
+            spv_create_llvm_module_from_kernel(spv, &ctx, filename);
+        prog->spirv = spv_create_spirv_from_llvm_module(spv, mod.get(), &prog->size);
 #else
-    spv_die("no opencl c support");
+        spv_die("no opencl c support");
 #endif
+    } else {
+        glslang_shader_t *glsl_sh =
+            spv_create_glslang_shader(spv, (glslang_stage_t)stage, filename);
+        glslang_program_t *glsl_prog = spv_create_glslang_program(spv, glsl_sh);
+
+        prog->spirv =
+            spv_transpile_glslang_program(spv, glsl_prog, (glslang_stage_t)stage, &prog->size);
+
+        glslang_program_delete(glsl_prog);
+        glslang_shader_delete(glsl_sh);
+    }
 
     return prog;
 }
@@ -329,20 +336,16 @@ spv_create_program_from_kernel(struct spv *spv, const char *filename)
 void
 spv_destroy_program(struct spv *spv, struct spv_program *prog)
 {
-    free(prog->reflection.entrypoint);
+    struct spv_program_reflection *reflection = &prog->reflection;
+
+    free(reflection->entrypoint);
     for (uint32_t i = 0; i < prog->reflection.set_count; i++) {
-        struct spv_program_reflection_set *set = &prog->reflection.sets[i];
+        struct spv_program_reflection_set *set = &reflection->sets[i];
         free(set->bindings);
     }
-    free(prog->reflection.sets);
+    free(reflection->sets);
 
-    if (prog->glsl_prog) {
-        glslang_shader_delete(prog->glsl_sh);
-        glslang_program_delete(prog->glsl_prog);
-    } else {
-        free((void *)prog->spirv);
-    }
-
+    free(prog->spirv);
     free(prog);
 }
 

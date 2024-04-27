@@ -10,6 +10,8 @@
 
 #include <glslang/Include/glslang_c_interface.h>
 
+#define SPV_STAGE_KERNEL GLSLANG_STAGE_COUNT
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -41,14 +43,12 @@ struct spv_program_reflection {
 };
 
 struct spv_program {
-    glslang_stage_t stage;
-    glslang_shader_t *glsl_sh;
-    glslang_program_t *glsl_prog;
+    /* GLSLANG_STAGE_* or SPV_STAGE_* */
+    int stage;
+    void *spirv;
+    size_t size;
 
     struct spv_program_reflection reflection;
-
-    const void *spirv;
-    size_t size;
 };
 
 static inline void PRINTFLIKE(1, 2) spv_log(const char *format, ...)
@@ -73,17 +73,11 @@ spv_init(struct spv *spv, const struct spv_init_params *params);
 void
 spv_cleanup(struct spv *spv);
 
-bool
-spv_guess_shader(struct spv *spv, const char *filename);
-
-glslang_stage_t
+int
 spv_guess_stage(struct spv *spv, const char *filename);
 
 struct spv_program *
-spv_create_program_from_shader(struct spv *spv, glslang_stage_t stage, const char *filename);
-
-struct spv_program *
-spv_create_program_from_kernel(struct spv *spv, const char *filename);
+spv_create_program(struct spv *spv, int stage, const char *filename);
 
 void
 spv_destroy_program(struct spv *spv, struct spv_program *prog);
