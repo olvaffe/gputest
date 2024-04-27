@@ -17,7 +17,8 @@ extern "C" {
 #endif
 
 struct spv_init_params {
-    glslang_messages_t messages;
+    glslang_target_client_version_t glsl_client_version;
+    glslang_messages_t glsl_messages;
 };
 
 struct spv {

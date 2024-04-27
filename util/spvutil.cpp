@@ -33,6 +33,21 @@
 #include <spirv_reflect.h>
 #endif
 
+static void
+spv_init_params(struct spv *spv, const struct spv_init_params *params)
+{
+    if (params)
+        spv->params = *params;
+
+    if (!spv->params.glsl_client_version)
+        spv->params.glsl_client_version = GLSLANG_TARGET_VULKAN_1_2;
+
+    spv->params.glsl_messages =
+        (glslang_messages_t)((int)spv->params.glsl_messages |
+                             (GLSLANG_MSG_DEFAULT_BIT | GLSLANG_MSG_SPV_RULES_BIT |
+                              GLSLANG_MSG_VULKAN_RULES_BIT));
+}
+
 static inline void
 spv_init_glslang(struct spv *spv)
 {
@@ -46,16 +61,7 @@ void
 spv_init(struct spv *spv, const struct spv_init_params *params)
 {
     memset(spv, 0, sizeof(*spv));
-
-    if (params)
-        spv->params = *params;
-
-    if (!spv->params.messages) {
-        spv->params.messages =
-            (glslang_messages_t)(GLSLANG_MSG_DEFAULT_BIT | GLSLANG_MSG_SPV_RULES_BIT |
-                                 GLSLANG_MSG_VULKAN_RULES_BIT);
-    }
-
+    spv_init_params(spv, params);
     spv_init_glslang(spv);
 }
 
@@ -122,18 +128,35 @@ spv_create_glslang_shader(struct spv *spv, glslang_stage_t stage, const char *fi
 
     u_unmap_file(file_data, file_size);
 
+    glslang_target_language_version_t target_ver;
+    switch (spv->params.glsl_client_version) {
+    case GLSLANG_TARGET_VULKAN_1_0:
+    default:
+        target_ver = GLSLANG_TARGET_SPV_1_0;
+        break;
+    case GLSLANG_TARGET_VULKAN_1_1:
+        target_ver = GLSLANG_TARGET_SPV_1_3;
+        break;
+    case GLSLANG_TARGET_VULKAN_1_2:
+        target_ver = GLSLANG_TARGET_SPV_1_5;
+        break;
+    case GLSLANG_TARGET_VULKAN_1_3:
+        target_ver = GLSLANG_TARGET_SPV_1_6;
+        break;
+    }
+
     const glslang_input_t input = {
         .language = GLSLANG_SOURCE_GLSL,
         .stage = stage,
         .client = GLSLANG_CLIENT_VULKAN,
-        .client_version = GLSLANG_TARGET_VULKAN_1_2,
+        .client_version = spv->params.glsl_client_version,
         .target_language = GLSLANG_TARGET_SPV,
-        .target_language_version = GLSLANG_TARGET_SPV_1_2,
+        .target_language_version = target_ver,
         .code = glsl,
         .default_version = 100,
         .default_profile = GLSLANG_NO_PROFILE,
         .forward_compatible = true,
-        .messages = spv->params.messages,
+        .messages = spv->params.glsl_messages,
         .resource = glslang_resource(),
     };
 
@@ -157,7 +180,7 @@ spv_create_glslang_program(struct spv *spv, glslang_shader_t *sh)
 
     glslang_program_add_shader(prog, sh);
 
-    if (!glslang_program_link(prog, spv->params.messages))
+    if (!glslang_program_link(prog, spv->params.glsl_messages))
         spv_die("failed to link program:\n%s", glslang_program_get_info_log(prog));
 
     glslang_program_map_io(prog);
@@ -401,15 +424,32 @@ spv_reflect_program(struct spv *spv, struct spv_program *prog)
 void
 spv_disasm_program(struct spv *spv, struct spv_program *prog)
 {
-    spv_context ctx = spvContextCreate(SPV_ENV_VULKAN_1_2);
+    const uint32_t options = SPV_BINARY_TO_TEXT_OPTION_COLOR | SPV_BINARY_TO_TEXT_OPTION_INDENT |
+                             SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
+
+    spv_target_env target_env;
+    switch (spv->params.glsl_client_version) {
+    case GLSLANG_TARGET_VULKAN_1_0:
+    default:
+        target_env = SPV_ENV_VULKAN_1_0;
+        break;
+    case GLSLANG_TARGET_VULKAN_1_1:
+        target_env = SPV_ENV_VULKAN_1_1;
+        break;
+    case GLSLANG_TARGET_VULKAN_1_2:
+        target_env = SPV_ENV_VULKAN_1_2;
+        break;
+    case GLSLANG_TARGET_VULKAN_1_3:
+        target_env = SPV_ENV_VULKAN_1_3;
+        break;
+    }
+
+    spv_context ctx = spvContextCreate(target_env);
 
     spv_text txt;
     spv_diagnostic diag;
     spv_result_t res =
-        spvBinaryToText(ctx, (const uint32_t *)prog->spirv, prog->size / 4,
-                        SPV_BINARY_TO_TEXT_OPTION_COLOR | SPV_BINARY_TO_TEXT_OPTION_INDENT |
-                            SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES,
-                        &txt, &diag);
+        spvBinaryToText(ctx, (const uint32_t *)prog->spirv, prog->size / 4, options, &txt, &diag);
     if (res != SPV_SUCCESS)
         spv_die("failed to disasm prog");
 
