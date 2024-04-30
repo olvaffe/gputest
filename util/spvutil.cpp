@@ -265,7 +265,7 @@ spv_create_clspv_spirv(struct spv *spv, const char *filename, size_t *out_size)
     u_unmap_file(file_data, file_size);
 
     *out_size = size;
-    return spirv
+    return spirv;
 }
 
 #elif defined(HAVE_LLVM_SPIRV)
