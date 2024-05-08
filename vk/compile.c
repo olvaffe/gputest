@@ -57,6 +57,12 @@ compile_test_create_pipeline_layout(struct compile_test *test, struct spv_progra
 
             VkDescriptorType type;
             switch (binding->type) {
+            case 0: /* SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER */
+                type = VK_DESCRIPTOR_TYPE_SAMPLER;
+                break;
+            case 2: /* SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE */
+                type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+                break;
             case 4: /* SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER */
                 type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
                 break;
@@ -70,7 +76,7 @@ compile_test_create_pipeline_layout(struct compile_test *test, struct spv_progra
                 type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 break;
             default:
-                vk_die("bad type");
+                vk_die("bad type %d", binding->type);
                 break;
             }
 
