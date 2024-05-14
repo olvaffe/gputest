@@ -115,18 +115,16 @@ spv_guess_stage(struct spv *spv, const char *filename)
 }
 
 static glslang_shader_t *
-spv_create_glslang_shader(struct spv *spv, glslang_stage_t stage, const char *filename)
+spv_create_glslang_shader(struct spv *spv,
+                          glslang_stage_t stage,
+                          const void *file_data,
+                          size_t file_size)
 {
-    size_t file_size;
-    const void *file_data = u_map_file(filename, &file_size);
-
     char *glsl = (char *)malloc(file_size + 1);
     if (!glsl)
         spv_die("failed to alloc glsl");
     memcpy(glsl, file_data, file_size);
     glsl[file_size] = '\0';
-
-    u_unmap_file(file_data, file_size);
 
     glslang_target_language_version_t target_ver;
     switch (spv->params.glsl_client_version) {
@@ -212,7 +210,7 @@ spv_transpile_glslang_program(struct spv *spv,
 #if defined(HAVE_CLSPV)
 
 static void *
-spv_create_clspv_spirv(struct spv *spv, const char *filename, size_t *out_size)
+spv_create_clspv_spirv(struct spv *spv, const void *file_data, size_t file_size, size_t *out_size)
 {
     std::string spv_ver;
     switch (spv->params.glsl_client_version) {
@@ -251,9 +249,6 @@ spv_create_clspv_spirv(struct spv *spv, const char *filename, size_t *out_size)
 
     const std::string opts = std_opts + " " + clspv_opts;
 
-    size_t file_size;
-    const void *file_data = u_map_file(filename, &file_size);
-
     char *info_log = NULL;
     char *spirv;
     size_t size;
@@ -261,8 +256,6 @@ spv_create_clspv_spirv(struct spv *spv, const char *filename, size_t *out_size)
                                       &spirv, &size, &info_log))
         spv_die("failed to compile kernel:\n%s", info_log);
     free(info_log);
-
-    u_unmap_file(file_data, file_size);
 
     *out_size = size;
     return spirv;
@@ -369,9 +362,17 @@ spv_create_program(struct spv *spv, int stage, const char *filename)
 
     prog->stage = stage;
 
-    if (stage == SPV_STAGE_KERNEL) {
+    size_t file_size;
+    const void *file_data = u_map_file(filename, &file_size);
+    if (file_size >= 4 && ((const uint32_t *)file_data)[0] == 0x07230203) {
+        prog->spirv = malloc(file_size);
+        if (!prog->spirv)
+            spv_die("failed to alloc spirv");
+        memcpy(prog->spirv, file_data, file_size);
+        prog->size = file_size;
+    } else if (stage == SPV_STAGE_KERNEL) {
 #if defined(HAVE_CLSPV)
-        prog->spirv = spv_create_clspv_spirv(spv, filename, &prog->size);
+        prog->spirv = spv_create_clspv_spirv(spv, file_data, file_size, &prog->size);
 #elif defined(HAVE_LLVM_SPIRV)
         llvm::LLVMContext ctx;
         std::unique_ptr<llvm::Module> mod =
@@ -382,7 +383,7 @@ spv_create_program(struct spv *spv, int stage, const char *filename)
 #endif
     } else {
         glslang_shader_t *glsl_sh =
-            spv_create_glslang_shader(spv, (glslang_stage_t)stage, filename);
+            spv_create_glslang_shader(spv, (glslang_stage_t)stage, file_data, file_size);
         glslang_program_t *glsl_prog = spv_create_glslang_program(spv, glsl_sh);
 
         prog->spirv =
@@ -391,6 +392,8 @@ spv_create_program(struct spv *spv, int stage, const char *filename)
         glslang_program_delete(glsl_prog);
         glslang_shader_delete(glsl_sh);
     }
+
+    u_unmap_file(file_data, file_size);
 
     return prog;
 }
