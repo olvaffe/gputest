@@ -122,6 +122,32 @@ compile_test_compile_compute_pipeline(struct compile_test *test, struct spv_prog
     const VkShaderStageFlags stage = VK_SHADER_STAGE_COMPUTE_BIT;
     struct vk *vk = &test->vk;
 
+    const VkSpecializationInfo spec_info = {
+#if 0
+        .mapEntryCount = 3,
+        .pMapEntries = (VkSpecializationMapEntry[]) {
+            [0] = {
+                .constantID = 0,
+                .offset = 0,
+                .size = 4,
+            },
+            [1] = {
+                .constantID = 1,
+                .offset = 4,
+                .size = 4,
+            },
+            [2] = {
+                .constantID = 1,
+                .offset = 8,
+                .size = 4,
+            },
+        },
+        .dataSize = sizeof(uint32_t[3]),
+        .pData = (uint32_t[]) { 8, 4, 1, },
+#else
+        .mapEntryCount = 0,
+#endif
+    };
     const VkComputePipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
         .stage = {
@@ -129,6 +155,7 @@ compile_test_compile_compute_pipeline(struct compile_test *test, struct spv_prog
             .stage = stage,
             .module = vk_create_shader_module(vk, prog->spirv, prog->size),
             .pName = prog->reflection.entrypoint,
+            .pSpecializationInfo = &spec_info,
         },
         .layout = compile_test_create_pipeline_layout(test, prog),
     };
