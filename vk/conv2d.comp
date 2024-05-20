@@ -12,11 +12,11 @@ layout(local_size_x = 64) in;
 layout(set = 0, binding = 0) uniform textureBuffer src;
 
 layout(set = 0, binding = 1) buffer DST {
-    vec4 data[];
+    f16vec4 data[];
 } dst;
 
 layout(set = 0, binding = 2) readonly buffer WEIGHTS {
-    mat4 data[];
+    f16mat4 data[];
 } weights;
 
 layout(push_constant) uniform CONSTS {
@@ -33,7 +33,7 @@ main()
     const uint bx = gl_GlobalInvocationID.x;
     const uint by = gl_GlobalInvocationID.y;
 
-    vec4 dst_val = vec4(0.0);
+    f16vec4 dst_val = f16vec4(0.0);
 
     for (uint ky = 0; ky < consts.kernel_height; ky++) {
         for (uint kx = 0; kx < consts.kernel_width; kx++) {
@@ -43,8 +43,8 @@ main()
                 const uint weight_coord =
                     (ky * consts.kernel_width + kx) * consts.slice + ks;
 
-                const vec4 src_val = texelFetch(src, int(src_coord));
-                const mat4 weight = weights.data[weight_coord];
+                const f16vec4 src_val = f16vec4(texelFetch(src, int(src_coord)));
+                const f16mat4 weight = weights.data[weight_coord];
 
                 dst_val += weight * src_val;
             }

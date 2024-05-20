@@ -232,8 +232,8 @@ main(void)
         .height = 288,
         .slice = 6,
 
-        .type_format = VK_FORMAT_R32G32B32A32_SFLOAT,
-        .type_size = 4,
+        .type_format = VK_FORMAT_R16G16B16A16_SFLOAT,
+        .type_size = 2,
         .type_width = 4,
 
         .kernel_width = 3,
