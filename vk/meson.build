@@ -7,6 +7,7 @@ tests = [
   'clear',
   'clear_depth',
   'conv1d',
+  'conv2d',
   'depth_resolve',
   'desc_buf',
   'dynamic_rendering',
