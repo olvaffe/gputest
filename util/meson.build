@@ -80,37 +80,46 @@ if dep_skia.found()
 endif
 util_summary += {'skutil': idep_skutil}
 
-idep_spvutil = dep_not_found
-if dep_glslang.found() and dep_spirv_tools.found()
-  link_args = ['-lglslang-default-resource-limits', '-lMachineIndependent', '-lGenericCodeGen', '-lSPIRV']
-  compile_args = []
-  include_dirs = []
-  deps = [idep_util, dep_glslang, dep_spirv_tools]
+spvutil_deps = [idep_util]
+spvutil_compile_args = []
+spvutil_include_dirs = []
+spvutil_link_args = []
 
-  if dep_spirv_reflect.found()
-    compile_args += ['-DHAVE_SPIRV_REFLECT']
-    include_dirs += [spirv_reflect_path]
-    deps += [dep_spirv_reflect]
-  endif
-
-  if dep_clspv.found()
-    compile_args += ['-DHAVE_CLSPV']
-    include_dirs += [clspv_path / 'include', spirv_reflect_path]
-    deps += [dep_clspv]
-  elif dep_llvm_spirv.found()
-    compile_args += ['-DHAVE_LLVM_SPIRV']
-    deps += [dep_dl, dep_llvm, dep_clang, dep_llvm_spirv]
-  endif
-
-  idep_spvutil = declare_dependency(
-    sources: ['spvutil.cpp', 'spvutil.h'],
-    dependencies: deps,
-    link_args: link_args,
-    compile_args: compile_args,
-    include_directories: include_dirs,
-  )
+if dep_spirv_tools.found()
+  spvutil_deps += [dep_spirv_tools]
+  spvutil_compile_args += ['-DHAVE_SPIRV_TOOLS']
 endif
-util_summary += {'spvutil': idep_spvutil}
+
+if dep_glslang.found()
+  spvutil_deps += [dep_glslang]
+  spvutil_compile_args += ['-DHAVE_GLSLANG']
+  spvutil_link_args = ['-lglslang-default-resource-limits',
+                       '-lMachineIndependent', '-lGenericCodeGen', '-lSPIRV']
+endif
+
+if dep_clspv.found()
+  spvutil_deps += [dep_clspv]
+  spvutil_compile_args += ['-DHAVE_CLSPV']
+  spvutil_include_dirs += [clspv_path / 'include', spirv_reflect_path]
+elif dep_llvm_spirv.found()
+  spvutil_deps += [dep_dl, dep_llvm, dep_clang, dep_llvm_spirv]
+  spvutil_compile_args += ['-DHAVE_LLVM_SPIRV']
+endif
+
+if dep_spirv_reflect.found()
+  spvutil_deps += [dep_spirv_reflect]
+  spvutil_compile_args += ['-DHAVE_SPIRV_REFLECT']
+  spvutil_include_dirs += [spirv_reflect_path]
+endif
+
+idep_spvutil = declare_dependency(
+  sources: ['spvutil.cpp', 'spvutil.h'],
+  dependencies: spvutil_deps,
+  compile_args: spvutil_compile_args,
+  include_directories: spvutil_include_dirs,
+  link_args: spvutil_link_args,
+)
+util_summary += {'spvutil': [idep_spvutil, spvutil_compile_args]}
 
 idep_v4l2util = dep_not_found
 if cc.has_header('linux/videodev2.h')

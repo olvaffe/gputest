@@ -71,6 +71,8 @@ if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
 endif
 
 # for spvutil
+dep_spirv_tools = dependency('SPIRV-Tools', required: false)
+
 dep_glslang = cpp.find_library(
     'glslang',
     has_headers: [
@@ -79,19 +81,6 @@ dep_glslang = cpp.find_library(
     ],
     required: false,
 )
-dep_spirv_tools = dependency('SPIRV-Tools', required: false)
-
-dep_spirv_reflect = dep_not_found
-spirv_reflect_path = get_option('spirv-reflect-path')
-spirv_reflect_path = fs.expanduser(spirv_reflect_path)
-if fs.is_absolute(spirv_reflect_path) and fs.is_dir(spirv_reflect_path)
-  dep_spirv_reflect = cpp.find_library(
-    'spirv-reflect-static',
-    dirs: [spirv_reflect_path / 'out'],
-    has_headers: ['spirv_reflect.h'],
-    header_include_directories: include_directories(spirv_reflect_path),
-  )
-endif
 
 dep_clspv = dep_not_found
 clspv_path = get_option('clspv-path')
@@ -119,6 +108,18 @@ if dep_llvm_spirv.found()
 
   dep_llvm = dependency('LLVM', version: version, method: 'cmake')
   dep_clang = dependency('Clang', version: version, modules: ['clang-cpp'], method: 'cmake')
+endif
+
+dep_spirv_reflect = dep_not_found
+spirv_reflect_path = get_option('spirv-reflect-path')
+spirv_reflect_path = fs.expanduser(spirv_reflect_path)
+if fs.is_absolute(spirv_reflect_path) and fs.is_dir(spirv_reflect_path)
+  dep_spirv_reflect = cpp.find_library(
+    'spirv-reflect-static',
+    dirs: [spirv_reflect_path / 'out'],
+    has_headers: ['spirv_reflect.h'],
+    header_include_directories: include_directories(spirv_reflect_path),
+  )
 endif
 
 # for vautil

@@ -9,6 +9,7 @@
 struct compile_test {
     const char *filename;
     bool disasm;
+    bool compile_compute;
 
     struct spv spv;
     struct vk vk;
@@ -175,15 +176,19 @@ compile_test_compile(struct compile_test *test)
 {
     struct spv *spv = &test->spv;
 
-    struct spv_program *prog =
-        spv_create_program(spv, spv_guess_stage(spv, test->filename), test->filename);
+    struct spv_program *prog = spv_create_program(spv, test->filename);
 
     if (test->disasm)
         spv_disasm_program(spv, prog);
 
-    if (prog->stage == GLSLANG_STAGE_COMPUTE || prog->stage == SPV_STAGE_KERNEL) {
-        spv_reflect_program(spv, prog);
-        compile_test_compile_compute_pipeline(test, prog);
+    switch (prog->reflection.execution_model) {
+    case SpvExecutionModelGLCompute:
+    case SpvExecutionModelKernel:
+        if (test->compile_compute)
+            compile_test_compile_compute_pipeline(test, prog);
+        break;
+    default:
+        break;
     }
 
     spv_destroy_program(spv, prog);
@@ -195,6 +200,7 @@ main(int argc, const char **argv)
     struct compile_test test = {
         .filename = NULL,
         .disasm = true,
+        .compile_compute = true,
     };
 
     if (argc != 2)

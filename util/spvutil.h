@@ -8,17 +8,14 @@
 
 #include "util.h"
 
-#include <glslang/Include/glslang_c_interface.h>
-
-#define SPV_STAGE_KERNEL GLSLANG_STAGE_COUNT
+#include <spirv/unified1/spirv.h>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
 struct spv_init_params {
-    glslang_target_client_version_t glsl_client_version;
-    glslang_messages_t glsl_messages;
+    int dummy;
 };
 
 struct spv {
@@ -37,6 +34,7 @@ struct spv_program_reflection_set {
 };
 
 struct spv_program_reflection {
+    SpvExecutionModel execution_model;
     char *entrypoint;
 
     uint32_t set_count;
@@ -44,8 +42,6 @@ struct spv_program_reflection {
 };
 
 struct spv_program {
-    /* GLSLANG_STAGE_* or SPV_STAGE_* */
-    int stage;
     void *spirv;
     size_t size;
 
@@ -74,17 +70,11 @@ spv_init(struct spv *spv, const struct spv_init_params *params);
 void
 spv_cleanup(struct spv *spv);
 
-int
-spv_guess_stage(struct spv *spv, const char *filename);
-
 struct spv_program *
-spv_create_program(struct spv *spv, int stage, const char *filename);
+spv_create_program(struct spv *spv, const char *filename);
 
 void
 spv_destroy_program(struct spv *spv, struct spv_program *prog);
-
-void
-spv_reflect_program(struct spv *spv, struct spv_program *prog);
 
 void
 spv_disasm_program(struct spv *spv, struct spv_program *prog);
