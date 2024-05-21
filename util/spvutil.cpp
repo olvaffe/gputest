@@ -466,8 +466,10 @@ spv_reflect_program(struct spv *spv, struct spv_program *prog)
 void
 spv_disasm_program(struct spv *spv, struct spv_program *prog)
 {
-    const uint32_t options = SPV_BINARY_TO_TEXT_OPTION_COLOR | SPV_BINARY_TO_TEXT_OPTION_INDENT |
-                             SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
+    uint32_t options =
+        SPV_BINARY_TO_TEXT_OPTION_INDENT | SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
+    if (u_isatty())
+        options |= SPV_BINARY_TO_TEXT_OPTION_COLOR;
 
     spv_target_env target_env;
     switch (spv->params.glsl_client_version) {
