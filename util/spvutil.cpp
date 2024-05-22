@@ -213,10 +213,9 @@ spv_guess_glslang_stage(struct spv *spv, const char *filename)
 {
     const char *suffix = strrchr(filename, '.');
     if (!suffix)
-        spv_die("%s has no suffix", filename);
-    suffix++;
+        return -1;
 
-    const std::string name(suffix);
+    const std::string name(suffix + 1);
     if (name == "vert")
         return GLSLANG_STAGE_VERTEX;
     else if (name == "tesc")
