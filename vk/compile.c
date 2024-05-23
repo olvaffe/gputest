@@ -61,8 +61,14 @@ compile_test_create_pipeline_layout(struct compile_test *test, struct spv_progra
             case 0: /* SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER */
                 type = VK_DESCRIPTOR_TYPE_SAMPLER;
                 break;
+            case 1: /* SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER */
+                type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                break;
             case 2: /* SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE */
                 type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+                break;
+            case 3: /* SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE */
+                type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
                 break;
             case 4: /* SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER */
                 type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
