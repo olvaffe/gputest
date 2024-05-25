@@ -1,0 +1,151 @@
+#version 460 core
+
+/*
+ * Copyright 2024 Google LLC
+ * SPDX-License-Identifier: MIT
+ */
+
+#define BLOCK_SIZE 4
+
+#extension GL_EXT_shader_explicit_arithmetic_types : enable
+#extension GL_EXT_shader_image_load_formatted : enable
+
+layout(local_size_x = 16, local_size_y = 1, local_size_z = 16) in;
+
+layout(set = 0, binding = 0) readonly buffer SSBO {
+    f16mat4 weights[];
+} ssbo;
+
+layout(set = 0, binding = 1) uniform UBO {
+    uint src_slice_count;
+    uint dst_width;
+    uint dst_height;
+    uint dst_slice_count;
+} ubo;
+
+layout(set = 0, binding = 2) uniform sampler2D src;
+layout(set = 0, binding = 3) uniform image2D dst;
+
+void main()
+{
+    const uint dst_x = gl_GlobalInvocationID.x * BLOCK_SIZE;
+    const uint dst_y = gl_GlobalInvocationID.y;
+    const uint dst_slice = gl_GlobalInvocationID.z * BLOCK_SIZE;
+
+    if (dst_x >= ubo.dst_width || dst_y >= ubo.dst_height || dst_slice >= ubo.dst_slice_count)
+        return;
+
+    f16vec4 res_00 = f16vec4(0.0);
+    f16vec4 res_10 = f16vec4(0.0);
+    f16vec4 res_20 = f16vec4(0.0);
+    f16vec4 res_30 = f16vec4(0.0);
+    f16vec4 res_01 = f16vec4(0.0);
+    f16vec4 res_11 = f16vec4(0.0);
+    f16vec4 res_21 = f16vec4(0.0);
+    f16vec4 res_31 = f16vec4(0.0);
+    f16vec4 res_02 = f16vec4(0.0);
+    f16vec4 res_12 = f16vec4(0.0);
+    f16vec4 res_22 = f16vec4(0.0);
+    f16vec4 res_32 = f16vec4(0.0);
+    f16vec4 res_03 = f16vec4(0.0);
+    f16vec4 res_13 = f16vec4(0.0);
+    f16vec4 res_23 = f16vec4(0.0);
+    f16vec4 res_33 = f16vec4(0.0);
+
+    uint idx = dst_slice * ubo.src_slice_count;
+    uint src_slice = 0;
+    do {
+        const f16vec4 val_0 = f16vec4(
+            texelFetch(src, ivec2(dst_x + 0, dst_y * ubo.src_slice_count + src_slice), 0));
+        const f16vec4 val_1 = f16vec4(
+            texelFetch(src, ivec2(dst_x + 1, dst_y * ubo.src_slice_count + src_slice), 0));
+        const f16vec4 val_2 = f16vec4(
+            texelFetch(src, ivec2(dst_x + 2, dst_y * ubo.src_slice_count + src_slice), 0));
+        const f16vec4 val_3 = f16vec4(
+            texelFetch(src, ivec2(dst_x + 3, dst_y * ubo.src_slice_count + src_slice), 0));
+
+        res_00 += ssbo.weights[idx + 0] * val_0;
+        res_10 += ssbo.weights[idx + 0] * val_1;
+        res_20 += ssbo.weights[idx + 0] * val_2;
+        res_30 += ssbo.weights[idx + 0] * val_3;
+        res_01 += ssbo.weights[idx + 1] * val_0;
+        res_11 += ssbo.weights[idx + 1] * val_1;
+        res_21 += ssbo.weights[idx + 1] * val_2;
+        res_31 += ssbo.weights[idx + 1] * val_3;
+        res_02 += ssbo.weights[idx + 2] * val_0;
+        res_12 += ssbo.weights[idx + 2] * val_1;
+        res_22 += ssbo.weights[idx + 2] * val_2;
+        res_32 += ssbo.weights[idx + 2] * val_3;
+        res_03 += ssbo.weights[idx + 3] * val_0;
+        res_13 += ssbo.weights[idx + 3] * val_1;
+        res_23 += ssbo.weights[idx + 3] * val_2;
+        res_33 += ssbo.weights[idx + 3] * val_3;
+        idx += 4;
+        src_slice += 1;
+    } while (src_slice < ubo.src_slice_count);
+
+    imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + 0), vec4(res_00));
+    if (dst_x + 1 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 1, dst_y * ubo.dst_slice_count + dst_slice + 0),
+                   vec4(res_10));
+    }
+    if (dst_x + 2 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 2, dst_y * ubo.dst_slice_count + dst_slice + 0),
+                   vec4(res_20));
+    }
+    if (dst_x + 3 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 3, dst_y * ubo.dst_slice_count + dst_slice + 0),
+                   vec4(res_30));
+    }
+
+    if (dst_slice + 1 >= ubo.dst_slice_count) {
+        return;
+    }
+    imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + 1), vec4(res_01));
+    if (dst_x + 1 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 1, dst_y * ubo.dst_slice_count + dst_slice + 1),
+                   vec4(res_11));
+    }
+    if (dst_x + 2 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 2, dst_y * ubo.dst_slice_count + dst_slice + 1),
+                   vec4(res_21));
+    }
+    if (dst_x + 3 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 3, dst_y * ubo.dst_slice_count + dst_slice + 1),
+                   vec4(res_31));
+    }
+
+    if (dst_slice + 2 >= ubo.dst_slice_count) {
+        return;
+    }
+    imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + 2), vec4(res_02));
+    if (dst_x + 1 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 1, dst_y * ubo.dst_slice_count + dst_slice + 2),
+                   vec4(res_12));
+    }
+    if (dst_x + 2 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 2, dst_y * ubo.dst_slice_count + dst_slice + 2),
+                   vec4(res_22));
+    }
+    if (dst_x + 3 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 3, dst_y * ubo.dst_slice_count + dst_slice + 2),
+                   vec4(res_32));
+    }
+
+    if (dst_slice + 3 >= ubo.dst_slice_count) {
+        return;
+    }
+    imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + 3), vec4(res_03));
+    if (dst_x + 1 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 1, dst_y * ubo.dst_slice_count + dst_slice + 3),
+                   vec4(res_13));
+    }
+    if (dst_x + 2 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 2, dst_y * ubo.dst_slice_count + dst_slice + 3),
+                   vec4(res_23));
+    }
+    if (dst_x + 3 < ubo.dst_width) {
+        imageStore(dst, ivec2(dst_x + 3, dst_y * ubo.dst_slice_count + dst_slice + 3),
+                   vec4(res_33));
+    }
+}

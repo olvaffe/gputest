@@ -8,6 +8,7 @@ tests = [
   'clear_depth',
   'conv1d',
   'conv2d',
+  'convlayer',
   'depth_resolve',
   'desc_buf',
   'dynamic_rendering',
