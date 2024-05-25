@@ -11,22 +11,23 @@ static const uint32_t convlayer_test_cs[] = {
 
 struct convlayer_test_ubo {
     uint32_t src_slice_count;
-    uint32_t dst_width;
-    uint32_t dst_height;
     uint32_t dst_slice_count;
+    uint32_t grid_width;
+    uint32_t grid_height;
 };
 
 struct convlayer_test {
+    VkFormat format;
     uint32_t width;
     uint32_t height;
     uint32_t src_slice_count;
     uint32_t dst_slice_count;
 
-    VkFormat format;
+    uint32_t grid_width;
+    uint32_t grid_height;
 
-    uint32_t work_width;
-    uint32_t local_size;
-    uint32_t block_size;
+    uint32_t local_size[3];
+    uint32_t block_size[3];
 
     struct vk vk;
 
@@ -172,10 +173,7 @@ convlayer_test_init_buffers(struct convlayer_test *test)
 
     const VkDeviceSize weight_size = 4 * 4 * 2; /* f16mat4 */
     const VkDeviceSize weight_count = test->src_slice_count * test->dst_slice_count;
-    const VkDeviceSize ssbo_size = 37748736;
-    if (weight_size * weight_count > ssbo_size)
-        vk_die("bad ssbo size");
-
+    const VkDeviceSize ssbo_size = weight_size * weight_count;
     test->ssbo =
         vk_create_buffer(vk, 0, ssbo_size,
                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
@@ -187,9 +185,9 @@ convlayer_test_init_buffers(struct convlayer_test *test)
 
     struct convlayer_test_ubo *ubo = test->ubo->mem_ptr;
     ubo->src_slice_count = test->src_slice_count;
-    ubo->dst_width = test->width;
-    ubo->dst_height = test->height;
     ubo->dst_slice_count = test->dst_slice_count;
+    ubo->grid_width = test->grid_width;
+    ubo->grid_height = test->grid_height;
 }
 
 static void
@@ -269,22 +267,16 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                               test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
 
-    if (test->work_width > test->width)
-        vk_die("bad work width or width");
-    if (test->work_width % (test->local_size * test->block_size))
-        vk_die("bad work width, local size, or block size");
-    const uint32_t dispatch_width = test->work_width / (test->local_size * test->block_size);
-
-    if (test->height % test->local_size)
-        vk_die("bad height or local size");
-    if (test->dst_slice_count % test->block_size)
-        vk_die("bad dst slice count or block size");
+    const uint32_t dispatch_width =
+        DIV_ROUND_UP(test->grid_width, test->local_size[0] * test->block_size[0]);
+    const uint32_t dispatch_height =
+        DIV_ROUND_UP(test->grid_height, test->local_size[1] * test->block_size[1]);
     const uint32_t dispatch_depth =
-        (test->height / test->local_size) * (test->dst_slice_count / test->block_size);
+        DIV_ROUND_UP(test->dst_slice_count, test->local_size[2] * test->block_size[2]);
 
     if (stopwatch)
         vk_write_stopwatch(vk, stopwatch, cmd);
-    vk->CmdDispatch(cmd, dispatch_width, 1, dispatch_depth);
+    vk->CmdDispatch(cmd, dispatch_width, dispatch_height, dispatch_depth);
     if (stopwatch)
         vk_write_stopwatch(vk, stopwatch, cmd);
 
@@ -303,20 +295,18 @@ int
 main(void)
 {
     struct convlayer_test test = {
-        .width = 1024,
-        .height = 96,
-        .src_slice_count = 32,
-        .dst_slice_count = 4,
-
         .format = VK_FORMAT_R16G16B16A16_SFLOAT,
+        .width = 1024,
+        .height = 1,
+        .src_slice_count = 3072,
+        .dst_slice_count = 384,
 
-        .work_width = 256,
-        .local_size = 16,
-        .block_size = 4,
+        .grid_width = 256,
+        .grid_height = 1,
+
+        .local_size = { 16, 1, 16 },
+        .block_size = { 4, 1, 4 },
     };
-
-    if (test.width % test.local_size)
-        vk_die("bad width / local size");
 
     convlayer_test_init(&test);
     convlayer_test_dispatch(&test, true);
