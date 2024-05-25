@@ -15,7 +15,7 @@
 layout(local_size_x = 16, local_size_y = 1, local_size_z = 16) in;
 
 layout(set = 0, binding = 0) readonly buffer SSBO {
-    f16mat4 weights[];
+    f16vec4 weights[];
 } ssbo;
 
 layout(set = 0, binding = 1) uniform UBO {
@@ -54,7 +54,7 @@ void main()
     f16vec4 res_23 = f16vec4(0.0);
     f16vec4 res_33 = f16vec4(0.0);
 
-    uint idx = dst_slice * ubo.src_slice_count;
+    uint idx = dst_slice * ubo.src_slice_count * 4;
     for (uint src_slice = 0; src_slice < ubo.src_slice_count; src_slice++) {
         const f16vec4 val_0 = f16vec4(
             texelFetch(src, ivec2(dst_x + 0, dst_y * ubo.src_slice_count + src_slice), 0));
@@ -65,24 +65,93 @@ void main()
         const f16vec4 val_3 = f16vec4(
             texelFetch(src, ivec2(dst_x + 3, dst_y * ubo.src_slice_count + src_slice), 0));
 
-        res_00 += ssbo.weights[idx + 0] * val_0;
-        res_10 += ssbo.weights[idx + 0] * val_1;
-        res_20 += ssbo.weights[idx + 0] * val_2;
-        res_30 += ssbo.weights[idx + 0] * val_3;
-        res_01 += ssbo.weights[idx + 1] * val_0;
-        res_11 += ssbo.weights[idx + 1] * val_1;
-        res_21 += ssbo.weights[idx + 1] * val_2;
-        res_31 += ssbo.weights[idx + 1] * val_3;
-        res_02 += ssbo.weights[idx + 2] * val_0;
-        res_12 += ssbo.weights[idx + 2] * val_1;
-        res_22 += ssbo.weights[idx + 2] * val_2;
-        res_32 += ssbo.weights[idx + 2] * val_3;
-        res_03 += ssbo.weights[idx + 3] * val_0;
-        res_13 += ssbo.weights[idx + 3] * val_1;
-        res_23 += ssbo.weights[idx + 3] * val_2;
-        res_33 += ssbo.weights[idx + 3] * val_3;
+        res_00 += ssbo.weights[idx + 0] * val_0.x;
+        res_00 += ssbo.weights[idx + 1] * val_0.y;
+        res_00 += ssbo.weights[idx + 2] * val_0.z;
+        res_00 += ssbo.weights[idx + 3] * val_0.w;
 
-        idx += BLOCK_SIZE_Z;
+        res_10 += ssbo.weights[idx + 0] * val_1.x;
+        res_10 += ssbo.weights[idx + 1] * val_1.y;
+        res_10 += ssbo.weights[idx + 2] * val_1.z;
+        res_10 += ssbo.weights[idx + 3] * val_1.w;
+
+        res_20 += ssbo.weights[idx + 0] * val_2.x;
+        res_20 += ssbo.weights[idx + 1] * val_2.y;
+        res_20 += ssbo.weights[idx + 2] * val_2.z;
+        res_20 += ssbo.weights[idx + 3] * val_2.w;
+
+        res_30 += ssbo.weights[idx + 0] * val_3.x;
+        res_30 += ssbo.weights[idx + 1] * val_3.y;
+        res_30 += ssbo.weights[idx + 2] * val_3.z;
+        res_30 += ssbo.weights[idx + 3] * val_3.w;
+
+        idx += 4;
+
+        res_01 += ssbo.weights[idx + 0] * val_0.x;
+        res_01 += ssbo.weights[idx + 1] * val_0.y;
+        res_01 += ssbo.weights[idx + 2] * val_0.z;
+        res_01 += ssbo.weights[idx + 3] * val_0.w;
+
+        res_11 += ssbo.weights[idx + 0] * val_1.x;
+        res_11 += ssbo.weights[idx + 1] * val_1.y;
+        res_11 += ssbo.weights[idx + 2] * val_1.z;
+        res_11 += ssbo.weights[idx + 3] * val_1.w;
+
+        res_21 += ssbo.weights[idx + 0] * val_2.x;
+        res_21 += ssbo.weights[idx + 1] * val_2.y;
+        res_21 += ssbo.weights[idx + 2] * val_2.z;
+        res_21 += ssbo.weights[idx + 3] * val_2.w;
+
+        res_31 += ssbo.weights[idx + 0] * val_3.x;
+        res_31 += ssbo.weights[idx + 1] * val_3.y;
+        res_31 += ssbo.weights[idx + 2] * val_3.z;
+        res_31 += ssbo.weights[idx + 3] * val_3.w;
+
+        idx += 4;
+
+        res_02 += ssbo.weights[idx + 0] * val_0.x;
+        res_02 += ssbo.weights[idx + 1] * val_0.y;
+        res_02 += ssbo.weights[idx + 2] * val_0.z;
+        res_02 += ssbo.weights[idx + 3] * val_0.w;
+
+        res_12 += ssbo.weights[idx + 0] * val_1.x;
+        res_12 += ssbo.weights[idx + 1] * val_1.y;
+        res_12 += ssbo.weights[idx + 2] * val_1.z;
+        res_12 += ssbo.weights[idx + 3] * val_1.w;
+
+        res_22 += ssbo.weights[idx + 0] * val_2.x;
+        res_22 += ssbo.weights[idx + 1] * val_2.y;
+        res_22 += ssbo.weights[idx + 2] * val_2.z;
+        res_22 += ssbo.weights[idx + 3] * val_2.w;
+
+        res_32 += ssbo.weights[idx + 0] * val_3.x;
+        res_32 += ssbo.weights[idx + 1] * val_3.y;
+        res_32 += ssbo.weights[idx + 2] * val_3.z;
+        res_32 += ssbo.weights[idx + 3] * val_3.w;
+
+        idx += 4;
+
+        res_03 += ssbo.weights[idx + 0] * val_0.x;
+        res_03 += ssbo.weights[idx + 1] * val_0.y;
+        res_03 += ssbo.weights[idx + 2] * val_0.z;
+        res_03 += ssbo.weights[idx + 3] * val_0.w;
+
+        res_13 += ssbo.weights[idx + 0] * val_1.x;
+        res_13 += ssbo.weights[idx + 1] * val_1.y;
+        res_13 += ssbo.weights[idx + 2] * val_1.z;
+        res_13 += ssbo.weights[idx + 3] * val_1.w;
+
+        res_23 += ssbo.weights[idx + 0] * val_2.x;
+        res_23 += ssbo.weights[idx + 1] * val_2.y;
+        res_23 += ssbo.weights[idx + 2] * val_2.z;
+        res_23 += ssbo.weights[idx + 3] * val_2.w;
+
+        res_33 += ssbo.weights[idx + 0] * val_3.x;
+        res_33 += ssbo.weights[idx + 1] * val_3.y;
+        res_33 += ssbo.weights[idx + 2] * val_3.z;
+        res_33 += ssbo.weights[idx + 3] * val_3.w;
+
+        idx += 4;
     }
 
     imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + 0), vec4(res_00));
