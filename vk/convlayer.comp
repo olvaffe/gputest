@@ -11,6 +11,8 @@
 #extension GL_EXT_samplerless_texture_functions : enable
 #extension GL_EXT_shader_explicit_arithmetic_types : enable
 #extension GL_EXT_shader_image_load_formatted : enable
+#extension GL_KHR_shader_subgroup_ballot : enable
+#extension GL_EXT_shader_subgroup_extended_types_float16 : enable
 
 layout(local_size_x = 16, local_size_y = 1, local_size_z = 16) in;
 
@@ -51,6 +53,7 @@ void main()
                 texelFetch(src, ivec2(dst_x + x, dst_y * ubo.src_slice_count + src_slice), 0));
         }
 
+#if 1
         for (uint s = 0; s < BLOCK_SIZE_Z; s++) {
             for (uint x = 0; x < BLOCK_SIZE_X; x++) {
                 res[s][x] += ssbo.weights[idx + 0] * val[x].x;
@@ -60,6 +63,35 @@ void main()
             }
             idx += 4;
         }
+#else
+#if BLOCK_SIZE_X != 1
+#error "BLOCK_SIZE_X must be 1"
+#endif
+#if BLOCK_SIZE_Z != 8
+#error "BLOCK_SIZE_Z must be 8"
+#endif
+	/* local size must be (>=32, 1, 1) too */
+
+        f16vec4 w;
+        if (gl_SubgroupInvocationID < BLOCK_SIZE_Z * 4)
+            w = ssbo.weights[idx + gl_SubgroupInvocationID];
+        idx += BLOCK_SIZE_Z * 4;
+
+#define MATMUL(res, mat, vec, s)                             \
+    res[s][0] += subgroupBroadcast(w, s * 4 + 0) * val[0].x; \
+    res[s][0] += subgroupBroadcast(w, s * 4 + 1) * val[0].y; \
+    res[s][0] += subgroupBroadcast(w, s * 4 + 2) * val[0].z; \
+    res[s][0] += subgroupBroadcast(w, s * 4 + 3) * val[0].w
+        MATMUL(res, w, val, 0);
+        MATMUL(res, w, val, 1);
+        MATMUL(res, w, val, 2);
+        MATMUL(res, w, val, 3);
+        MATMUL(res, w, val, 4);
+        MATMUL(res, w, val, 5);
+        MATMUL(res, w, val, 6);
+        MATMUL(res, w, val, 7);
+
+#endif
     }
 
     for (uint s = 0; s < BLOCK_SIZE_Z; s++) {
