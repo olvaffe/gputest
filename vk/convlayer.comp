@@ -37,185 +37,40 @@ void main()
     if (dst_x >= ubo.grid_width || dst_y >= ubo.grid_height || dst_slice >= ubo.dst_slice_count)
         return;
 
-    f16vec4 res_00 = f16vec4(0.0);
-    f16vec4 res_10 = f16vec4(0.0);
-    f16vec4 res_20 = f16vec4(0.0);
-    f16vec4 res_30 = f16vec4(0.0);
-    f16vec4 res_01 = f16vec4(0.0);
-    f16vec4 res_11 = f16vec4(0.0);
-    f16vec4 res_21 = f16vec4(0.0);
-    f16vec4 res_31 = f16vec4(0.0);
-    f16vec4 res_02 = f16vec4(0.0);
-    f16vec4 res_12 = f16vec4(0.0);
-    f16vec4 res_22 = f16vec4(0.0);
-    f16vec4 res_32 = f16vec4(0.0);
-    f16vec4 res_03 = f16vec4(0.0);
-    f16vec4 res_13 = f16vec4(0.0);
-    f16vec4 res_23 = f16vec4(0.0);
-    f16vec4 res_33 = f16vec4(0.0);
+    f16vec4 res[BLOCK_SIZE_Z][BLOCK_SIZE_X];
+    for (uint s = 0; s < BLOCK_SIZE_Z; s++) {
+        for (uint x = 0; x < BLOCK_SIZE_X; x++)
+            res[s][x] = f16vec4(0.0);
+    }
 
     uint idx = dst_slice * ubo.src_slice_count * 4;
     for (uint src_slice = 0; src_slice < ubo.src_slice_count; src_slice++) {
-        const f16vec4 val_0 = f16vec4(
-            texelFetch(src, ivec2(dst_x + 0, dst_y * ubo.src_slice_count + src_slice), 0));
-        const f16vec4 val_1 = f16vec4(
-            texelFetch(src, ivec2(dst_x + 1, dst_y * ubo.src_slice_count + src_slice), 0));
-        const f16vec4 val_2 = f16vec4(
-            texelFetch(src, ivec2(dst_x + 2, dst_y * ubo.src_slice_count + src_slice), 0));
-        const f16vec4 val_3 = f16vec4(
-            texelFetch(src, ivec2(dst_x + 3, dst_y * ubo.src_slice_count + src_slice), 0));
+        f16vec4 val[BLOCK_SIZE_X];
+        for (uint x = 0; x < BLOCK_SIZE_X; x++) {
+            val[x] = f16vec4(
+                texelFetch(src, ivec2(dst_x + x, dst_y * ubo.src_slice_count + src_slice), 0));
+        }
 
-        res_00 += ssbo.weights[idx + 0] * val_0.x;
-        res_00 += ssbo.weights[idx + 1] * val_0.y;
-        res_00 += ssbo.weights[idx + 2] * val_0.z;
-        res_00 += ssbo.weights[idx + 3] * val_0.w;
-
-        res_10 += ssbo.weights[idx + 0] * val_1.x;
-        res_10 += ssbo.weights[idx + 1] * val_1.y;
-        res_10 += ssbo.weights[idx + 2] * val_1.z;
-        res_10 += ssbo.weights[idx + 3] * val_1.w;
-
-        res_20 += ssbo.weights[idx + 0] * val_2.x;
-        res_20 += ssbo.weights[idx + 1] * val_2.y;
-        res_20 += ssbo.weights[idx + 2] * val_2.z;
-        res_20 += ssbo.weights[idx + 3] * val_2.w;
-
-        res_30 += ssbo.weights[idx + 0] * val_3.x;
-        res_30 += ssbo.weights[idx + 1] * val_3.y;
-        res_30 += ssbo.weights[idx + 2] * val_3.z;
-        res_30 += ssbo.weights[idx + 3] * val_3.w;
-
-        idx += 4;
-
-        res_01 += ssbo.weights[idx + 0] * val_0.x;
-        res_01 += ssbo.weights[idx + 1] * val_0.y;
-        res_01 += ssbo.weights[idx + 2] * val_0.z;
-        res_01 += ssbo.weights[idx + 3] * val_0.w;
-
-        res_11 += ssbo.weights[idx + 0] * val_1.x;
-        res_11 += ssbo.weights[idx + 1] * val_1.y;
-        res_11 += ssbo.weights[idx + 2] * val_1.z;
-        res_11 += ssbo.weights[idx + 3] * val_1.w;
-
-        res_21 += ssbo.weights[idx + 0] * val_2.x;
-        res_21 += ssbo.weights[idx + 1] * val_2.y;
-        res_21 += ssbo.weights[idx + 2] * val_2.z;
-        res_21 += ssbo.weights[idx + 3] * val_2.w;
-
-        res_31 += ssbo.weights[idx + 0] * val_3.x;
-        res_31 += ssbo.weights[idx + 1] * val_3.y;
-        res_31 += ssbo.weights[idx + 2] * val_3.z;
-        res_31 += ssbo.weights[idx + 3] * val_3.w;
-
-        idx += 4;
-
-        res_02 += ssbo.weights[idx + 0] * val_0.x;
-        res_02 += ssbo.weights[idx + 1] * val_0.y;
-        res_02 += ssbo.weights[idx + 2] * val_0.z;
-        res_02 += ssbo.weights[idx + 3] * val_0.w;
-
-        res_12 += ssbo.weights[idx + 0] * val_1.x;
-        res_12 += ssbo.weights[idx + 1] * val_1.y;
-        res_12 += ssbo.weights[idx + 2] * val_1.z;
-        res_12 += ssbo.weights[idx + 3] * val_1.w;
-
-        res_22 += ssbo.weights[idx + 0] * val_2.x;
-        res_22 += ssbo.weights[idx + 1] * val_2.y;
-        res_22 += ssbo.weights[idx + 2] * val_2.z;
-        res_22 += ssbo.weights[idx + 3] * val_2.w;
-
-        res_32 += ssbo.weights[idx + 0] * val_3.x;
-        res_32 += ssbo.weights[idx + 1] * val_3.y;
-        res_32 += ssbo.weights[idx + 2] * val_3.z;
-        res_32 += ssbo.weights[idx + 3] * val_3.w;
-
-        idx += 4;
-
-        res_03 += ssbo.weights[idx + 0] * val_0.x;
-        res_03 += ssbo.weights[idx + 1] * val_0.y;
-        res_03 += ssbo.weights[idx + 2] * val_0.z;
-        res_03 += ssbo.weights[idx + 3] * val_0.w;
-
-        res_13 += ssbo.weights[idx + 0] * val_1.x;
-        res_13 += ssbo.weights[idx + 1] * val_1.y;
-        res_13 += ssbo.weights[idx + 2] * val_1.z;
-        res_13 += ssbo.weights[idx + 3] * val_1.w;
-
-        res_23 += ssbo.weights[idx + 0] * val_2.x;
-        res_23 += ssbo.weights[idx + 1] * val_2.y;
-        res_23 += ssbo.weights[idx + 2] * val_2.z;
-        res_23 += ssbo.weights[idx + 3] * val_2.w;
-
-        res_33 += ssbo.weights[idx + 0] * val_3.x;
-        res_33 += ssbo.weights[idx + 1] * val_3.y;
-        res_33 += ssbo.weights[idx + 2] * val_3.z;
-        res_33 += ssbo.weights[idx + 3] * val_3.w;
-
-        idx += 4;
+        for (uint s = 0; s < BLOCK_SIZE_Z; s++) {
+            for (uint x = 0; x < BLOCK_SIZE_X; x++) {
+                res[s][x] += ssbo.weights[idx + 0] * val[x].x;
+                res[s][x] += ssbo.weights[idx + 1] * val[x].y;
+                res[s][x] += ssbo.weights[idx + 2] * val[x].z;
+                res[s][x] += ssbo.weights[idx + 3] * val[x].w;
+            }
+            idx += 4;
+        }
     }
 
-    imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + 0), vec4(res_00));
-    if (dst_x + 1 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 1, dst_y * ubo.dst_slice_count + dst_slice + 0),
-                   vec4(res_10));
-    }
-    if (dst_x + 2 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 2, dst_y * ubo.dst_slice_count + dst_slice + 0),
-                   vec4(res_20));
-    }
-    if (dst_x + 3 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 3, dst_y * ubo.dst_slice_count + dst_slice + 0),
-                   vec4(res_30));
-    }
+    for (uint s = 0; s < BLOCK_SIZE_Z; s++) {
+        if (dst_slice + s >= ubo.dst_slice_count)
+            break;
 
-    if (dst_slice + 1 >= ubo.dst_slice_count) {
-        return;
-    }
-    imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + 1), vec4(res_01));
-    if (dst_x + 1 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 1, dst_y * ubo.dst_slice_count + dst_slice + 1),
-                   vec4(res_11));
-    }
-    if (dst_x + 2 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 2, dst_y * ubo.dst_slice_count + dst_slice + 1),
-                   vec4(res_21));
-    }
-    if (dst_x + 3 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 3, dst_y * ubo.dst_slice_count + dst_slice + 1),
-                   vec4(res_31));
-    }
-
-    if (dst_slice + 2 >= ubo.dst_slice_count) {
-        return;
-    }
-    imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + 2), vec4(res_02));
-    if (dst_x + 1 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 1, dst_y * ubo.dst_slice_count + dst_slice + 2),
-                   vec4(res_12));
-    }
-    if (dst_x + 2 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 2, dst_y * ubo.dst_slice_count + dst_slice + 2),
-                   vec4(res_22));
-    }
-    if (dst_x + 3 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 3, dst_y * ubo.dst_slice_count + dst_slice + 2),
-                   vec4(res_32));
-    }
-
-    if (dst_slice + 3 >= ubo.dst_slice_count) {
-        return;
-    }
-    imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + 3), vec4(res_03));
-    if (dst_x + 1 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 1, dst_y * ubo.dst_slice_count + dst_slice + 3),
-                   vec4(res_13));
-    }
-    if (dst_x + 2 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 2, dst_y * ubo.dst_slice_count + dst_slice + 3),
-                   vec4(res_23));
-    }
-    if (dst_x + 3 < ubo.grid_width) {
-        imageStore(dst, ivec2(dst_x + 3, dst_y * ubo.dst_slice_count + dst_slice + 3),
-                   vec4(res_33));
+        for (uint x = 0; x < BLOCK_SIZE_X; x++) {
+            if (dst_x + x >= ubo.grid_width)
+                break;
+            imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + s),
+                       vec4(res[s][x]));
+        }
     }
 }
