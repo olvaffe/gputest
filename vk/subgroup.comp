@@ -1,0 +1,28 @@
+#version 460 core
+
+/*
+ * Copyright 2024 Google LLC
+ * SPDX-License-Identifier: MIT
+ */
+
+#extension GL_KHR_shader_subgroup_ballot : enable
+
+layout(local_size_x = 2, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std430) writeonly buffer DST {
+    float vals[2];
+} dst;
+
+layout(set = 0, binding = 1, std430) readonly buffer SRC {
+    float vals[2];
+} src;
+
+void main()
+{
+    float val;
+    if (gl_SubgroupInvocationID < 2)
+        val = src.vals[gl_SubgroupInvocationID];
+    float sum = subgroupBroadcast(val, 0) + subgroupBroadcast(val, 1);
+
+    dst.vals[gl_GlobalInvocationID.x] = sum;
+}

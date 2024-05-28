@@ -28,6 +28,7 @@ tests = [
   'ssbo_max',
   'stencil',
   'storage_3d',
+  'subgroup',
   'tess',
   'tex',
   'tex_depth',
