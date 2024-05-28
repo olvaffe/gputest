@@ -55,8 +55,7 @@ void main()
     f16vec4 res_33 = f16vec4(0.0);
 
     uint idx = dst_slice * ubo.src_slice_count;
-    uint src_slice = 0;
-    do {
+    for (uint src_slice = 0; src_slice < ubo.src_slice_count; src_slice++) {
         const f16vec4 val_0 = f16vec4(
             texelFetch(src, ivec2(dst_x + 0, dst_y * ubo.src_slice_count + src_slice), 0));
         const f16vec4 val_1 = f16vec4(
@@ -82,9 +81,9 @@ void main()
         res_13 += ssbo.weights[idx + 3] * val_1;
         res_23 += ssbo.weights[idx + 3] * val_2;
         res_33 += ssbo.weights[idx + 3] * val_3;
+
         idx += BLOCK_SIZE_Z;
-        src_slice += 1;
-    } while (src_slice < ubo.src_slice_count);
+    }
 
     imageStore(dst, ivec2(dst_x + 0, dst_y * ubo.dst_slice_count + dst_slice + 0), vec4(res_00));
     if (dst_x + 1 < ubo.grid_width) {
