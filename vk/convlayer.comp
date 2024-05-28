@@ -8,6 +8,7 @@
 #define BLOCK_SIZE_X 4
 #define BLOCK_SIZE_Z 4
 
+#extension GL_EXT_samplerless_texture_functions : enable
 #extension GL_EXT_shader_explicit_arithmetic_types : enable
 #extension GL_EXT_shader_image_load_formatted : enable
 
@@ -24,7 +25,7 @@ layout(set = 0, binding = 1) uniform UBO {
     uint grid_height;
 } ubo;
 
-layout(set = 0, binding = 2) uniform sampler2D src;
+layout(set = 0, binding = 2) uniform texture2D src;
 layout(set = 0, binding = 3) uniform image2D dst;
 
 void main()
