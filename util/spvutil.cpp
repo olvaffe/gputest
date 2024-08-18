@@ -211,41 +211,54 @@ spv_transpile_glslang_program(struct spv *spv,
 static int
 spv_guess_glslang_stage(struct spv *spv, const char *filename)
 {
+    const struct {
+        const char *suffix;
+        int stage;
+    } stages[] = {
+#ifndef HAVE_GLSLANG
+#define GLSLANG_STAGE_MAGIC 42
+#define GLSLANG_STAGE_VERTEX GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_TESSCONTROL GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_TESSEVALUATION GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_GEOMETRY GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_FRAGMENT GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_COMPUTE GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_RAYGEN GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_INTERSECT GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_ANYHIT GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_CLOSESTHIT GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_MISS GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_CALLABLE GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_TASK GLSLANG_STAGE_MAGIC
+#define GLSLANG_STAGE_MESH GLSLANG_STAGE_MAGIC
+#endif
+        { .suffix = "vert", .stage = GLSLANG_STAGE_VERTEX },
+        { .suffix = "tesc", .stage = GLSLANG_STAGE_TESSCONTROL },
+        { .suffix = "tese", .stage = GLSLANG_STAGE_TESSEVALUATION },
+        { .suffix = "geom", .stage = GLSLANG_STAGE_GEOMETRY },
+        { .suffix = "frag", .stage = GLSLANG_STAGE_FRAGMENT },
+        { .suffix = "comp", .stage = GLSLANG_STAGE_COMPUTE },
+        { .suffix = "rgen", .stage = GLSLANG_STAGE_RAYGEN },
+        { .suffix = "rint", .stage = GLSLANG_STAGE_INTERSECT },
+        { .suffix = "rahit", .stage = GLSLANG_STAGE_ANYHIT },
+        { .suffix = "rchit", .stage = GLSLANG_STAGE_CLOSESTHIT },
+        { .suffix = "rmiss", .stage = GLSLANG_STAGE_MISS },
+        { .suffix = "rcall", .stage = GLSLANG_STAGE_CALLABLE },
+        { .suffix = "task", .stage = GLSLANG_STAGE_TASK },
+        { .suffix = "mesh", .stage = GLSLANG_STAGE_MESH },
+    };
+
     const char *suffix = strrchr(filename, '.');
     if (!suffix)
         return -1;
+    suffix++;
 
-    const std::string name(suffix + 1);
-    if (name == "vert")
-        return GLSLANG_STAGE_VERTEX;
-    else if (name == "tesc")
-        return GLSLANG_STAGE_TESSCONTROL;
-    else if (name == "tese")
-        return GLSLANG_STAGE_TESSEVALUATION;
-    else if (name == "geom")
-        return GLSLANG_STAGE_GEOMETRY;
-    else if (name == "frag")
-        return GLSLANG_STAGE_FRAGMENT;
-    else if (name == "comp")
-        return GLSLANG_STAGE_COMPUTE;
-    else if (name == "rgen")
-        return GLSLANG_STAGE_RAYGEN;
-    else if (name == "rint")
-        return GLSLANG_STAGE_INTERSECT;
-    else if (name == "rahit")
-        return GLSLANG_STAGE_ANYHIT;
-    else if (name == "rchit")
-        return GLSLANG_STAGE_CLOSESTHIT;
-    else if (name == "rmiss")
-        return GLSLANG_STAGE_MISS;
-    else if (name == "rcall")
-        return GLSLANG_STAGE_CALLABLE;
-    else if (name == "task")
-        return GLSLANG_STAGE_TASK;
-    else if (name == "mesh")
-        return GLSLANG_STAGE_MESH;
-    else
-        return -1;
+    for (uint32_t i = 0; i < ARRAY_SIZE(stages); i++) {
+        if (!strcmp(suffix, stages[i].suffix))
+            return stages[i].stage;
+    }
+
+    return -1;
 }
 
 static bool
