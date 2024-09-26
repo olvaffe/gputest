@@ -58,6 +58,7 @@ ssbo_max_test_init_ssbo(struct ssbo_max_test *test)
     const VkPhysicalDeviceLimits *limits = &vk->props.properties.limits;
 
     test->grid_size = (uint32_t)sqrt((double)(limits->maxStorageBufferRange / sizeof(uint32_t)));
+    test->grid_size &= ~(test->local_size - 1);
 
     VkDeviceSize size = test->grid_size * test->grid_size * sizeof(uint32_t);
     test->ssbo = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
