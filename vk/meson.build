@@ -33,6 +33,7 @@ tests = [
   'tex',
   'tex_depth',
   'tex_ubo',
+  'timeline',
   'timestamp',
   'tri',
   'ubo',

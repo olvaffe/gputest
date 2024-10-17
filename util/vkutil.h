@@ -170,6 +170,10 @@ struct vk_descriptor_set {
     VkDescriptorSet set;
 };
 
+struct vk_semaphore {
+    VkSemaphore sem;
+};
+
 struct vk_event {
     VkEvent event;
 };
@@ -1755,6 +1759,50 @@ static inline void
 vk_destroy_descriptor_set(struct vk *vk, struct vk_descriptor_set *set)
 {
     free(set);
+}
+
+static inline struct vk_semaphore *
+vk_create_semaphore(struct vk *vk, VkSemaphoreType type)
+{
+    struct vk_semaphore *sem = (struct vk_semaphore *)calloc(1, sizeof(*sem));
+    if (!sem)
+        vk_die("failed to alloc semaphore");
+
+    if (type == VK_SEMAPHORE_TYPE_TIMELINE &&
+        !(vk->vulkan_12_features.timelineSemaphore && vk->params.enable_all_features))
+        vk_die("no support for timeline semaphore");
+
+    const VkSemaphoreTypeCreateInfo type_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+        .semaphoreType = type,
+        .initialValue = 0,
+    };
+    const VkSemaphoreCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = &type_info,
+    };
+
+    vk->result = vk->CreateSemaphore(vk->dev, &info, NULL, &sem->sem);
+    vk_check(vk, "failed to create semaphore");
+
+    return sem;
+}
+
+static inline void
+vk_destroy_semaphore(struct vk *vk, struct vk_semaphore *sem)
+{
+    vk->DestroySemaphore(vk->dev, sem->sem, NULL);
+    free(sem);
+}
+
+static inline uint64_t
+vk_get_semaphore_counter_value(struct vk *vk, struct vk_semaphore *sem)
+{
+    uint64_t val;
+    vk->result = vk->GetSemaphoreCounterValue(vk->dev, sem->sem, &val);
+    vk_check(vk, "failed to get semaphore counter value");
+
+    return val;
 }
 
 static inline struct vk_event *
