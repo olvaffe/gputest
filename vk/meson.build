@@ -12,6 +12,7 @@ tests = [
   'depth_resolve',
   'desc_buf',
   'dynamic_rendering',
+  'dynamic_rendering_suspend_resume',
   'external',
   'formats',
   'gs',
