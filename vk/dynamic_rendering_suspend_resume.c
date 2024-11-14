@@ -228,17 +228,40 @@ dynamic_rendering_suspend_resume_test_draw(struct dynamic_rendering_suspend_resu
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
-    dynamic_rendering_suspend_resume_test_draw_triangle_1(test, cmd);
-    vk_end_cmd(vk);
+    VkCommandBuffer cmds[3];
+    const VkCommandBufferAllocateInfo alloc_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = vk->cmd_pool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = ARRAY_SIZE(cmds),
+    };
+    vk->result = vk->AllocateCommandBuffers(vk->dev, &alloc_info, cmds);
+    vk_check(vk, "failed to allocate command buffers");
 
-    cmd = vk_begin_cmd(vk, false);
-    dynamic_rendering_suspend_resume_test_draw_triangle_2(test, cmd);
-    vk_end_cmd(vk);
+    for (uint32_t i = 0; i < ARRAY_SIZE(cmds); i++) {
+        const VkCommandBufferBeginInfo begin_info = {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        };
+        vk->result = vk->BeginCommandBuffer(cmds[i], &begin_info);
+        vk_check(vk, "failed to begin command buffer");
+    }
 
-    cmd = vk_begin_cmd(vk, false);
-    dynamic_rendering_suspend_resume_test_draw_triangle_3(test, cmd);
-    vk_end_cmd(vk);
+    dynamic_rendering_suspend_resume_test_draw_triangle_1(test, cmds[0]);
+    dynamic_rendering_suspend_resume_test_draw_triangle_2(test, cmds[1]);
+    dynamic_rendering_suspend_resume_test_draw_triangle_3(test, cmds[2]);
+
+    for (uint32_t i = 0; i < ARRAY_SIZE(cmds); i++) {
+        vk->result = vk->EndCommandBuffer(cmds[i]);
+        vk_check(vk, "failed to end command buffer");
+    }
+
+    const VkSubmitInfo submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .commandBufferCount = ARRAY_SIZE(cmds),
+        .pCommandBuffers = cmds,
+    };
+    vk->result = vk->QueueSubmit(vk->queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk_check(vk, "failed to submit command buffer");
 
     vk_wait(vk);
 
