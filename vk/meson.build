@@ -16,6 +16,7 @@ tests = [
   'external',
   'formats',
   'gs',
+  'ibo',
   'image',
   'info',
   'ktx',
