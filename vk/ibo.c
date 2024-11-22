@@ -108,13 +108,13 @@ ibo_test_init_ibo(struct ibo_test *test)
     vk->result = vk->CreateBufferView(vk->dev, &view_info, NULL, &test->ibo_view);
     vk_check(vk, "failed to create ibo view");
 
-    const uint32_t step = 53;
-    for (uint32_t i = 0; i < test->point_count; i += 2) {
+    const uint32_t step = 37;
+    for (uint32_t i = 0; i < test->point_count; i++) {
         const uint8_t x = (i * step) % test->width;
         const uint8_t y = ((i * step) / test->width) % test->height;
 
-        uint32_t *elems = test->ibo->mem_ptr;
-        elems[i / 2] = x | (y << 8) | (x + 1) << 16 | (y << 24);
+        uint16_t *elems = test->ibo->mem_ptr;
+        elems[i] = x | (y << 8);
     }
 }
 
@@ -237,7 +237,7 @@ main(void)
         .ibo_format = VK_FORMAT_R32_UINT,
         .width = 256,
         .height = 256,
-        .point_count = 500,
+        .point_count = 60,
     };
 
     ibo_test_init(&test);

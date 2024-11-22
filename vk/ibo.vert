@@ -17,7 +17,7 @@ void main()
 {
     uint raw = imageLoad(ibo, gl_VertexIndex / 2).x;
     uint packed = (gl_VertexIndex % 2 == 0) ? (raw & 0xffff) : (raw >> 16);
-    vec2 xy = vec2((packed & 0xff), packed >> 8) / 255.0 * 2.0 - 1.0;
+    vec2 xy = vec2((packed & 0xff), packed >> 8) / 255.0 * 1.98 - 0.99;
 
     gl_Position = vec4(xy, 0.0, 1.0);
     gl_PointSize = 1.0;
