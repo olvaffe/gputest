@@ -13,6 +13,8 @@ layout(set = 0, binding = 0) buffer SSBO {
 
 void main()
 {
-    uint idx = gl_GlobalInvocationID.y * gl_NumWorkGroups.x * 8 + gl_GlobalInvocationID.x;
-    ssbo.data[idx] = 0x7f7f7f7f;
+    uint wg_idx = gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x;
+    uint off = wg_idx * gl_WorkGroupSize.x * gl_WorkGroupSize.y;
+    off += gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_GlobalInvocationID.x;
+    ssbo.data[off] = 0x7f7f7f7f;
 }
