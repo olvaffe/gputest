@@ -805,8 +805,25 @@ vk_validate_image_info(struct vk *vk, const VkImageCreateInfo *info)
     return features;
 }
 
+static inline uint32_t
+vk_get_image_mt_mask(struct vk *vk, const VkImageCreateInfo *info)
+{
+    vk_validate_image_info(vk, info);
+
+    VkImage img;
+    vk->result = vk->CreateImage(vk->dev, info, NULL, &img);
+    vk_check(vk, "failed to create test image");
+
+    VkMemoryRequirements reqs;
+    vk->GetImageMemoryRequirements(vk->dev, img, &reqs);
+
+    vk->DestroyImage(vk->dev, img, NULL);
+
+    return reqs.memoryTypeBits;
+}
+
 static inline void
-vk_init_image(struct vk *vk, struct vk_image *img)
+vk_init_image(struct vk *vk, struct vk_image *img, uint32_t mt_idx)
 {
     img->features = vk_validate_image_info(vk, &img->info);
 
@@ -816,16 +833,17 @@ vk_init_image(struct vk *vk, struct vk_image *img)
     VkMemoryRequirements reqs;
     vk->GetImageMemoryRequirements(vk->dev, img->img, &reqs);
 
-    uint32_t mt_index;
-    if (reqs.memoryTypeBits & (1u << vk->buf_mt_index)) {
-        mt_index = vk->buf_mt_index;
-        img->mem_mappable = true;
-    } else {
-        mt_index = ffs(reqs.memoryTypeBits) - 1;
-        img->mem_mappable = false;
+    if (mt_idx == VK_MAX_MEMORY_TYPES) {
+        if (reqs.memoryTypeBits & (1u << vk->buf_mt_index))
+            mt_idx = vk->buf_mt_index;
+        else
+            mt_idx = ffs(reqs.memoryTypeBits) - 1;
     }
 
-    img->mem = vk_alloc_memory(vk, reqs.size, mt_index);
+    const VkMemoryType *mt = &vk->mem_props.memoryTypes[mt_idx];
+    img->mem_mappable = mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+
+    img->mem = vk_alloc_memory(vk, reqs.size, mt_idx);
     img->mem_size = reqs.size;
 
     vk->result = vk->BindImageMemory(vk->dev, img->img, img->mem, 0);
@@ -833,16 +851,22 @@ vk_init_image(struct vk *vk, struct vk_image *img)
 }
 
 static inline struct vk_image *
-vk_create_image_from_info(struct vk *vk, const VkImageCreateInfo *info)
+vk_create_image_with_mt(struct vk *vk, const VkImageCreateInfo *info, uint32_t mt_idx)
 {
     struct vk_image *img = (struct vk_image *)calloc(1, sizeof(*img));
     if (!img)
         vk_die("failed to alloc img");
 
     img->info = *info;
-    vk_init_image(vk, img);
+    vk_init_image(vk, img, mt_idx);
 
     return img;
+}
+
+static inline struct vk_image *
+vk_create_image_from_info(struct vk *vk, const VkImageCreateInfo *info)
+{
+    return vk_create_image_with_mt(vk, info, VK_MAX_MEMORY_TYPES);
 }
 
 static inline struct vk_image *
@@ -907,7 +931,7 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
             .initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED,
     };
 
-    vk_init_image(vk, img);
+    vk_init_image(vk, img, VK_MAX_MEMORY_TYPES);
 
     void *ptr;
     vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
