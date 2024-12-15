@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 tests = [
+  'bench_buffer',
   'buf_align',
   'cacheline',
   'clear',
