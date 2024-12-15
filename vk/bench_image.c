@@ -5,6 +5,14 @@
 
 #include "vkutil.h"
 
+static const uint32_t bench_image_test_vs[] = {
+#include "bench_image_test.vert.inc"
+};
+
+static const uint32_t bench_image_test_fs[] = {
+#include "bench_image_test.frag.inc"
+};
+
 static const uint32_t bench_image_test_cs[] = {
 #include "bench_image_test.comp.inc"
 };
@@ -139,16 +147,16 @@ bench_image_test_copy(struct bench_image_test *test, struct vk_image *dst, struc
             .image = dst->img,
             .subresourceRange = subres_range,
         },
-    [1] = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        .image = src->img,
-        .subresourceRange = subres_range,
-    },
-};
+        [1] = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = 0,
+            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .image = src->img,
+            .subresourceRange = subres_range,
+        },
+    };
 
     const VkImageSubresourceLayers subres_layers = {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -288,6 +296,120 @@ bench_image_test_dispatch(struct bench_image_test *test, struct vk_image *img)
     return dur;
 }
 
+static uint64_t
+bench_image_test_render_pass(struct bench_image_test *test,
+                             struct vk_image *dst,
+                             struct vk_image *src)
+{
+    struct vk *vk = &test->vk;
+    struct vk_framebuffer *fb;
+    struct vk_pipeline *pipeline;
+    struct vk_descriptor_set *set;
+
+    {
+        fb = vk_create_framebuffer(vk, dst, NULL, NULL, VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                   VK_ATTACHMENT_STORE_OP_STORE);
+    }
+
+    {
+        pipeline = vk_create_pipeline(vk);
+
+        vk_add_pipeline_shader(vk, pipeline, VK_SHADER_STAGE_VERTEX_BIT, bench_image_test_vs,
+                               sizeof(bench_image_test_vs));
+        vk_add_pipeline_shader(vk, pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, bench_image_test_fs,
+                               sizeof(bench_image_test_fs));
+
+        vk_add_pipeline_set_layout(vk, pipeline, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+                                   VK_SHADER_STAGE_FRAGMENT_BIT, NULL);
+
+        vk_set_pipeline_topology(vk, pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+        vk_set_pipeline_viewport(vk, pipeline, test->width, test->height);
+        vk_set_pipeline_rasterization(vk, pipeline, VK_POLYGON_MODE_FILL);
+        vk_set_pipeline_sample_count(vk, pipeline, VK_SAMPLE_COUNT_1_BIT);
+
+        vk_setup_pipeline(vk, pipeline, fb);
+        vk_compile_pipeline(vk, pipeline);
+    }
+
+    {
+        set = vk_create_descriptor_set(vk, pipeline->set_layouts[0]);
+        vk_write_descriptor_set_image(vk, set, src);
+    }
+
+    const VkImageSubresourceRange subres_range = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .levelCount = 1,
+        .layerCount = 1,
+    };
+    const VkImageMemoryBarrier barriers[2] = {
+        [0] = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = 0,
+            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .image = dst->img,
+            .subresourceRange = subres_range,
+        },
+        [1] = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = 0,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .image = src->img,
+            .subresourceRange = subres_range,
+        },
+    };
+    const VkRenderPassBeginInfo pass_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .renderPass = fb->pass,
+        .framebuffer = fb->fb,
+        .renderArea = {
+            .extent = {
+                .width = test->width,
+                .height = test->height,
+            },
+        },
+    };
+
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
+    vk->CmdPipelineBarrier(
+        cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
+        0, NULL, 0, NULL, ARRAY_SIZE(barriers), barriers);
+    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
+    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, 0,
+                              1, &set->set, 0, NULL);
+    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk->CmdDraw(cmd, 4, 1, 0, 0);
+    vk->CmdEndRenderPass(cmd);
+    vk_end_cmd(vk);
+    vk_wait(vk);
+
+    cmd = vk_begin_cmd(vk, false);
+    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
+    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, 0,
+                              1, &set->set, 0, NULL);
+    vk_write_stopwatch(vk, test->stopwatch, cmd);
+    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    for (uint32_t i = 0; i < test->loop; i++)
+        vk->CmdDraw(cmd, 4, 1, 0, 0);
+    vk->CmdEndRenderPass(cmd);
+    vk_write_stopwatch(vk, test->stopwatch, cmd);
+    vk_end_cmd(vk);
+    vk_wait(vk);
+
+    vk_destroy_pipeline(vk, pipeline);
+    vk_destroy_descriptor_set(vk, set);
+    vk_destroy_framebuffer(vk, fb);
+
+    const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
+    vk_reset_stopwatch(vk, test->stopwatch);
+
+    return dur;
+}
+
 static void
 bench_image_test_init_info(struct bench_image_test *test,
                            VkImageTiling tiling,
@@ -399,6 +521,44 @@ bench_image_test_draw_ssbo(struct bench_image_test *test, VkImageTiling tiling)
 }
 
 static void
+bench_image_test_draw_quad(struct bench_image_test *test, VkImageTiling tiling)
+{
+    struct vk *vk = &test->vk;
+    char desc[64];
+
+    const VkImageUsageFlags dst_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    const VkImageUsageFlags src_usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    VkImageCreateInfo dst_info;
+    VkImageCreateInfo src_info;
+    bench_image_test_init_info(test, tiling, dst_usage, &dst_info);
+    bench_image_test_init_info(test, tiling, src_usage, &src_info);
+
+    const uint32_t dst_mt_mask = vk_get_image_mt_mask(vk, &dst_info);
+    const uint32_t src_mt_mask = vk_get_image_mt_mask(vk, &src_info);
+    const uint32_t mt_mask = dst_mt_mask & src_mt_mask;
+
+    for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
+        if (!(mt_mask & (1 << i)))
+            continue;
+
+        struct vk_image *dst = vk_create_image_with_mt(vk, &dst_info, i);
+        struct vk_image *src = vk_create_image_with_mt(vk, &src_info, i);
+
+        vk_create_image_render_view(vk, dst, VK_IMAGE_ASPECT_COLOR_BIT);
+        vk_create_image_sample_view(vk, src, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT);
+        vk_create_image_sampler(vk, src, VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST);
+
+        const uint64_t dur = bench_image_test_render_pass(test, dst, src);
+
+        vk_destroy_image(vk, dst);
+        vk_destroy_image(vk, src);
+
+        vk_log("%s: DRAW: %d MB/s", bench_image_test_describe_mt(test, tiling, i, desc),
+               bench_image_test_calc_throughput_mb(test, dur));
+    }
+}
+
+static void
 bench_image_test_draw(struct bench_image_test *test)
 {
     bench_image_test_draw_clear(test, VK_IMAGE_TILING_LINEAR);
@@ -409,6 +569,9 @@ bench_image_test_draw(struct bench_image_test *test)
 
     bench_image_test_draw_ssbo(test, VK_IMAGE_TILING_LINEAR);
     bench_image_test_draw_ssbo(test, VK_IMAGE_TILING_OPTIMAL);
+
+    bench_image_test_draw_quad(test, VK_IMAGE_TILING_LINEAR);
+    bench_image_test_draw_quad(test, VK_IMAGE_TILING_OPTIMAL);
 }
 
 int
