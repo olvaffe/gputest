@@ -1094,29 +1094,26 @@ vk_create_image_sampler(struct vk *vk,
         .sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO,
         .conversion = img->ycbcr_conv,
     };
-
-    VkClearColorValue custom_border_color = { 0 };
-    VkBorderColor border_color;
-    if (vk->EXT_custom_border_color) {
-        custom_border_color = (VkClearColorValue){
-            .uint32 = { 10, 0, 0, 0 },
-        };
-        border_color = VK_BORDER_COLOR_INT_CUSTOM_EXT;
-    } else {
-        border_color = VK_BORDER_COLOR_INT_OPAQUE_WHITE;
-    }
     const VkSamplerCustomBorderColorCreateInfoEXT border_info = {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT,
-        .customBorderColor = custom_border_color,
+        .customBorderColor = { .uint32 = { 10, 0, 0, 0 }, },
         .format = img->info.format,
     };
 
-    const VkSamplerAddressMode addr_mode = img->ycbcr_conv != VK_NULL_HANDLE
-                                               ? VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-                                               : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    VkSamplerAddressMode addr_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    VkBorderColor border_color = VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+    void *pnext = NULL;
+    if (img->ycbcr_conv != VK_NULL_HANDLE) {
+        addr_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        pnext = (void *)&conv_info;
+    } else if (vk->EXT_custom_border_color) {
+        border_color = VK_BORDER_COLOR_INT_CUSTOM_EXT;
+        pnext = (void *)&border_info;
+    }
+
     const VkSamplerCreateInfo sampler_info = {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .pNext = img->ycbcr_conv != VK_NULL_HANDLE ? (void *)&conv_info : (void *)&border_info,
+        .pNext = pnext,
         .magFilter = filter,
         .minFilter = filter,
         .mipmapMode = mipmap_mode,
