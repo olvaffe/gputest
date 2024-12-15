@@ -673,11 +673,36 @@ vk_alloc_memory(struct vk *vk, VkDeviceSize size, uint32_t mt_index)
     return mem;
 }
 
+static inline uint32_t
+vk_get_buffer_mt_mask(struct vk *vk,
+                      VkBufferCreateFlags flags,
+                      VkDeviceSize size,
+                      VkBufferUsageFlags usage)
+{
+    const struct VkBufferCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .flags = flags,
+        .size = size,
+        .usage = usage,
+    };
+    VkBuffer buf;
+    vk->result = vk->CreateBuffer(vk->dev, &info, NULL, &buf);
+    vk_check(vk, "failed to create test buffer");
+
+    VkMemoryRequirements reqs;
+    vk->GetBufferMemoryRequirements(vk->dev, buf, &reqs);
+
+    vk->DestroyBuffer(vk->dev, buf, NULL);
+
+    return reqs.memoryTypeBits;
+}
+
 static inline struct vk_buffer *
-vk_create_buffer(struct vk *vk,
-                 VkBufferCreateFlags flags,
-                 VkDeviceSize size,
-                 VkBufferUsageFlags usage)
+vk_create_buffer_with_mt(struct vk *vk,
+                         VkBufferCreateFlags flags,
+                         VkDeviceSize size,
+                         VkBufferUsageFlags usage,
+                         uint32_t mt_idx)
 {
     struct vk_buffer *buf = (struct vk_buffer *)calloc(1, sizeof(*buf));
     if (!buf)
@@ -695,19 +720,31 @@ vk_create_buffer(struct vk *vk,
 
     VkMemoryRequirements reqs;
     vk->GetBufferMemoryRequirements(vk->dev, buf->buf, &reqs);
-    if (!(reqs.memoryTypeBits & (1u << vk->buf_mt_index)))
+    if (!(reqs.memoryTypeBits & (1u << mt_idx)))
         vk_die("failed to meet buf memory reqs: 0x%x", reqs.memoryTypeBits);
 
-    buf->mem = vk_alloc_memory(vk, reqs.size, vk->buf_mt_index);
+    buf->mem = vk_alloc_memory(vk, reqs.size, mt_idx);
     buf->mem_size = reqs.size;
 
-    vk->result = vk->MapMemory(vk->dev, buf->mem, 0, buf->mem_size, 0, &buf->mem_ptr);
-    vk_check(vk, "failed to map buffer memory");
+    const VkMemoryType *mt = &vk->mem_props.memoryTypes[mt_idx];
+    if (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
+        vk->result = vk->MapMemory(vk->dev, buf->mem, 0, buf->mem_size, 0, &buf->mem_ptr);
+        vk_check(vk, "failed to map buffer memory");
+    }
 
     vk->result = vk->BindBufferMemory(vk->dev, buf->buf, buf->mem, 0);
     vk_check(vk, "failed to bind buffer memory");
 
     return buf;
+}
+
+static inline struct vk_buffer *
+vk_create_buffer(struct vk *vk,
+                 VkBufferCreateFlags flags,
+                 VkDeviceSize size,
+                 VkBufferUsageFlags usage)
+{
+    return vk_create_buffer_with_mt(vk, flags, size, usage, vk->buf_mt_index);
 }
 
 static inline void
