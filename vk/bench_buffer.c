@@ -147,7 +147,7 @@ bench_buffer_test_copy_buffer(struct bench_buffer_test *test,
 }
 
 static uint64_t
-bench_buffer_test_dispatch(struct bench_buffer_test *test, VkBuffer buf)
+bench_buffer_test_dispatch(struct bench_buffer_test *test, struct vk_buffer *buf)
 {
     struct vk *vk = &test->vk;
     struct vk_pipeline *pipeline;
@@ -189,7 +189,7 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test, VkBuffer buf)
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                 .pBufferInfo = &(VkDescriptorBufferInfo){
-                    .buffer = buf,
+                    .buffer = buf->buf,
                     .range = test->size,
                 },
             },
@@ -353,38 +353,18 @@ bench_buffer_test_ssbo(struct bench_buffer_test *test)
     struct vk *vk = &test->vk;
     char desc[64];
 
-    const VkBufferCreateInfo test_info = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = test->size,
-        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-    };
-
-    VkBuffer test_buf;
-    vk->result = vk->CreateBuffer(vk->dev, &test_info, NULL, &test_buf);
-    vk_check(vk, "failed to create buffer");
-
-    VkMemoryRequirements test_reqs;
-    vk->GetBufferMemoryRequirements(vk->dev, test_buf, &test_reqs);
-
-    vk->DestroyBuffer(vk->dev, test_buf, NULL);
+    const VkBufferUsageFlags usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    const uint32_t mt_mask = vk_get_buffer_mt_mask(vk, 0, test->size, usage);
 
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
-        if (!(test_reqs.memoryTypeBits & (1 << i)))
+        if (!(mt_mask & (1 << i)))
             continue;
 
-        VkBuffer buf;
-        vk->result = vk->CreateBuffer(vk->dev, &test_info, NULL, &buf);
-        vk_check(vk, "failed to create buffer");
-
-        VkDeviceMemory mem = vk_alloc_memory(vk, test_reqs.size, i);
-
-        vk->result = vk->BindBufferMemory(vk->dev, buf, mem, 0);
-        vk_check(vk, "failed to bind buffer memory");
+        struct vk_buffer *buf = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
 
         const uint64_t dur = bench_buffer_test_dispatch(test, buf);
 
-        vk->FreeMemory(vk->dev, mem, NULL);
-        vk->DestroyBuffer(vk->dev, buf, NULL);
+        vk_destroy_buffer(vk, buf);
 
         vk_log("%s: SSBO: %d MB/s", bench_buffer_test_describe_mt(test, i, desc),
                bench_buffer_test_calc_throughput_mb(test, dur));
