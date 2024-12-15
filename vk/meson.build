@@ -3,6 +3,7 @@
 
 tests = [
   'bench_buffer',
+  'bench_image',
   'buf_align',
   'cacheline',
   'clear',
