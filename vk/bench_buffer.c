@@ -5,6 +5,10 @@
 
 #include "vkutil.h"
 
+static const uint32_t bench_buffer_test_cs[] = {
+#include "bench_buffer_test.comp.inc"
+};
+
 struct bench_buffer_test {
     VkDeviceSize size;
     uint32_t loop;
@@ -132,6 +136,92 @@ bench_buffer_test_copy_buffer(struct bench_buffer_test *test, VkBuffer dst, VkBu
     vk_write_stopwatch(vk, stopwatch, cmd);
     vk_end_cmd(vk);
     vk_wait(vk);
+
+    const uint64_t dur = vk_read_stopwatch(vk, stopwatch, 0);
+    vk_destroy_stopwatch(vk, stopwatch);
+
+    return dur;
+}
+
+static uint64_t
+bench_buffer_test_dispatch(struct bench_buffer_test *test, VkBuffer buf)
+{
+    struct vk *vk = &test->vk;
+    struct vk_pipeline *pipeline;
+    struct vk_descriptor_set *set;
+
+    {
+        pipeline = vk_create_pipeline(vk);
+
+        vk_add_pipeline_shader(vk, pipeline, VK_SHADER_STAGE_COMPUTE_BIT, bench_buffer_test_cs,
+                               sizeof(bench_buffer_test_cs));
+
+        const VkDescriptorSetLayoutBinding bindings[] = {
+            [0] = {
+                .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            },
+        };
+        const VkDescriptorSetLayoutCreateInfo set_layout_info = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = ARRAY_SIZE(bindings),
+            .pBindings = bindings,
+        };
+        vk_add_pipeline_set_layout_from_info(vk, pipeline, &set_layout_info);
+
+        vk_setup_pipeline(vk, pipeline, NULL);
+        vk_compile_pipeline(vk, pipeline);
+    }
+
+    {
+        set = vk_create_descriptor_set(vk, pipeline->set_layouts[0]);
+
+        const VkWriteDescriptorSet write_infos[] = {
+            [0] = {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = set->set,
+                .dstBinding = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .pBufferInfo = &(VkDescriptorBufferInfo){
+                    .buffer = buf,
+                    .range = test->size,
+                },
+            },
+        };
+        vk->UpdateDescriptorSets(vk->dev, ARRAY_SIZE(write_infos), write_infos, 0, NULL);
+    }
+
+    const uint64_t grid_size = (uint64_t)sqrt(test->size / sizeof(uint32_t));
+    assert(grid_size * grid_size * sizeof(uint32_t) == test->size);
+    const uint32_t local_size = 8;
+    const uint32_t group_count = grid_size / local_size;
+
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
+    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
+    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
+                              1, &set->set, 0, NULL);
+    vk->CmdDispatch(cmd, group_count, group_count, 1);
+    vk_end_cmd(vk);
+    vk_wait(vk);
+
+    struct vk_stopwatch *stopwatch = vk_create_stopwatch(vk, 2);
+
+    cmd = vk_begin_cmd(vk, false);
+    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
+    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
+                              1, &set->set, 0, NULL);
+    vk_write_stopwatch(vk, stopwatch, cmd);
+    for (uint32_t i = 0; i < test->loop; i++)
+        vk->CmdDispatch(cmd, group_count, group_count, 1);
+    vk_write_stopwatch(vk, stopwatch, cmd);
+    vk_end_cmd(vk);
+    vk_wait(vk);
+
+    vk_destroy_pipeline(vk, pipeline);
+    vk_destroy_descriptor_set(vk, set);
 
     const uint64_t dur = vk_read_stopwatch(vk, stopwatch, 0);
     vk_destroy_stopwatch(vk, stopwatch);
@@ -290,6 +380,50 @@ bench_buffer_test_xfer(struct bench_buffer_test *test)
 }
 
 static void
+bench_buffer_test_ssbo(struct bench_buffer_test *test)
+{
+    struct vk *vk = &test->vk;
+    char desc[64];
+
+    const VkBufferCreateInfo test_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = test->size,
+        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    };
+
+    VkBuffer test_buf;
+    vk->result = vk->CreateBuffer(vk->dev, &test_info, NULL, &test_buf);
+    vk_check(vk, "failed to create buffer");
+
+    VkMemoryRequirements test_reqs;
+    vk->GetBufferMemoryRequirements(vk->dev, test_buf, &test_reqs);
+
+    vk->DestroyBuffer(vk->dev, test_buf, NULL);
+
+    for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
+        if (!(test_reqs.memoryTypeBits & (1 << i)))
+            continue;
+
+        VkBuffer buf;
+        vk->result = vk->CreateBuffer(vk->dev, &test_info, NULL, &buf);
+        vk_check(vk, "failed to create buffer");
+
+        VkDeviceMemory mem = vk_alloc_memory(vk, test_reqs.size, i);
+
+        vk->result = vk->BindBufferMemory(vk->dev, buf, mem, 0);
+        vk_check(vk, "failed to bind buffer memory");
+
+        const uint64_t dur = bench_buffer_test_dispatch(test, buf);
+
+        vk->FreeMemory(vk->dev, mem, NULL);
+        vk->DestroyBuffer(vk->dev, buf, NULL);
+
+        vk_log("%s: SSBO: %d MB/s", bench_buffer_test_describe_mt(test, i, desc),
+               bench_buffer_test_calc_throughput_mb(test, dur));
+    }
+}
+
+static void
 bench_buffer_test_draw(struct bench_buffer_test *test)
 {
     struct vk *vk = &test->vk;
@@ -300,6 +434,7 @@ bench_buffer_test_draw(struct bench_buffer_test *test)
         bench_buffer_test_mt(test, i);
 
     bench_buffer_test_xfer(test);
+    bench_buffer_test_ssbo(test);
 }
 
 int
