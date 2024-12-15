@@ -755,9 +755,17 @@ vk_destroy_buffer(struct vk *vk, struct vk_buffer *buf)
     free(buf);
 }
 
-static inline void
-vk_validate_image(struct vk *vk, struct vk_image *img)
+static inline VkFormatFeatureFlags
+vk_validate_image_info(struct vk *vk, const VkImageCreateInfo *info)
 {
+    VkFormatProperties2 fmt_props = {
+        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+    };
+    vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, info->format, &fmt_props);
+    const VkFormatFeatureFlags features = info->tiling == VK_IMAGE_TILING_OPTIMAL
+                                              ? fmt_props.formatProperties.optimalTilingFeatures
+                                              : fmt_props.formatProperties.linearTilingFeatures;
+
     const struct {
         VkImageUsageFlagBits usage;
         VkFormatFeatureFlagBits feature;
@@ -771,42 +779,36 @@ vk_validate_image(struct vk *vk, struct vk_image *img)
     };
 
     for (uint32_t i = 0; i < ARRAY_SIZE(pairs); i++) {
-        if ((img->info.usage & pairs[i].usage) && !(img->features & pairs[i].feature))
-            vk_die("image usage 0x%x is not supported", img->info.usage);
+        if ((info->usage & pairs[i].usage) && !(features & pairs[i].feature))
+            vk_die("image usage 0x%x is not supported", info->usage);
     }
 
     VkImageFormatProperties img_props;
-    vk->result = vk->GetPhysicalDeviceImageFormatProperties(
-        vk->physical_dev, img->info.format, img->info.imageType, img->info.tiling,
-        img->info.usage, img->info.flags, &img_props);
+    vk->result = vk->GetPhysicalDeviceImageFormatProperties(vk->physical_dev, info->format,
+                                                            info->imageType, info->tiling,
+                                                            info->usage, info->flags, &img_props);
     vk_check(vk, "image format/type/tiling/usage/flags is not supported");
 
-    if (img->info.extent.width > img_props.maxExtent.width)
-        vk_die("image width %u is not supported", img->info.extent.width);
-    if (img->info.extent.height > img_props.maxExtent.height)
-        vk_die("image height %u is not supported", img->info.extent.height);
-    if (img->info.extent.depth > img_props.maxExtent.depth)
-        vk_die("image depth %u is not supported", img->info.extent.depth);
-    if (img->info.mipLevels > img_props.maxMipLevels)
-        vk_die("image miplevel %u is not supported", img->info.mipLevels);
-    if (img->info.arrayLayers > img_props.maxArrayLayers)
-        vk_die("image array layer %u is not supported", img->info.arrayLayers);
-    if (!(img->info.samples & img_props.sampleCounts))
-        vk_die("image sample count %u is not supported", img->info.samples);
+    if (info->extent.width > img_props.maxExtent.width)
+        vk_die("image width %u is not supported", info->extent.width);
+    if (info->extent.height > img_props.maxExtent.height)
+        vk_die("image height %u is not supported", info->extent.height);
+    if (info->extent.depth > img_props.maxExtent.depth)
+        vk_die("image depth %u is not supported", info->extent.depth);
+    if (info->mipLevels > img_props.maxMipLevels)
+        vk_die("image miplevel %u is not supported", info->mipLevels);
+    if (info->arrayLayers > img_props.maxArrayLayers)
+        vk_die("image array layer %u is not supported", info->arrayLayers);
+    if (!(info->samples & img_props.sampleCounts))
+        vk_die("image sample count %u is not supported", info->samples);
+
+    return features;
 }
 
 static inline void
 vk_init_image(struct vk *vk, struct vk_image *img)
 {
-    VkFormatProperties2 fmt_props = {
-        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
-    };
-    vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, img->info.format, &fmt_props);
-    img->features = img->info.tiling == VK_IMAGE_TILING_OPTIMAL
-                        ? fmt_props.formatProperties.optimalTilingFeatures
-                        : fmt_props.formatProperties.linearTilingFeatures;
-
-    vk_validate_image(vk, img);
+    img->features = vk_validate_image_info(vk, &img->info);
 
     vk->result = vk->CreateImage(vk->dev, &img->info, NULL, &img->img);
     vk_check(vk, "failed to create image");
@@ -2185,14 +2187,7 @@ vk_recreate_swapchain(struct vk *vk,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         };
 
-        VkFormatProperties2 fmt_props = {
-            .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
-        };
-        vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, img->info.format, &fmt_props);
-        img->features = img->info.tiling == VK_IMAGE_TILING_OPTIMAL
-                            ? fmt_props.formatProperties.optimalTilingFeatures
-                            : fmt_props.formatProperties.linearTilingFeatures;
-        vk_validate_image(vk, img);
+        img->features = vk_validate_image_info(vk, &img->info);
 
         img->img = swapchain->img_handles[i];
     }
