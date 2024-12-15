@@ -14,6 +14,7 @@ struct bench_buffer_test {
     uint32_t loop;
 
     struct vk vk;
+    struct vk_stopwatch *stopwatch;
 };
 
 static void
@@ -22,12 +23,16 @@ bench_buffer_test_init(struct bench_buffer_test *test)
     struct vk *vk = &test->vk;
 
     vk_init(vk, NULL);
+
+    test->stopwatch = vk_create_stopwatch(vk, 2);
 }
 
 static void
 bench_buffer_test_cleanup(struct bench_buffer_test *test)
 {
     struct vk *vk = &test->vk;
+
+    vk_destroy_stopwatch(vk, test->stopwatch);
     vk_cleanup(vk);
 }
 
@@ -97,18 +102,16 @@ bench_buffer_test_fill_buffer(struct bench_buffer_test *test, VkBuffer buf)
     vk_end_cmd(vk);
     vk_wait(vk);
 
-    struct vk_stopwatch *stopwatch = vk_create_stopwatch(vk, 2);
-
     cmd = vk_begin_cmd(vk, false);
-    vk_write_stopwatch(vk, stopwatch, cmd);
+    vk_write_stopwatch(vk, test->stopwatch, cmd);
     for (uint32_t i = 0; i < test->loop; i++)
         vk->CmdFillBuffer(cmd, buf, 0, test->size, 0x7f7f7f7f);
-    vk_write_stopwatch(vk, stopwatch, cmd);
+    vk_write_stopwatch(vk, test->stopwatch, cmd);
     vk_end_cmd(vk);
     vk_wait(vk);
 
-    const uint64_t dur = vk_read_stopwatch(vk, stopwatch, 0);
-    vk_destroy_stopwatch(vk, stopwatch);
+    const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
+    vk_reset_stopwatch(vk, test->stopwatch);
 
     return dur;
 }
@@ -127,18 +130,16 @@ bench_buffer_test_copy_buffer(struct bench_buffer_test *test, VkBuffer dst, VkBu
     vk_end_cmd(vk);
     vk_wait(vk);
 
-    struct vk_stopwatch *stopwatch = vk_create_stopwatch(vk, 2);
-
     cmd = vk_begin_cmd(vk, false);
-    vk_write_stopwatch(vk, stopwatch, cmd);
+    vk_write_stopwatch(vk, test->stopwatch, cmd);
     for (uint32_t i = 0; i < test->loop; i++)
         vk->CmdCopyBuffer(cmd, src, dst, 1, &copy);
-    vk_write_stopwatch(vk, stopwatch, cmd);
+    vk_write_stopwatch(vk, test->stopwatch, cmd);
     vk_end_cmd(vk);
     vk_wait(vk);
 
-    const uint64_t dur = vk_read_stopwatch(vk, stopwatch, 0);
-    vk_destroy_stopwatch(vk, stopwatch);
+    const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
+    vk_reset_stopwatch(vk, test->stopwatch);
 
     return dur;
 }
@@ -207,24 +208,22 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test, VkBuffer buf)
     vk_end_cmd(vk);
     vk_wait(vk);
 
-    struct vk_stopwatch *stopwatch = vk_create_stopwatch(vk, 2);
-
     cmd = vk_begin_cmd(vk, false);
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
                               1, &set->set, 0, NULL);
-    vk_write_stopwatch(vk, stopwatch, cmd);
+    vk_write_stopwatch(vk, test->stopwatch, cmd);
     for (uint32_t i = 0; i < test->loop; i++)
         vk->CmdDispatch(cmd, group_count, group_count, 1);
-    vk_write_stopwatch(vk, stopwatch, cmd);
+    vk_write_stopwatch(vk, test->stopwatch, cmd);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     vk_destroy_pipeline(vk, pipeline);
     vk_destroy_descriptor_set(vk, set);
 
-    const uint64_t dur = vk_read_stopwatch(vk, stopwatch, 0);
-    vk_destroy_stopwatch(vk, stopwatch);
+    const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
+    vk_reset_stopwatch(vk, test->stopwatch);
 
     return dur;
 }

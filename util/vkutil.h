@@ -1890,6 +1890,16 @@ vk_destroy_stopwatch(struct vk *vk, struct vk_stopwatch *stopwatch)
 }
 
 static inline void
+vk_reset_stopwatch(struct vk *vk, struct vk_stopwatch *stopwatch)
+{
+    stopwatch->query_count = 0;
+    if (stopwatch->ts) {
+        free(stopwatch->ts);
+        stopwatch->ts = NULL;
+    }
+}
+
+static inline void
 vk_write_stopwatch(struct vk *vk, struct vk_stopwatch *stopwatch, VkCommandBuffer cmd)
 {
     if (stopwatch->query_count >= stopwatch->query_max)
