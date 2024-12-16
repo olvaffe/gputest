@@ -112,7 +112,8 @@ struct vk_image {
 
     VkDeviceMemory mem;
     VkDeviceSize mem_size;
-    bool mem_mappable;
+    void *mem_ptr;
+    bool is_coherent;
 
     VkImageView render_view;
 
@@ -859,11 +860,16 @@ vk_init_image(struct vk *vk, struct vk_image *img, uint32_t mt_idx)
             mt_idx = ffs(reqs.memoryTypeBits) - 1;
     }
 
-    const VkMemoryType *mt = &vk->mem_props.memoryTypes[mt_idx];
-    img->mem_mappable = mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-
     img->mem = vk_alloc_memory(vk, reqs.size, mt_idx);
     img->mem_size = reqs.size;
+
+    const VkMemoryType *mt = &vk->mem_props.memoryTypes[mt_idx];
+    if (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
+        vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &img->mem_ptr);
+        vk_check(vk, "failed to map image memory");
+
+        img->is_coherent = mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    }
 
     vk->result = vk->BindImageMemory(vk->dev, img->img, img->mem, 0);
     vk_check(vk, "failed to bind image memory");
@@ -952,10 +958,6 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
 
     vk_init_image(vk, img, VK_MAX_MEMORY_TYPES);
 
-    void *ptr;
-    vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
-    vk_check(vk, "failed to map image");
-
     struct u_format_conversion conv = {
         .width = width,
         .height = height,
@@ -980,9 +982,9 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
         vk->GetImageSubresourceLayout(vk->dev, img->img, &y_subres, &y_layout);
         vk->GetImageSubresourceLayout(vk->dev, img->img, &uv_subres, &uv_layout);
 
-        conv.dst_plane_ptrs[0] = ptr + y_layout.offset;
+        conv.dst_plane_ptrs[0] = img->mem_ptr + y_layout.offset;
         conv.dst_plane_strides[0] = y_layout.rowPitch;
-        conv.dst_plane_ptrs[1] = ptr + uv_layout.offset;
+        conv.dst_plane_ptrs[1] = img->mem_ptr + uv_layout.offset;
         conv.dst_plane_strides[1] = uv_layout.rowPitch;
     } else {
         const VkImageSubresource subres = {
@@ -991,13 +993,11 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
         VkSubresourceLayout layout;
         vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
 
-        conv.dst_plane_ptrs[0] = ptr + layout.offset;
+        conv.dst_plane_ptrs[0] = img->mem_ptr + layout.offset;
         conv.dst_plane_strides[0] = layout.rowPitch;
     }
 
     u_convert_format(&conv);
-
-    vk->UnmapMemory(vk->dev, img->mem);
 
     return img;
 }
@@ -1163,17 +1163,13 @@ vk_destroy_image(struct vk *vk, struct vk_image *img)
 static inline void
 vk_fill_image(struct vk *vk, struct vk_image *img, uint8_t val)
 {
-    if (!img->mem_mappable)
+    if (!img->mem_ptr)
         vk_die("cannot fill non-mappable image");
 
     if (img->info.tiling != VK_IMAGE_TILING_LINEAR)
         vk_log("filling non-linear image");
 
-    void *ptr;
-    vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
-    vk_check(vk, "failed to map image");
-    memset(ptr, val, img->mem_size);
-    vk->UnmapMemory(vk->dev, img->mem);
+    memset(img->mem_ptr, val, img->mem_size);
 }
 
 static inline void
@@ -1269,7 +1265,7 @@ vk_dump_image(struct vk *vk,
               VkImageAspectFlagBits aspect,
               const char *filename)
 {
-    if (!img->mem_mappable)
+    if (!img->mem_ptr)
         vk_die("cannot dump non-mappable image");
 
     if (img->info.tiling != VK_IMAGE_TILING_LINEAR)
@@ -1284,35 +1280,23 @@ vk_dump_image(struct vk *vk,
     VkSubresourceLayout layout;
     vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
 
-    void *ptr;
-    vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
-    vk_check(vk, "failed to map image memory");
-
-    vk_write_ppm(filename, ptr + layout.offset, img->info.format,
+    vk_write_ppm(filename, img->mem_ptr + layout.offset, img->info.format,
                  img->info.extent.width * img->info.samples, img->info.extent.height,
                  layout.rowPitch);
-
-    vk->UnmapMemory(vk->dev, img->mem);
 }
 
 static inline void
 vk_dump_image_raw(struct vk *vk, struct vk_image *img, const char *filename)
 {
-    if (!img->mem_mappable)
+    if (!img->mem_ptr)
         vk_die("cannot dump non-mappable image");
-
-    void *ptr;
-    vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &ptr);
-    vk_check(vk, "failed to map image memory");
 
     FILE *fp = fopen(filename, "w");
     if (!fp)
         vk_die("failed to open %s", filename);
-    if (fwrite(ptr, 1, img->mem_size, fp) != img->mem_size)
+    if (fwrite(img->mem_ptr, 1, img->mem_size, fp) != img->mem_size)
         vk_die("failed to write raw memory");
     fclose(fp);
-
-    vk->UnmapMemory(vk->dev, img->mem);
 }
 
 static inline void

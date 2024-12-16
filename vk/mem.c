@@ -86,15 +86,8 @@ memory_test_draw(struct memory_test *test)
         if (!dst)
             vk_die("failed to alloc dst");
 
-        if (test->bench_mt == -1 && img->mem_mappable) {
-            void *src;
-            vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &src);
-            vk_check(vk, "failed to map image memory");
-
-            memory_test_timed_memcpy(test, NULL, dst, src, size, "linear image");
-
-            vk->UnmapMemory(vk->dev, img->mem);
-        }
+        if (test->bench_mt == -1 && img->mem_ptr)
+            memory_test_timed_memcpy(test, NULL, dst, img->mem_ptr, size, "linear image");
 
         vk_destroy_image(vk, img);
     }
