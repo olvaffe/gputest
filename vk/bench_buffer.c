@@ -371,7 +371,7 @@ bench_buffer_test_draw_xfer(struct bench_buffer_test *test)
 }
 
 static void
-bench_buffer_test_draw_ssbo(struct bench_buffer_test *test)
+bench_buffer_test_draw_compute(struct bench_buffer_test *test)
 {
     struct vk *vk = &test->vk;
     char desc[64];
@@ -391,7 +391,7 @@ bench_buffer_test_draw_ssbo(struct bench_buffer_test *test)
         vk_destroy_buffer(vk, dst);
         vk_destroy_buffer(vk, src);
 
-        vk_log("%s: SSBO: %d MB/s", bench_buffer_test_describe_mt(test, i, desc),
+        vk_log("%s: compute: %d MB/s", bench_buffer_test_describe_mt(test, i, desc),
                bench_buffer_test_calc_throughput_mb(test, dur));
     }
 }
@@ -407,7 +407,7 @@ bench_buffer_test_draw(struct bench_buffer_test *test)
         bench_buffer_test_draw_mt(test, i);
 
     bench_buffer_test_draw_xfer(test);
-    bench_buffer_test_draw_ssbo(test);
+    bench_buffer_test_draw_compute(test);
 }
 
 int

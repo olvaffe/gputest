@@ -536,7 +536,7 @@ bench_image_test_draw_copy(struct bench_image_test *test, VkImageTiling tiling)
 }
 
 static void
-bench_image_test_draw_ssbo(struct bench_image_test *test, VkImageTiling tiling)
+bench_image_test_draw_compute(struct bench_image_test *test, VkImageTiling tiling)
 {
     struct vk *vk = &test->vk;
     char desc[64];
@@ -561,7 +561,7 @@ bench_image_test_draw_ssbo(struct bench_image_test *test, VkImageTiling tiling)
         vk_destroy_image(vk, dst);
         vk_destroy_image(vk, src);
 
-        vk_log("%s: SSBO: %d MB/s", bench_image_test_describe_mt(test, tiling, i, desc),
+        vk_log("%s: compute: %d MB/s", bench_image_test_describe_mt(test, tiling, i, desc),
                bench_image_test_calc_throughput_mb(test, dur));
     }
 }
@@ -598,7 +598,7 @@ bench_image_test_draw_quad(struct bench_image_test *test, VkImageTiling tiling)
         vk_destroy_image(vk, dst);
         vk_destroy_image(vk, src);
 
-        vk_log("%s: DRAW: %d MB/s", bench_image_test_describe_mt(test, tiling, i, desc),
+        vk_log("%s: quad: %d MB/s", bench_image_test_describe_mt(test, tiling, i, desc),
                bench_image_test_calc_throughput_mb(test, dur));
     }
 }
@@ -612,8 +612,8 @@ bench_image_test_draw(struct bench_image_test *test)
     bench_image_test_draw_copy(test, VK_IMAGE_TILING_LINEAR);
     bench_image_test_draw_copy(test, VK_IMAGE_TILING_OPTIMAL);
 
-    bench_image_test_draw_ssbo(test, VK_IMAGE_TILING_LINEAR);
-    bench_image_test_draw_ssbo(test, VK_IMAGE_TILING_OPTIMAL);
+    bench_image_test_draw_compute(test, VK_IMAGE_TILING_LINEAR);
+    bench_image_test_draw_compute(test, VK_IMAGE_TILING_OPTIMAL);
 
     bench_image_test_draw_quad(test, VK_IMAGE_TILING_LINEAR);
     bench_image_test_draw_quad(test, VK_IMAGE_TILING_OPTIMAL);
