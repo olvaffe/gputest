@@ -208,13 +208,15 @@ bench_image_test_copy(struct bench_image_test *test, struct vk_image *dst, struc
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .layerCount = 1,
     };
-    const VkImageCopy copy = { .srcSubresource = subres_layers,
-                               .dstSubresource = subres_layers,
-                               .extent = {
-                                   .width = test->width,
-                                   .height = test->height,
-                                   .depth = 1,
-                               } };
+    const VkImageCopy copy = {
+        .srcSubresource = subres_layers,
+        .dstSubresource = subres_layers,
+        .extent = {
+            .width = test->width,
+            .height = test->height,
+            .depth = 1,
+        },
+    };
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
     bench_image_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE,
@@ -258,6 +260,81 @@ bench_image_test_copy(struct bench_image_test *test, struct vk_image *dst, struc
             const float(*row)[4] = ptr + stride * y;
             for (uint32_t x = 0; x < test->width; x++) {
                 if (memcmp(row[0], clear_val.float32, sizeof(clear_val.float32)))
+                    vk_die("bad pixel at (%d, %d)", x, y);
+            }
+        }
+    }
+
+    return dur;
+}
+
+static uint64_t
+bench_image_test_copy_buffer(struct bench_image_test *test,
+                             struct vk_image *dst,
+                             struct vk_buffer *src)
+{
+    struct vk *vk = &test->vk;
+
+    const VkClearColorValue clear_val = {
+        .float32 = { 0.5f, 0.5f, 0.5f, 0.5f },
+    };
+    const VkBufferMemoryBarrier src_barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        .buffer = src->buf,
+        .size = src->info.size,
+    };
+
+    const VkImageSubresourceLayers subres_layers = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .layerCount = 1,
+    };
+    const VkBufferImageCopy copy = {
+        .imageSubresource = subres_layers,
+        .imageExtent = {
+            .width = test->width,
+            .height = test->height,
+            .depth = 1,
+        },
+    };
+
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
+    vk->CmdFillBuffer(cmd, src->buf, 0, src->info.size, clear_val.uint32[0]);
+    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                           0, NULL, 1, &src_barrier, 0, NULL);
+    bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE,
+                             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
+    vk->CmdCopyBufferToImage(cmd, src->buf, dst->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                             &copy);
+    vk_end_cmd(vk);
+    vk_wait(vk);
+
+    cmd = vk_begin_cmd(vk, false);
+    vk_write_stopwatch(vk, test->stopwatch, cmd);
+    for (uint32_t i = 0; i < test->loop; i++) {
+        vk->CmdCopyBufferToImage(cmd, src->buf, dst->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                                 &copy);
+    }
+    vk_write_stopwatch(vk, test->stopwatch, cmd);
+    bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_HOST_BIT,
+                             VK_ACCESS_HOST_READ_BIT);
+    vk_end_cmd(vk);
+    vk_wait(vk);
+
+    const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
+    vk_reset_stopwatch(vk, test->stopwatch);
+
+    VkDeviceSize stride;
+    const void *ptr = bench_image_test_get_image_ptr(test, dst, &stride);
+    if (ptr) {
+        for (uint32_t y = 0; y < test->height; y++) {
+            const float(*row)[4] = ptr + stride * y;
+            for (uint32_t x = 0; x < test->width; x++) {
+                if (memcmp(row[0], &clear_val, sizeof(clear_val)))
                     vk_die("bad pixel at (%d, %d)", x, y);
             }
         }
@@ -622,6 +699,40 @@ bench_image_test_draw_copy(struct bench_image_test *test, VkImageTiling tiling)
 }
 
 static void
+bench_image_test_draw_copy_buffer(struct bench_image_test *test, VkImageTiling tiling)
+{
+    struct vk *vk = &test->vk;
+    char desc[64];
+
+    const VkImageUsageFlags dst_usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    VkImageCreateInfo dst_info;
+    bench_image_test_init_info(test, tiling, dst_usage, &dst_info);
+    const uint32_t dst_mask = vk_get_image_mt_mask(vk, &dst_info);
+
+    const VkBufferUsageFlags src_usage =
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    const VkDeviceSize src_size = (VkDeviceSize)test->width * test->height * test->elem_size;
+    const uint32_t src_mask = vk_get_buffer_mt_mask(vk, 0, src_size, src_usage);
+
+    for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
+        if (!((dst_mask & src_mask) & (1 << i)))
+            continue;
+
+        struct vk_image *dst = vk_create_image_with_mt(vk, &dst_info, i);
+        struct vk_buffer *src = vk_create_buffer_with_mt(vk, 0, src_size, src_usage, i);
+
+        const uint64_t dur = bench_image_test_copy_buffer(test, dst, src);
+
+        vk_destroy_image(vk, dst);
+        vk_destroy_buffer(vk, src);
+
+        vk_log("%s: vkCmdCopyBufferToImage: %d MB/s",
+               bench_image_test_describe_mt(test, tiling, i, desc),
+               bench_image_test_calc_throughput_mb(test, dur));
+    }
+}
+
+static void
 bench_image_test_draw_compute(struct bench_image_test *test, VkImageTiling tiling)
 {
     struct vk *vk = &test->vk;
@@ -698,6 +809,9 @@ bench_image_test_draw(struct bench_image_test *test)
 
     bench_image_test_draw_copy(test, VK_IMAGE_TILING_LINEAR);
     bench_image_test_draw_copy(test, VK_IMAGE_TILING_OPTIMAL);
+
+    bench_image_test_draw_copy_buffer(test, VK_IMAGE_TILING_LINEAR);
+    bench_image_test_draw_copy_buffer(test, VK_IMAGE_TILING_OPTIMAL);
 
     bench_image_test_draw_compute(test, VK_IMAGE_TILING_LINEAR);
     bench_image_test_draw_compute(test, VK_IMAGE_TILING_OPTIMAL);
