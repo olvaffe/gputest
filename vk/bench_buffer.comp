@@ -19,7 +19,7 @@ void main()
 {
     const uint wg_size = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
     const uint wg_id = gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x;
-    const uint local_id = gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_GlobalInvocationID.x;
+    const uint local_id = gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_LocalInvocationID.x;
     const uint idx = wg_size * wg_id + local_id;
 
     dst.data[idx] = src.data[idx];
