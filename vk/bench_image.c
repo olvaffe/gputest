@@ -82,6 +82,60 @@ bench_image_test_calc_throughput_mb(struct bench_image_test *test, uint64_t dur)
     return bench_image_test_calc_throughput(test, dur) / 1024 / 1024;
 }
 
+static const void *
+bench_image_test_get_image_ptr(struct bench_image_test *test,
+                               struct vk_image *img,
+                               VkDeviceSize *stride)
+{
+    struct vk *vk = &test->vk;
+
+    if (img->info.tiling != VK_IMAGE_TILING_LINEAR || !img->is_coherent)
+        return NULL;
+
+    const VkImageSubresource subres = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+    };
+    VkSubresourceLayout layout;
+    vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
+
+    *stride = layout.rowPitch;
+    return img->mem_ptr + layout.offset;
+}
+
+static void
+bench_image_test_barrier(struct bench_image_test *test,
+                         VkCommandBuffer cmd,
+                         struct vk_image *img,
+                         VkPipelineStageFlags src_stage,
+                         VkAccessFlags src_access,
+                         VkImageLayout old_layout,
+                         VkImageLayout new_layout,
+                         VkPipelineStageFlags dst_stage,
+                         VkAccessFlags dst_access)
+{
+    struct vk *vk = &test->vk;
+
+    if (src_stage == VK_PIPELINE_STAGE_NONE)
+        src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    if (dst_stage == VK_PIPELINE_STAGE_NONE)
+        dst_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
+    const VkImageMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .srcAccessMask = src_access,
+        .dstAccessMask = dst_access,
+        .oldLayout = old_layout,
+        .newLayout = new_layout,
+        .image = img->img,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount = 1,
+            .layerCount = 1,
+        },
+    };
+    vk->CmdPipelineBarrier(cmd, src_stage, dst_stage, 0, 0, NULL, 0, NULL, 1, &barrier);
+}
+
 static uint64_t
 bench_image_test_clear(struct bench_image_test *test, struct vk_image *img)
 {
@@ -92,22 +146,14 @@ bench_image_test_clear(struct bench_image_test *test, struct vk_image *img)
         .levelCount = 1,
         .layerCount = 1,
     };
-    const VkImageMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        .image = img->img,
-        .subresourceRange = subres_range,
-    };
     const VkClearColorValue clear_val = {
-        .float32 = { 0.5f, 0.5f, 0.5f, 0.5f },
+        .float32 = { 0.3f, 0.4f, 0.5f, 0.6f },
     };
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           0, 0, NULL, 0, NULL, 1, &barrier);
+    bench_image_test_barrier(test, cmd, img, VK_PIPELINE_STAGE_NONE, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_ACCESS_TRANSFER_WRITE_BIT);
     vk->CmdClearColorImage(cmd, img->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_val, 1,
                            &subres_range);
     vk_end_cmd(vk);
@@ -120,11 +166,27 @@ bench_image_test_clear(struct bench_image_test *test, struct vk_image *img)
                                &subres_range);
     }
     vk_write_stopwatch(vk, test->stopwatch, cmd);
+    bench_image_test_barrier(test, cmd, img, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_HOST_BIT,
+                             VK_ACCESS_HOST_READ_BIT);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
     vk_reset_stopwatch(vk, test->stopwatch);
+
+    VkDeviceSize stride;
+    const void *ptr = bench_image_test_get_image_ptr(test, img, &stride);
+    if (ptr) {
+        for (uint32_t y = 0; y < test->height; y++) {
+            const float(*row)[4] = ptr + stride * y;
+            for (uint32_t x = 0; x < test->width; x++) {
+                if (memcmp(row[0], clear_val.float32, sizeof(clear_val.float32)))
+                    vk_die("bad pixel at (%d, %d)", x, y);
+            }
+        }
+    }
 
     return dur;
 }
@@ -134,32 +196,14 @@ bench_image_test_copy(struct bench_image_test *test, struct vk_image *dst, struc
 {
     struct vk *vk = &test->vk;
 
+    const VkClearColorValue clear_val = {
+        .float32 = { 0.3f, 0.4f, 0.5f, 0.6f },
+    };
     const VkImageSubresourceRange subres_range = {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .levelCount = 1,
         .layerCount = 1,
     };
-    const VkImageMemoryBarrier barriers[2] = {
-        [0] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .image = dst->img,
-            .subresourceRange = subres_range,
-        },
-        [1] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            .image = src->img,
-            .subresourceRange = subres_range,
-        },
-    };
-
     const VkImageSubresourceLayers subres_layers = {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .layerCount = 1,
@@ -173,8 +217,18 @@ bench_image_test_copy(struct bench_image_test *test, struct vk_image *dst, struc
                                } };
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           0, 0, NULL, 0, NULL, ARRAY_SIZE(barriers), barriers);
+    bench_image_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE,
+                             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
+    vk->CmdClearColorImage(cmd, src->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_val, 1,
+                           &subres_range);
+    bench_image_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_ACCESS_TRANSFER_READ_BIT);
+    bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE,
+                             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
     vk->CmdCopyImage(cmd, src->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst->img,
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
     vk_end_cmd(vk);
@@ -187,11 +241,27 @@ bench_image_test_copy(struct bench_image_test *test, struct vk_image *dst, struc
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
     }
     vk_write_stopwatch(vk, test->stopwatch, cmd);
+    bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_HOST_BIT,
+                             VK_ACCESS_HOST_READ_BIT);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
     vk_reset_stopwatch(vk, test->stopwatch);
+
+    VkDeviceSize stride;
+    const void *ptr = bench_image_test_get_image_ptr(test, dst, &stride);
+    if (ptr) {
+        for (uint32_t y = 0; y < test->height; y++) {
+            const float(*row)[4] = ptr + stride * y;
+            for (uint32_t x = 0; x < test->width; x++) {
+                if (memcmp(row[0], clear_val.float32, sizeof(clear_val.float32)))
+                    vk_die("bad pixel at (%d, %d)", x, y);
+            }
+        }
+    }
 
     return dur;
 }
@@ -266,30 +336,13 @@ bench_image_test_dispatch(struct bench_image_test *test,
         vk->UpdateDescriptorSets(vk->dev, ARRAY_SIZE(write_infos), write_infos, 0, NULL);
     }
 
+    const VkClearColorValue clear_val = {
+        .float32 = { 0.3f, 0.4f, 0.5f, 0.6f },
+    };
     const VkImageSubresourceRange subres_range = {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .levelCount = 1,
         .layerCount = 1,
-    };
-    const VkImageMemoryBarrier barriers[2] = {
-        [0] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-            .image = dst->img,
-            .subresourceRange = subres_range,
-        },
-        [1] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-            .image = src->img,
-            .subresourceRange = subres_range,
-        },
     };
 
     assert((test->width | test->height) % test->cs_local_size == 0);
@@ -297,9 +350,18 @@ bench_image_test_dispatch(struct bench_image_test *test,
     const uint32_t group_count_y = test->height / test->cs_local_size;
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL,
-                           ARRAY_SIZE(barriers), barriers);
+    bench_image_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE,
+                             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
+    vk->CmdClearColorImage(cmd, src->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_val, 1,
+                           &subres_range);
+    bench_image_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_ACCESS_SHADER_READ_BIT);
+    bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE,
+                             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT);
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
                               1, &set->set, 0, NULL);
@@ -315,6 +377,10 @@ bench_image_test_dispatch(struct bench_image_test *test,
     for (uint32_t i = 0; i < test->loop; i++)
         vk->CmdDispatch(cmd, group_count_x, group_count_y, 1);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
+    bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL,
+                             VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_HOST_BIT,
+                             VK_ACCESS_HOST_READ_BIT);
     vk_end_cmd(vk);
     vk_wait(vk);
 
@@ -323,6 +389,18 @@ bench_image_test_dispatch(struct bench_image_test *test,
 
     const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
     vk_reset_stopwatch(vk, test->stopwatch);
+
+    VkDeviceSize stride;
+    const void *ptr = bench_image_test_get_image_ptr(test, dst, &stride);
+    if (ptr) {
+        for (uint32_t y = 0; y < test->height; y++) {
+            const float(*row)[4] = ptr + stride * y;
+            for (uint32_t x = 0; x < test->width; x++) {
+                if (memcmp(row[0], clear_val.float32, sizeof(clear_val.float32)))
+                    vk_die("bad pixel at (%d, %d)", x, y);
+            }
+        }
+    }
 
     return dur;
 }
@@ -379,30 +457,13 @@ bench_image_test_render_pass(struct bench_image_test *test,
         vk->UpdateDescriptorSets(vk->dev, 1, &write_info, 0, NULL);
     }
 
+    const VkClearColorValue clear_val = {
+        .float32 = { 0.3f, 0.4f, 0.5f, 0.6f },
+    };
     const VkImageSubresourceRange subres_range = {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .levelCount = 1,
         .layerCount = 1,
-    };
-    const VkImageMemoryBarrier barriers[2] = {
-        [0] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .image = dst->img,
-            .subresourceRange = subres_range,
-        },
-        [1] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .image = src->img,
-            .subresourceRange = subres_range,
-        },
     };
     const VkRenderPassBeginInfo pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -417,10 +478,19 @@ bench_image_test_render_pass(struct bench_image_test *test,
     };
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
-    vk->CmdPipelineBarrier(
-        cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
-        0, NULL, 0, NULL, ARRAY_SIZE(barriers), barriers);
+    bench_image_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE,
+                             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
+    vk->CmdClearColorImage(cmd, src->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_val, 1,
+                           &subres_range);
+    bench_image_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT);
+    bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE,
+                             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, 0,
                               1, &set->set, 0, NULL);
@@ -440,6 +510,10 @@ bench_image_test_render_pass(struct bench_image_test *test,
         vk->CmdDraw(cmd, 4, 1, 0, 0);
     vk->CmdEndRenderPass(cmd);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
+    bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+                             VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_READ_BIT);
     vk_end_cmd(vk);
     vk_wait(vk);
 
@@ -449,6 +523,18 @@ bench_image_test_render_pass(struct bench_image_test *test,
 
     const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
     vk_reset_stopwatch(vk, test->stopwatch);
+
+    VkDeviceSize stride;
+    const void *ptr = bench_image_test_get_image_ptr(test, dst, &stride);
+    if (ptr) {
+        for (uint32_t y = 0; y < test->height; y++) {
+            const float(*row)[4] = ptr + stride * y;
+            for (uint32_t x = 0; x < test->width; x++) {
+                if (memcmp(row[0], clear_val.float32, sizeof(clear_val.float32)))
+                    vk_die("bad pixel at (%d, %d)", x, y);
+            }
+        }
+    }
 
     return dur;
 }
@@ -541,7 +627,7 @@ bench_image_test_draw_compute(struct bench_image_test *test, VkImageTiling tilin
     struct vk *vk = &test->vk;
     char desc[64];
 
-    const VkImageUsageFlags usage = VK_IMAGE_USAGE_STORAGE_BIT;
+    const VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
     VkImageCreateInfo info;
     bench_image_test_init_info(test, tiling, usage, &info);
 
@@ -573,7 +659,8 @@ bench_image_test_draw_quad(struct bench_image_test *test, VkImageTiling tiling)
     char desc[64];
 
     const VkImageUsageFlags dst_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    const VkImageUsageFlags src_usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    const VkImageUsageFlags src_usage =
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     VkImageCreateInfo dst_info;
     VkImageCreateInfo src_info;
     bench_image_test_init_info(test, tiling, dst_usage, &dst_info);
