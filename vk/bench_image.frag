@@ -5,12 +5,14 @@
 
 #version 460 core
 
-layout(binding = 0) uniform sampler2D tex;
+#extension GL_EXT_samplerless_texture_functions : enable
 
-layout(location = 0) in vec2 in_texcoord;
+layout(set = 0, binding = 0) uniform texture2D tex;
+
 layout(location = 0) out vec4 out_color;
 
 void main()
 {
-    out_color = texture(tex, in_texcoord);
+    const ivec2 coord = ivec2(gl_FragCoord);
+    out_color = texelFetch(tex, coord, 0);
 }

@@ -350,7 +350,7 @@ bench_image_test_render_pass(struct bench_image_test *test,
         vk_add_pipeline_shader(vk, pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, bench_image_test_fs,
                                sizeof(bench_image_test_fs));
 
-        vk_add_pipeline_set_layout(vk, pipeline, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
+        vk_add_pipeline_set_layout(vk, pipeline, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1,
                                    VK_SHADER_STAGE_FRAGMENT_BIT, NULL);
 
         vk_set_pipeline_topology(vk, pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
@@ -364,7 +364,19 @@ bench_image_test_render_pass(struct bench_image_test *test,
 
     {
         set = vk_create_descriptor_set(vk, pipeline->set_layouts[0]);
-        vk_write_descriptor_set_image(vk, set, src);
+        const VkWriteDescriptorSet write_info = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = set->set,
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .pImageInfo =
+                &(VkDescriptorImageInfo){
+                    .imageView = src->sample_view,
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                },
+        };
+        vk->UpdateDescriptorSets(vk->dev, 1, &write_info, 0, NULL);
     }
 
     const VkImageSubresourceRange subres_range = {
@@ -580,7 +592,6 @@ bench_image_test_draw_quad(struct bench_image_test *test, VkImageTiling tiling)
 
         vk_create_image_render_view(vk, dst, VK_IMAGE_ASPECT_COLOR_BIT);
         vk_create_image_sample_view(vk, src, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT);
-        vk_create_image_sampler(vk, src, VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST);
 
         const uint64_t dur = bench_image_test_render_pass(test, dst, src);
 

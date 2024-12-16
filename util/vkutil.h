@@ -571,15 +571,31 @@ vk_init_desc_pool(struct vk *vk)
     const VkDescriptorPoolSize pool_sizes[] = {
         [0] = {
             .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 256,
+            .descriptorCount = 32,
         },
         [1] = {
-            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 256,
+            .type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .descriptorCount = 32,
         },
         [2] = {
+            .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptorCount = 32,
+        },
+        [3] = {
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,
+            .descriptorCount = 32,
+        },
+        [4] = {
+            .type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
+            .descriptorCount = 32,
+        },
+        [5] = {
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 32,
+        },
+        [6] = {
             .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .descriptorCount = 256,
+            .descriptorCount = 32,
         },
     };
     const VkDescriptorPoolCreateInfo pool_info = {
