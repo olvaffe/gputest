@@ -82,6 +82,7 @@ bench_buffer_test_memset(struct bench_buffer_test *test, void *buf)
 static uint64_t
 bench_buffer_test_memcpy(struct bench_buffer_test *test, void *dst, void *src)
 {
+    memset(src, 0x7f, test->size);
     memcpy(dst, src, test->size);
 
     const uint64_t begin = u_now();
