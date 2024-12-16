@@ -19,6 +19,7 @@ static const uint32_t bench_image_test_cs[] = {
 
 struct bench_image_test {
     VkFormat format;
+    uint32_t elem_size;
     uint32_t width;
     uint32_t height;
     uint32_t loop;
@@ -71,9 +72,8 @@ static uint64_t
 bench_image_test_calc_throughput(struct bench_image_test *test, uint64_t dur)
 {
     const uint64_t ns_per_s = 1000000000;
-    const VkDeviceSize cpp = 4;
 
-    return cpp * test->width * test->height * test->loop * ns_per_s / dur;
+    return test->elem_size * test->width * test->height * test->loop * ns_per_s / dur;
 }
 
 static uint32_t
@@ -612,7 +612,8 @@ int
 main(int argc, char **argv)
 {
     struct bench_image_test test = {
-        .format = VK_FORMAT_R8G8B8A8_UNORM,
+        .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+        .elem_size = sizeof(float[4]),
         .width = 1920,
         .height = 1080,
         .loop = 32,
