@@ -151,7 +151,9 @@ bench_buffer_test_copy_buffer(struct bench_buffer_test *test,
 }
 
 static uint64_t
-bench_buffer_test_dispatch(struct bench_buffer_test *test, struct vk_buffer *buf)
+bench_buffer_test_dispatch(struct bench_buffer_test *test,
+                           struct vk_buffer *dst,
+                           struct vk_buffer *src)
 {
     struct vk *vk = &test->vk;
     struct vk_pipeline *pipeline;
@@ -166,6 +168,12 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test, struct vk_buffer *buf
         const VkDescriptorSetLayoutBinding bindings[] = {
             [0] = {
                 .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .descriptorCount = 1,
+                .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            },
+            [1] = {
+                .binding = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                 .descriptorCount = 1,
                 .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
@@ -193,7 +201,18 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test, struct vk_buffer *buf
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                 .pBufferInfo = &(VkDescriptorBufferInfo){
-                    .buffer = buf->buf,
+                    .buffer = dst->buf,
+                    .range = test->size,
+                },
+            },
+            [1] = {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = set->set,
+                .dstBinding = 1,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .pBufferInfo = &(VkDescriptorBufferInfo){
+                    .buffer = src->buf,
                     .range = test->size,
                 },
             },
@@ -235,7 +254,7 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test, struct vk_buffer *buf
 }
 
 static void
-bench_buffer_test_malloc(struct bench_buffer_test *test)
+bench_buffer_test_draw_malloc(struct bench_buffer_test *test)
 {
     {
         void *mem = malloc(test->size);
@@ -265,7 +284,7 @@ bench_buffer_test_malloc(struct bench_buffer_test *test)
 }
 
 static void
-bench_buffer_test_mt(struct bench_buffer_test *test, uint32_t mt_idx)
+bench_buffer_test_draw_mt(struct bench_buffer_test *test, uint32_t mt_idx)
 {
     struct vk *vk = &test->vk;
 
@@ -311,7 +330,7 @@ bench_buffer_test_mt(struct bench_buffer_test *test, uint32_t mt_idx)
 }
 
 static void
-bench_buffer_test_xfer(struct bench_buffer_test *test)
+bench_buffer_test_draw_xfer(struct bench_buffer_test *test)
 {
     struct vk *vk = &test->vk;
     char desc[64];
@@ -352,7 +371,7 @@ bench_buffer_test_xfer(struct bench_buffer_test *test)
 }
 
 static void
-bench_buffer_test_ssbo(struct bench_buffer_test *test)
+bench_buffer_test_draw_ssbo(struct bench_buffer_test *test)
 {
     struct vk *vk = &test->vk;
     char desc[64];
@@ -364,11 +383,13 @@ bench_buffer_test_ssbo(struct bench_buffer_test *test)
         if (!(mt_mask & (1 << i)))
             continue;
 
-        struct vk_buffer *buf = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
+        struct vk_buffer *dst = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
+        struct vk_buffer *src = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
 
-        const uint64_t dur = bench_buffer_test_dispatch(test, buf);
+        const uint64_t dur = bench_buffer_test_dispatch(test, dst, src);
 
-        vk_destroy_buffer(vk, buf);
+        vk_destroy_buffer(vk, dst);
+        vk_destroy_buffer(vk, src);
 
         vk_log("%s: SSBO: %d MB/s", bench_buffer_test_describe_mt(test, i, desc),
                bench_buffer_test_calc_throughput_mb(test, dur));
@@ -380,13 +401,13 @@ bench_buffer_test_draw(struct bench_buffer_test *test)
 {
     struct vk *vk = &test->vk;
 
-    bench_buffer_test_malloc(test);
+    bench_buffer_test_draw_malloc(test);
 
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++)
-        bench_buffer_test_mt(test, i);
+        bench_buffer_test_draw_mt(test, i);
 
-    bench_buffer_test_xfer(test);
-    bench_buffer_test_ssbo(test);
+    bench_buffer_test_draw_xfer(test);
+    bench_buffer_test_draw_ssbo(test);
 }
 
 int
