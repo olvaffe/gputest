@@ -8,13 +8,13 @@
 layout(local_size_x = 8, local_size_y = 8) in;
 
 layout(set = 0, binding = 0) buffer SSBO {
-    uint data[];
+    uvec4 data[];
 } ssbo;
 
 void main()
 {
-    uint wg_idx = gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x;
-    uint off = wg_idx * gl_WorkGroupSize.x * gl_WorkGroupSize.y;
-    off += gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_GlobalInvocationID.x;
-    ssbo.data[off] = 0x7f7f7f7f;
+    const uint wg_size = gl_WorkGroupSize.x * gl_WorkGroupSize.y;
+    const uint wg_id = gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x;
+    const uint local_id = gl_LocalInvocationID.y * gl_WorkGroupSize.x + gl_GlobalInvocationID.x;
+    ssbo.data[wg_size * wg_id + local_id] = uvec4(0x7f7f7f7f);
 }

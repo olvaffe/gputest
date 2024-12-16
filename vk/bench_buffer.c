@@ -13,6 +13,9 @@ struct bench_buffer_test {
     VkDeviceSize size;
     uint32_t loop;
 
+    uint32_t cs_local_size;
+    uint32_t cs_elem_size;
+
     struct vk vk;
     struct vk_stopwatch *stopwatch;
 };
@@ -198,10 +201,10 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test, struct vk_buffer *buf
         vk->UpdateDescriptorSets(vk->dev, ARRAY_SIZE(write_infos), write_infos, 0, NULL);
     }
 
-    const uint64_t grid_size = (uint64_t)sqrt(test->size / sizeof(uint32_t));
-    assert(grid_size * grid_size * sizeof(uint32_t) == test->size);
-    const uint32_t local_size = 8;
-    const uint32_t group_count = grid_size / local_size;
+    const uint64_t grid_size = (uint64_t)sqrt(test->size / test->cs_elem_size);
+    const uint32_t group_count = grid_size / test->cs_local_size;
+    assert(grid_size * grid_size * test->cs_elem_size == test->size);
+    assert(group_count * test->cs_local_size == grid_size);
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
@@ -392,6 +395,9 @@ main(int argc, char **argv)
     struct bench_buffer_test test = {
         .size = 64 * 1024 * 1024,
         .loop = 32,
+
+        .cs_local_size = 8,
+        .cs_elem_size = sizeof(uint32_t[4]),
     };
 
     bench_buffer_test_init(&test);
