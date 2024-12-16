@@ -10,11 +10,11 @@ static const uint32_t bench_buffer_test_cs[] = {
 };
 
 struct bench_buffer_test {
+    uint32_t elem_size;
     VkDeviceSize size;
     uint32_t loop;
 
     uint32_t cs_local_size;
-    uint32_t cs_elem_size;
 
     struct vk vk;
     struct vk_stopwatch *stopwatch;
@@ -96,26 +96,57 @@ bench_buffer_test_memcpy(struct bench_buffer_test *test, void *dst, void *src)
     return end - begin;
 }
 
+static void
+bench_buffer_test_barrier(struct bench_buffer_test *test,
+                          VkCommandBuffer cmd,
+                          struct vk_buffer *buf,
+                          VkPipelineStageFlags src_stage,
+                          VkAccessFlags src_access,
+                          VkPipelineStageFlags dst_stage,
+                          VkAccessFlags dst_access)
+{
+    struct vk *vk = &test->vk;
+    const VkBufferMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .srcAccessMask = src_access,
+        .dstAccessMask = dst_access,
+        .buffer = buf->buf,
+        .size = test->size,
+    };
+    vk->CmdPipelineBarrier(cmd, src_stage, dst_stage, 0, 0, NULL, 1, &barrier, 0, NULL);
+}
+
 static uint64_t
-bench_buffer_test_fill_buffer(struct bench_buffer_test *test, struct vk_buffer *buf)
+bench_buffer_test_fill_buffer(struct bench_buffer_test *test, struct vk_buffer *buf, uint32_t val)
 {
     struct vk *vk = &test->vk;
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
-    vk->CmdFillBuffer(cmd, buf->buf, 0, test->size, 0x7f7f7f7f);
+    vk->CmdFillBuffer(cmd, buf->buf, 0, test->size, val);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     cmd = vk_begin_cmd(vk, false);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     for (uint32_t i = 0; i < test->loop; i++)
-        vk->CmdFillBuffer(cmd, buf->buf, 0, test->size, 0x7f7f7f7f);
+        vk->CmdFillBuffer(cmd, buf->buf, 0, test->size, val);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
+    bench_buffer_test_barrier(test, cmd, buf, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                              VK_ACCESS_HOST_READ_BIT);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
     vk_reset_stopwatch(vk, test->stopwatch);
+
+    if (buf->is_coherent) {
+        uint32_t(*ptr)[4] = buf->mem_ptr;
+        for (uint32_t i = 0; i < test->size / test->elem_size; i++) {
+            if (ptr[i][0] != val || ptr[i][1] != val || ptr[i][2] != val || ptr[i][3] != val)
+                vk_die("bad element %d", i);
+        }
+    }
 
     return dur;
 }
@@ -123,7 +154,8 @@ bench_buffer_test_fill_buffer(struct bench_buffer_test *test, struct vk_buffer *
 static uint64_t
 bench_buffer_test_copy_buffer(struct bench_buffer_test *test,
                               struct vk_buffer *dst,
-                              struct vk_buffer *src)
+                              struct vk_buffer *src,
+                              uint32_t val)
 {
     struct vk *vk = &test->vk;
 
@@ -132,6 +164,10 @@ bench_buffer_test_copy_buffer(struct bench_buffer_test *test,
     };
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
+    vk->CmdFillBuffer(cmd, src->buf, 0, test->size, val);
+    bench_buffer_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_ACCESS_TRANSFER_READ_BIT);
     vk->CmdCopyBuffer(cmd, src->buf, dst->buf, 1, &copy);
     vk_end_cmd(vk);
     vk_wait(vk);
@@ -141,11 +177,22 @@ bench_buffer_test_copy_buffer(struct bench_buffer_test *test,
     for (uint32_t i = 0; i < test->loop; i++)
         vk->CmdCopyBuffer(cmd, src->buf, dst->buf, 1, &copy);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
+    bench_buffer_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                              VK_ACCESS_HOST_READ_BIT);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
     vk_reset_stopwatch(vk, test->stopwatch);
+
+    if (dst->is_coherent) {
+        uint32_t(*ptr)[4] = dst->mem_ptr;
+        for (uint32_t i = 0; i < test->size / test->elem_size; i++) {
+            if (ptr[i][0] != val || ptr[i][1] != val || ptr[i][2] != val || ptr[i][3] != val)
+                vk_die("bad element %d", i);
+        }
+    }
 
     return dur;
 }
@@ -153,7 +200,8 @@ bench_buffer_test_copy_buffer(struct bench_buffer_test *test,
 static uint64_t
 bench_buffer_test_dispatch(struct bench_buffer_test *test,
                            struct vk_buffer *dst,
-                           struct vk_buffer *src)
+                           struct vk_buffer *src,
+                           uint32_t val)
 {
     struct vk *vk = &test->vk;
     struct vk_pipeline *pipeline;
@@ -220,12 +268,16 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test,
         vk->UpdateDescriptorSets(vk->dev, ARRAY_SIZE(write_infos), write_infos, 0, NULL);
     }
 
-    const uint64_t grid_size = (uint64_t)sqrt(test->size / test->cs_elem_size);
+    const uint64_t grid_size = (uint64_t)sqrt(test->size / test->elem_size);
     const uint32_t group_count = grid_size / test->cs_local_size;
-    assert(grid_size * grid_size * test->cs_elem_size == test->size);
+    assert(grid_size * grid_size * test->elem_size == test->size);
     assert(group_count * test->cs_local_size == grid_size);
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
+    vk->CmdFillBuffer(cmd, src->buf, 0, test->size, val);
+    bench_buffer_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                              VK_ACCESS_SHADER_READ_BIT);
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
                               1, &set->set, 0, NULL);
@@ -241,6 +293,9 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test,
     for (uint32_t i = 0; i < test->loop; i++)
         vk->CmdDispatch(cmd, group_count, group_count, 1);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
+    bench_buffer_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                              VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                              VK_ACCESS_HOST_READ_BIT);
     vk_end_cmd(vk);
     vk_wait(vk);
 
@@ -249,6 +304,14 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test,
 
     const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
     vk_reset_stopwatch(vk, test->stopwatch);
+
+    if (dst->is_coherent) {
+        uint32_t(*ptr)[4] = dst->mem_ptr;
+        for (uint32_t i = 0; i < test->size / test->elem_size; i++) {
+            if (ptr[i][0] != val || ptr[i][1] != val || ptr[i][2] != val || ptr[i][3] != val)
+                vk_die("bad element %d", i);
+        }
+    }
 
     return dur;
 }
@@ -345,7 +408,7 @@ bench_buffer_test_draw_xfer(struct bench_buffer_test *test)
 
         struct vk_buffer *buf = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
 
-        const uint64_t dur = bench_buffer_test_fill_buffer(test, buf);
+        const uint64_t dur = bench_buffer_test_fill_buffer(test, buf, 0x7f7f7f7f);
 
         vk_destroy_buffer(vk, buf);
 
@@ -360,7 +423,7 @@ bench_buffer_test_draw_xfer(struct bench_buffer_test *test)
         struct vk_buffer *dst = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
         struct vk_buffer *src = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
 
-        const uint64_t dur = bench_buffer_test_copy_buffer(test, dst, src);
+        const uint64_t dur = bench_buffer_test_copy_buffer(test, dst, src, 0x7f7f7f7f);
 
         vk_destroy_buffer(vk, dst);
         vk_destroy_buffer(vk, src);
@@ -376,7 +439,8 @@ bench_buffer_test_draw_compute(struct bench_buffer_test *test)
     struct vk *vk = &test->vk;
     char desc[64];
 
-    const VkBufferUsageFlags usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    const VkBufferUsageFlags usage =
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     const uint32_t mt_mask = vk_get_buffer_mt_mask(vk, 0, test->size, usage);
 
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
@@ -386,7 +450,7 @@ bench_buffer_test_draw_compute(struct bench_buffer_test *test)
         struct vk_buffer *dst = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
         struct vk_buffer *src = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
 
-        const uint64_t dur = bench_buffer_test_dispatch(test, dst, src);
+        const uint64_t dur = bench_buffer_test_dispatch(test, dst, src, 0x7f7f7f7f);
 
         vk_destroy_buffer(vk, dst);
         vk_destroy_buffer(vk, src);
@@ -414,11 +478,11 @@ int
 main(int argc, char **argv)
 {
     struct bench_buffer_test test = {
+        .elem_size = sizeof(uint32_t[4]),
         .size = 64 * 1024 * 1024,
         .loop = 32,
 
         .cs_local_size = 8,
-        .cs_elem_size = sizeof(uint32_t[4]),
     };
 
     bench_buffer_test_init(&test);

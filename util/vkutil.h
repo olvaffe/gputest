@@ -102,6 +102,7 @@ struct vk_buffer {
     VkDeviceMemory mem;
     VkDeviceSize mem_size;
     void *mem_ptr;
+    bool is_coherent;
 };
 
 struct vk_image {
@@ -746,6 +747,8 @@ vk_create_buffer_with_mt(struct vk *vk,
     if (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
         vk->result = vk->MapMemory(vk->dev, buf->mem, 0, buf->mem_size, 0, &buf->mem_ptr);
         vk_check(vk, "failed to map buffer memory");
+
+        buf->is_coherent = mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     }
 
     vk->result = vk->BindBufferMemory(vk->dev, buf->buf, buf->mem, 0);
