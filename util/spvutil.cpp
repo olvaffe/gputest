@@ -353,7 +353,12 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
         spv_die("failed to create invocation: %s", diag_log.c_str());
 
     c.getDiagnosticOpts().ShowCarets = false;
+#if LLVM_VERSION_MAJOR >= 20
+    c.createDiagnostics(*llvm::vfs::getRealFileSystem(),
+                        new clang::TextDiagnosticPrinter{ diag_stream, &c.getDiagnosticOpts() });
+#else
     c.createDiagnostics(new clang::TextDiagnosticPrinter{ diag_stream, &c.getDiagnosticOpts() });
+#endif
 
     c.getFrontendOpts().ProgramAction = clang::frontend::EmitLLVMOnly;
 
@@ -365,8 +370,12 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
         char *lib_path = realpath(lib_info.dli_fname, NULL);
         if (!lib_path)
             spv_die("failed to get real path of %s", lib_info.dli_fname);
+#if LLVM_VERSION_MAJOR >= 20
+        std::string res_path = clang::driver::Driver::GetResourcesPath(lib_path);
+#else
         std::string res_path =
             clang::driver::Driver::GetResourcesPath(lib_path, CLANG_RESOURCE_DIR);
+#endif
         free(lib_path);
 
         c.getHeaderSearchOpts().AddPath(res_path + "/include", clang::frontend::Angled, false,
