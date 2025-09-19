@@ -265,7 +265,7 @@ PFN_DEVICE(AcquireNextImageKHR)
 PFN_DEVICE(QueuePresentKHR)
 PFN_DEVICE(GetDeviceGroupPresentCapabilitiesKHR)
 PFN_DEVICE(GetDeviceGroupSurfacePresentModesKHR)
-PFN_DEVICE(GetPhysicalDevicePresentRectanglesKHR)
+PFN_INSTANCE(GetPhysicalDevicePresentRectanglesKHR)
 PFN_DEVICE(AcquireNextImage2KHR)
 
 /* VK_KHR_external_memory_fd */
