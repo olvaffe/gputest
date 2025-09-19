@@ -137,6 +137,7 @@ dma_heap_test_init(struct dma_heap_test *test)
     const char *const dev_exts[] = {
         VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
         VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME,
+        VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME,
     };
     const struct vk_init_params params = {
         .api_version = VK_API_VERSION_1_3,
@@ -169,19 +170,34 @@ dma_heap_test_draw(struct dma_heap_test *test)
 {
     struct vk *vk = &test->vk;
 
-    const VkBufferMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
-        .buffer = test->buf,
-        .size = VK_WHOLE_SIZE,
+    const VkBufferMemoryBarrier barriers[] = {
+        [0] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_NONE,
+            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT,
+            .dstQueueFamilyIndex = vk->queue_family_index,
+            .buffer = test->buf,
+            .size = VK_WHOLE_SIZE,
+        },
+        [1] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_NONE,
+            .srcQueueFamilyIndex = vk->queue_family_index,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT,
+            .buffer = test->buf,
+            .size = VK_WHOLE_SIZE,
+        },
     };
 
     for (uint32_t val = 0; val < 10; val++) {
         VkCommandBuffer cmd = vk_begin_cmd(vk, false);
+        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_NONE, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                               NULL, 1, &barriers[0], 0, NULL);
         vk->CmdFillBuffer(cmd, test->buf, 0, VK_WHOLE_SIZE, val);
-        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0,
-                               0, NULL, 1, &barrier, 0, NULL);
+        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_NONE, 0, 0,
+                               NULL, 1, &barriers[1], 0, NULL);
         vk_end_cmd(vk);
         vk_wait(vk);
 
