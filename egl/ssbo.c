@@ -11,6 +11,7 @@ static const char ssbo_test_cs[] = {
 
 struct ssbo_test {
     uint32_t local_size;
+    GLbitfield ssbo_flags;
 
     struct egl egl;
     GLuint ssbo;
@@ -38,7 +39,7 @@ ssbo_test_init_ssbo(struct ssbo_test *test)
 
     gl->GenBuffers(1, &test->ssbo);
     gl->BindBuffer(GL_SHADER_STORAGE_BUFFER, test->ssbo);
-    gl->BufferStorageEXT(GL_SHADER_STORAGE_BUFFER, test->ssbo_size, NULL, GL_MAP_READ_BIT);
+    gl->BufferStorageEXT(GL_SHADER_STORAGE_BUFFER, test->ssbo_size, NULL, test->ssbo_flags);
 }
 
 static void
@@ -78,17 +79,25 @@ ssbo_test_draw(struct ssbo_test *test)
 {
     struct egl *egl = &test->egl;
     struct egl_gl *gl = &egl->gl;
+    const uint32_t *vals;
 
     gl->BindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, test->ssbo);
     gl->UseProgram(test->prog);
     egl_check(egl, "setup");
 
+    if (test->ssbo_flags & GL_MAP_PERSISTENT_BIT_EXT)
+        vals = gl->MapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, test->ssbo_size, GL_MAP_READ_BIT);
+
     gl->DispatchCompute(1, 1, 1);
     egl_check(egl, "compute");
 
-    const uint32_t *vals =
-        gl->MapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, test->ssbo_size, GL_MAP_READ_BIT);
-    egl_check(egl, "map");
+    if (test->ssbo_flags & GL_MAP_PERSISTENT_BIT_EXT) {
+        if (!(test->ssbo_flags & GL_MAP_COHERENT_BIT_EXT))
+            gl->MemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT_EXT);
+        gl->Finish();
+    } else {
+        vals = gl->MapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, test->ssbo_size, GL_MAP_READ_BIT);
+    }
 
     for (uint32_t i = 0; i < test->local_size; i++) {
         if (vals[i] != i)
@@ -96,6 +105,8 @@ ssbo_test_draw(struct ssbo_test *test)
     }
 
     gl->UnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+    egl_check(egl, "validation");
 }
 
 int
@@ -103,6 +114,7 @@ main(int argc, const char **argv)
 {
     struct ssbo_test test = {
         .local_size = 64,
+        .ssbo_flags = GL_MAP_READ_BIT,
     };
 
     ssbo_test_init(&test);
