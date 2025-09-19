@@ -5,6 +5,7 @@ tests = [
   'clear',
   'formats',
   'info',
+  'ssbo',
   'tex',
   'timestamp',
   'tri',
