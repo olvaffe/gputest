@@ -169,9 +169,19 @@ dma_heap_test_draw(struct dma_heap_test *test)
 {
     struct vk *vk = &test->vk;
 
+    const VkBufferMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+        .buffer = test->buf,
+        .size = VK_WHOLE_SIZE,
+    };
+
     for (uint32_t val = 0; val < 10; val++) {
         VkCommandBuffer cmd = vk_begin_cmd(vk, false);
         vk->CmdFillBuffer(cmd, test->buf, 0, VK_WHOLE_SIZE, val);
+        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0,
+                               0, NULL, 1, &barrier, 0, NULL);
         vk_end_cmd(vk);
         vk_wait(vk);
 
