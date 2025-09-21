@@ -23,6 +23,7 @@ struct dma_heap_test {
     int buf_fd;
     void *buf_ptr;
     VkDeviceMemory mem;
+    void *mem_ptr;
 };
 
 static void
@@ -37,9 +38,25 @@ dma_heap_test_init_memory(struct dma_heap_test *test)
         vk->GetMemoryFdPropertiesKHR(vk->dev, test->handle_type, test->buf_fd, &fd_props);
     vk_check(vk, "invalid dma-buf");
 
-    const uint32_t mt_mask = test->buf_reqs.memoryTypeBits & fd_props.memoryTypeBits;
+    uint32_t mt_mask = test->buf_reqs.memoryTypeBits & fd_props.memoryTypeBits;
     if (!mt_mask)
         vk_die("no valid mt");
+
+    uint32_t mt;
+    VkMemoryPropertyFlags mt_flags;
+    while (mt_mask) {
+        mt = ffs(mt_mask) - 1;
+        mt_flags = vk->mem_props.memoryTypes[mt].propertyFlags;
+        mt_mask &= ~(1 << mt);
+
+        if (mt_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+            break;
+    }
+
+    vk_log("importing dma-buf as mt %d: visible %d, coherent %d, cached %d", mt,
+           (bool)(mt_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT),
+           (bool)(mt_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+           (bool)(mt_flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT));
 
     const int buf_fd = dup(test->buf_fd);
     if (buf_fd < 0)
@@ -59,10 +76,18 @@ dma_heap_test_init_memory(struct dma_heap_test *test)
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .pNext = &dedicated_info,
         .allocationSize = test->buf_reqs.size,
-        .memoryTypeIndex = ffs(mt_mask) - 1,
+        .memoryTypeIndex = mt,
     };
     vk->result = vk->AllocateMemory(vk->dev, &alloc_info, NULL, &test->mem);
     vk_check(vk, "failed to import dma-buf");
+
+    if (mt_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
+        /* Some implementations refuse to map imported memory. Some map imported memory via the
+         * dma-buf and do not respect coherent/cached bits.
+         */
+        if (vk->MapMemory(vk->dev, test->mem, 0, VK_WHOLE_SIZE, 0, &test->mem_ptr) != VK_SUCCESS)
+            vk_log("failed to map memory");
+    }
 
     vk->result = vk->BindBufferMemory(vk->dev, test->buf, test->mem, 0);
     vk_check(vk, "failed to bind buffer memory");
