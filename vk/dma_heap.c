@@ -89,7 +89,8 @@ dma_heap_test_init_memory(struct dma_heap_test *test)
             vk_log("failed to map memory");
 
         /* some trigger SIGBUS on access */
-        memset(test->mem_ptr, 0xff, test->buf_reqs.size);
+        if (test->mem_ptr)
+            memset(test->mem_ptr, 0xff, test->buf_reqs.size);
     }
 
     vk->result = vk->BindBufferMemory(vk->dev, test->buf, test->mem, 0);
