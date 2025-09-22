@@ -194,6 +194,27 @@ dma_heap_test_cleanup(struct dma_heap_test *test)
 }
 
 static void
+dma_heap_test_timed_read(struct dma_heap_test *test, const void *src, const char *what)
+{
+    const uint32_t loop = 64 * 1024 * 1024 / test->size;
+
+    void *dst = malloc(test->size);
+    if (!dst)
+        vk_die("failed to alloc dst");
+
+    const uint64_t begin = u_now();
+    for (uint32_t i = 0; i < loop; i++)
+        memcpy(dst, src, test->size);
+    const uint64_t end = u_now();
+
+    free(dst);
+
+    const int us = (end - begin) / 1000;
+    vk_log("%s took %d.%dms to read %d MB", what, us / 1000, us % 1000,
+           (int)(loop * test->size) / 1024 / 1024);
+}
+
+static void
 dma_heap_test_draw(struct dma_heap_test *test)
 {
     struct vk *vk = &test->vk;
@@ -245,6 +266,10 @@ dma_heap_test_draw(struct dma_heap_test *test)
         if (ioctl(test->buf_fd, DMA_BUF_IOCTL_SYNC, &args))
             vk_die("failed to end cpu access");
     }
+
+    dma_heap_test_timed_read(test, test->buf_ptr, "dma-buf");
+    if (test->mem_ptr)
+        dma_heap_test_timed_read(test, test->mem_ptr, "VkDeviceMemory");
 }
 
 int
