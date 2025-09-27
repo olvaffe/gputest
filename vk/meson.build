@@ -46,6 +46,9 @@ tests = [
   'ycbcr',
 ]
 
+if idep_drmutil.found()
+  tests += ['residency']
+endif
 if idep_spvutil.found()
   tests += ['compile']
 endif
@@ -97,6 +100,8 @@ foreach t : tests
     else
       test_args += ['-DFAKEKTX']
     endif
+  elif t == 'residency'
+    test_deps += [idep_drmutil]
   elif t == 'sdl'
     test_deps += [idep_sdlutil]
   elif t == 'wl'
