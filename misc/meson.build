@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 drm_tests = [
+  'drmdumb',
   'drminfo',
 ]
 

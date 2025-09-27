@@ -116,6 +116,22 @@ struct drm {
     int fd;
     struct drm_file file;
     struct drm_modeset modeset;
+
+    drmModeAtomicReqPtr req;
+};
+
+struct drm_dumb {
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+
+    uint32_t handle;
+    uint32_t pitch;
+    uint64_t size;
+
+    uint32_t fb_id;
+
+    void *map;
 };
 
 static inline void PRINTFLIKE(1, 2) drm_log(const char *format, ...)
@@ -179,6 +195,9 @@ drm_init(struct drm *drm, const struct drm_init_params *params)
 static inline void
 drm_cleanup(struct drm *drm)
 {
+    if (drm->req)
+        drmModeAtomicFree(drm->req);
+
     drmFreeDevices(drm->devices, drm->device_count);
 }
 
@@ -745,6 +764,107 @@ drm_dump_modeset(struct drm *drm, bool dump_all)
         if (connector->properties)
             drm_dump_properties(drm, connector->properties, "      ");
     }
+}
+
+static inline struct drm_dumb *
+drm_create_dumb(struct drm *drm, uint32_t width, uint32_t height, uint32_t format)
+{
+    struct drm_dumb *dumb = (struct drm_dumb *)calloc(1, sizeof(*dumb));
+    if (!dumb)
+        drm_die("failed to alloc dumb");
+
+    dumb->width = width;
+    dumb->height = height;
+    dumb->format = format;
+
+    const uint32_t bpp = u_drm_format_to_cpp(format) * 8;
+    if (drmModeCreateDumbBuffer(drm->fd, width, height, bpp, 0, &dumb->handle, &dumb->pitch,
+                                &dumb->size))
+        drm_die("failed to create dumb");
+
+    const uint32_t handles[4] = { dumb->handle };
+    const uint32_t pitches[4] = { dumb->pitch };
+    const uint32_t offsets[4] = { 0 };
+    if (drmModeAddFB2WithModifiers(drm->fd, width, height, format, handles, pitches, offsets,
+                                   NULL, &dumb->fb_id, 0))
+        drm_die("failed to create fb");
+
+    return dumb;
+}
+
+static inline void
+drm_destroy_dumb(struct drm *drm, struct drm_dumb *dumb)
+{
+    if (dumb->map)
+        drm_die("mapped dumb");
+
+    drmModeRmFB(drm->fd, dumb->fb_id);
+    drmModeDestroyDumbBuffer(drm->fd, dumb->handle);
+    free(dumb);
+}
+
+static inline void *
+drm_map_dumb(struct drm *drm, struct drm_dumb *dumb)
+{
+    if (dumb->map)
+        drm_die("nested dumb map");
+
+    uint64_t offset;
+    if (drmModeMapDumbBuffer(drm->fd, dumb->handle, &offset))
+        drm_die("failed to map dumb");
+
+    dumb->map = mmap(NULL, dumb->size, PROT_READ | PROT_WRITE, MAP_SHARED, drm->fd, offset);
+    if (dumb->map == MAP_FAILED)
+        drm_die("failed to mmap dumb");
+
+    return dumb->map;
+}
+
+static inline void
+drm_unmap_dumb(struct drm *drm, struct drm_dumb *dumb)
+{
+    munmap(dumb->map, dumb->size);
+    dumb->map = NULL;
+}
+
+static inline void
+drm_reset_req(struct drm *drm)
+{
+    if (drm->req)
+        drmModeAtomicFree(drm->req);
+
+    drm->req = drmModeAtomicAlloc();
+    if (!drm->req)
+        drm_die("failed to alloc req");
+}
+
+static inline void
+drm_add_property(struct drm *drm,
+                 uint32_t obj_id,
+                 const struct drm_properties *props,
+                 const char *name,
+                 uint64_t val)
+{
+    uint32_t prop_id = 0;
+    for (uint32_t i = 0; i < props->count; i++) {
+        const drmModePropertyPtr prop = props->props[i];
+        if (!strcmp(prop->name, name)) {
+            prop_id = prop->prop_id;
+            break;
+        }
+    }
+    if (!prop_id)
+        drm_die("failed to find property %s", name);
+
+    if (drmModeAtomicAddProperty(drm->req, obj_id, prop_id, val) < 0)
+        drm_die("failed to add property");
+}
+
+static inline void
+drm_commit(struct drm *drm)
+{
+    if (drmModeAtomicCommit(drm->fd, drm->req, 0, NULL))
+        drm_die("failed to commit");
 }
 
 #endif /* DRMUTIL_H */
