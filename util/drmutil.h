@@ -132,6 +132,8 @@ struct drm_dumb {
     uint32_t fb_id;
 
     void *map;
+
+    bool replaced;
 };
 
 static inline void PRINTFLIKE(1, 2) drm_log(const char *format, ...)
@@ -766,6 +768,17 @@ drm_dump_modeset(struct drm *drm, bool dump_all)
     }
 }
 
+static inline void
+drm_init_dumb_fb(struct drm *drm, struct drm_dumb *dumb)
+{
+    const uint32_t handles[4] = { dumb->handle };
+    const uint32_t pitches[4] = { dumb->pitch };
+    const uint32_t offsets[4] = { 0 };
+    if (drmModeAddFB2WithModifiers(drm->fd, dumb->width, dumb->height, dumb->format, handles,
+                                   pitches, offsets, NULL, &dumb->fb_id, 0))
+        drm_die("failed to create fb");
+}
+
 static inline struct drm_dumb *
 drm_create_dumb(struct drm *drm, uint32_t width, uint32_t height, uint32_t format)
 {
@@ -782,12 +795,7 @@ drm_create_dumb(struct drm *drm, uint32_t width, uint32_t height, uint32_t forma
                                 &dumb->size))
         drm_die("failed to create dumb");
 
-    const uint32_t handles[4] = { dumb->handle };
-    const uint32_t pitches[4] = { dumb->pitch };
-    const uint32_t offsets[4] = { 0 };
-    if (drmModeAddFB2WithModifiers(drm->fd, width, height, format, handles, pitches, offsets,
-                                   NULL, &dumb->fb_id, 0))
-        drm_die("failed to create fb");
+    drm_init_dumb_fb(drm, dumb);
 
     return dumb;
 }
@@ -799,7 +807,12 @@ drm_destroy_dumb(struct drm *drm, struct drm_dumb *dumb)
         drm_die("mapped dumb");
 
     drmModeRmFB(drm->fd, dumb->fb_id);
-    drmModeDestroyDumbBuffer(drm->fd, dumb->handle);
+
+    if (dumb->replaced)
+        drmCloseBufferHandle(drm->fd, dumb->handle);
+    else
+        drmModeDestroyDumbBuffer(drm->fd, dumb->handle);
+
     free(dumb);
 }
 
@@ -808,6 +821,8 @@ drm_map_dumb(struct drm *drm, struct drm_dumb *dumb)
 {
     if (dumb->map)
         drm_die("nested dumb map");
+    if (dumb->replaced)
+        drm_die("failed to map replaced dumb");
 
     uint64_t offset;
     if (drmModeMapDumbBuffer(drm->fd, dumb->handle, &offset))
@@ -825,6 +840,20 @@ drm_unmap_dumb(struct drm *drm, struct drm_dumb *dumb)
 {
     munmap(dumb->map, dumb->size);
     dumb->map = NULL;
+}
+
+static inline void
+drm_replace_dumb_storage(struct drm *drm, struct drm_dumb *dumb, uint32_t handle)
+{
+    if (dumb->map)
+        drm_die("failed to replace mapped dumb");
+
+    dumb->handle = handle;
+
+    drmModeRmFB(drm->fd, dumb->fb_id);
+    drm_init_dumb_fb(drm, dumb);
+
+    dumb->replaced = true;
 }
 
 static inline void
@@ -883,9 +912,6 @@ drm_prime_import(struct drm *drm, int fd)
     uint32_t handle;
     if (drmPrimeFDToHandle(drm->fd, fd, &handle))
         drm_die("failed to import");
-
-    /* take ownership */
-    close(fd);
 
     return handle;
 }

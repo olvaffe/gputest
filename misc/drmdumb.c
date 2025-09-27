@@ -9,6 +9,7 @@
 struct drmdumb_test {
     int dev_index;
     uint32_t format;
+    const char *heap_name;
 
     struct drm drm;
 
@@ -142,22 +143,45 @@ drmdumb_test_cleanup(struct drmdumb_test *test)
 }
 
 static void
-drmdumb_test_prime(struct drmdumb_test *test)
+drmdumb_test_import(struct drmdumb_test *test)
+{
+    struct drm *drm = &test->drm;
+
+    if (!test->heap_name)
+        return;
+
+    struct dma_heap heap;
+    dma_heap_init(&heap, test->heap_name);
+    struct dma_buf *buf = dma_heap_alloc(&heap, test->dumb->size);
+    dma_heap_cleanup(&heap);
+
+    dma_buf_map(buf);
+    dma_buf_start(buf, DMA_BUF_SYNC_WRITE);
+
+    drm_map_dumb(drm, test->dumb);
+    memcpy(buf->map, test->dumb->map, test->dumb->size);
+    drm_unmap_dumb(drm, test->dumb);
+
+    dma_buf_end(buf);
+    dma_buf_unmap(buf);
+
+    const uint32_t handle = drm_prime_import(drm, buf->fd);
+    dma_buf_destroy(buf);
+
+    drm_replace_dumb_storage(drm, test->dumb, handle);
+}
+
+static void
+drmdumb_test_export(struct drmdumb_test *test)
 {
     struct drm *drm = &test->drm;
 
     const int fd = drm_prime_export(drm, test->dumb->handle);
 
     /* test import */
-    {
-        const int fd2 = dup(fd);
-        if (fd2 < 0)
-            drm_die("failed to dup");
-
-        const uint32_t handle = drm_prime_import(drm, fd2);
-        if (test->dumb->handle != handle)
-            drm_die("re-import returned bad handle");
-    }
+    const uint32_t handle = drm_prime_import(drm, fd);
+    if (test->dumb->handle != handle)
+        drm_die("re-import returned bad handle");
 
     /* test access through dma-buf */
     struct dma_buf *buf = dma_buf_create(fd);
@@ -184,10 +208,12 @@ main(int argc, char **argv)
     struct drmdumb_test test = {
         .dev_index = 0,
         .format = DRM_FORMAT_XRGB8888,
+        .heap_name = "system",
     };
 
     drmdumb_test_init(&test);
-    drmdumb_test_prime(&test);
+    drmdumb_test_import(&test);
+    drmdumb_test_export(&test);
     drmdumb_test_commit(&test);
     drmdumb_test_cleanup(&test);
 
