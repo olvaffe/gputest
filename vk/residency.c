@@ -13,7 +13,11 @@ struct residency_test {
     struct vk vk;
 };
 
-struct statm {
+struct proc_vmstat {
+    unsigned long nr_free_pages;
+};
+
+struct proc_statm {
     unsigned long size;
     unsigned long resident;
     unsigned long shared;
@@ -22,7 +26,27 @@ struct statm {
 };
 
 static void
-residency_test_read_statm(struct residency_test *test, struct statm *statm)
+residency_test_read_vmstat(struct residency_test *test, struct proc_vmstat *vmstat)
+{
+    const char path[] = "/proc/vmstat";
+    char buf[256];
+
+    const int fd = open(path, O_RDONLY);
+    if (fd < 0)
+        vk_die("failed to open %s", path);
+
+    const ssize_t size = read(fd, buf, sizeof(buf));
+    if (size < -1)
+        vk_die("failed to read %s", path);
+
+    close(fd);
+
+    if (sscanf(buf, "nr_free_pages %lu\n", &vmstat->nr_free_pages) != 1)
+        vk_die("failed to parse %s", path);
+}
+
+static void
+residency_test_read_statm(struct residency_test *test, struct proc_statm *statm)
 {
     const char path[] = "/proc/self/statm";
     char buf[256];
@@ -45,10 +69,14 @@ residency_test_read_statm(struct residency_test *test, struct statm *statm)
 static void
 residency_test_log_statm(struct residency_test *test, const char *reason)
 {
-    struct statm statm;
+    struct proc_vmstat vmstat;
+    residency_test_read_vmstat(test, &vmstat);
+
+    struct proc_statm statm;
     residency_test_read_statm(test, &statm);
 
-    vk_log("%s: size %lu MiB, resident %lu MiB, shared %lu MiB", reason,
+    vk_log("%s: free %lu MiB, size %lu MiB, resident %lu MiB, shared %lu MiB", reason,
+           vmstat.nr_free_pages * test->page_size / 1024 / 1024,
            statm.size * test->page_size / 1024 / 1024,
            statm.resident * test->page_size / 1024 / 1024,
            statm.shared * test->page_size / 1024 / 1024);
@@ -134,6 +162,7 @@ residency_test_run_dma_heap(struct residency_test *test)
     if (!madvise(buf->map, test->size, MADV_PAGEOUT))
         residency_test_log_statm(test, "  after MADV_PAGEOUT");
 
+    dma_buf_unmap(buf);
     dma_buf_destroy(buf);
     residency_test_log_statm(test, "  after free");
 }
@@ -168,11 +197,11 @@ residency_test_run(struct residency_test *test)
     vk_log("malloc:");
     residency_test_run_malloc(test);
 
-    vk_log("system dma-heap: (check /proc/meminfo instead!)");
+    vk_log("system dma-heap:");
     residency_test_run_dma_heap(test);
 
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
-        vk_log("vulkan mt %d: (check fdinfo instead!)", i);
+        vk_log("vulkan mt %d:", i);
         residency_test_run_vulkan(test, i);
     }
 }

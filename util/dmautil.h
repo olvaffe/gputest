@@ -77,6 +77,9 @@ dma_buf_create(int fd)
 static inline void
 dma_buf_destroy(struct dma_buf *buf)
 {
+    if (buf->map)
+        dma_die("mapped dma-buf");
+
     close(buf->fd);
     free(buf);
 }
@@ -98,6 +101,7 @@ static inline void
 dma_buf_unmap(struct dma_buf *buf)
 {
     munmap(buf->map, buf->size);
+    buf->map = NULL;
 }
 
 static inline void
