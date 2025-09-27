@@ -70,6 +70,9 @@ struct drm_connector {
     uint32_t height_mm;
     uint32_t possible_crtcs;
 
+    struct drm_mode_modeinfo *modes;
+    uint32_t mode_count;
+
     uint32_t crtc_id;
     bool connected;
 
@@ -466,6 +469,14 @@ drm_scan_resources(struct drm *drm)
         dst->width_mm = src->mmWidth;
         dst->height_mm = src->mmHeight;
 
+        static_assert(sizeof(*dst->modes) == sizeof(*src->modes), "");
+        const size_t modes_size = sizeof(*src->modes) * src->count_modes;
+        dst->modes = malloc(modes_size);
+        if (!dst->modes)
+            drm_die("failed to alloc modes");
+        memcpy(dst->modes, src->modes, modes_size);
+        dst->mode_count = src->count_modes;
+
         for (int j = 0; j < src->count_encoders; j++) {
             drmModeEncoderPtr encoder = NULL;
             for (int k = 0; k < res->count_encoders; k++) {
@@ -724,6 +735,12 @@ drm_dump_modeset(struct drm *drm, bool dump_all)
                 i, connector->id, connector->crtc_id, connector->connected,
                 drmModeGetConnectorTypeName(connector->type), connector->type_id,
                 connector->width_mm, connector->height_mm, connector->possible_crtcs);
+
+        for (uint32_t i = 0; i < connector->mode_count; i++) {
+            const struct drm_mode_modeinfo *mode = &connector->modes[i];
+            drm_log("      mode[%d]: %dx%d@%d%s", i, mode->hdisplay, mode->vdisplay,
+                    mode->vrefresh, mode->type & DRM_MODE_TYPE_PREFERRED ? ", preferred" : "");
+        }
 
         if (connector->properties)
             drm_dump_properties(drm, connector->properties, "      ");
