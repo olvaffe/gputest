@@ -3,25 +3,20 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "dmautil.h"
 #include "vkutil.h"
-
-#include <fcntl.h>
-#include <linux/dma-buf.h>
-#include <linux/dma-heap.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <unistd.h>
 
 struct dma_heap_test {
     VkDeviceSize size;
     VkExternalMemoryHandleTypeFlagBits handle_type;
-    char *heap_path;
+    char *heap_name;
 
     struct vk vk;
     VkBuffer buf;
     VkMemoryRequirements buf_reqs;
-    int buf_fd;
-    void *buf_ptr;
+
+    struct dma_buf *dma_buf;
+
     VkDeviceMemory mem;
     void *mem_ptr;
 };
@@ -35,7 +30,7 @@ dma_heap_test_init_memory(struct dma_heap_test *test)
         .sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR,
     };
     vk->result =
-        vk->GetMemoryFdPropertiesKHR(vk->dev, test->handle_type, test->buf_fd, &fd_props);
+        vk->GetMemoryFdPropertiesKHR(vk->dev, test->handle_type, test->dma_buf->fd, &fd_props);
     vk_check(vk, "invalid dma-buf");
 
     uint32_t mt_mask = test->buf_reqs.memoryTypeBits & fd_props.memoryTypeBits;
@@ -58,7 +53,7 @@ dma_heap_test_init_memory(struct dma_heap_test *test)
            (bool)(mt_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
            (bool)(mt_flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT));
 
-    const int buf_fd = dup(test->buf_fd);
+    const int buf_fd = dup(test->dma_buf->fd);
     if (buf_fd < 0)
         vk_die("failed to dup dma-buf");
 
@@ -100,26 +95,14 @@ dma_heap_test_init_memory(struct dma_heap_test *test)
 static void
 dma_heap_test_init_dma_buf(struct dma_heap_test *test)
 {
-    int heap_fd;
+    struct dma_heap heap;
+    dma_heap_init(&heap, test->heap_name);
 
-    heap_fd = open(test->heap_path, O_RDONLY | O_CLOEXEC);
-    if (heap_fd < 0)
-        vk_die("failed to open %s", test->heap_path);
+    test->dma_buf = dma_heap_alloc(&heap, test->buf_reqs.size);
 
-    struct dma_heap_allocation_data args = {
-        .len = test->buf_reqs.size,
-        .fd_flags = O_RDWR | O_CLOEXEC,
-    };
-    if (ioctl(heap_fd, DMA_HEAP_IOCTL_ALLOC, &args))
-        vk_die("failed to alloc dma-buf");
+    dma_heap_cleanup(&heap);
 
-    close(heap_fd);
-
-    test->buf_fd = args.fd;
-
-    test->buf_ptr = mmap(NULL, test->buf_reqs.size, PROT_READ, MAP_SHARED, test->buf_fd, 0);
-    if (test->buf_ptr == MAP_FAILED)
-        vk_die("failed to mmap dma-buf");
+    dma_buf_map(test->dma_buf);
 }
 
 static void
@@ -188,8 +171,8 @@ dma_heap_test_cleanup(struct dma_heap_test *test)
     vk->FreeMemory(vk->dev, test->mem, NULL);
     vk->DestroyBuffer(vk->dev, test->buf, NULL);
 
-    munmap(test->buf_ptr, test->buf_reqs.size);
-    close(test->buf_fd);
+    dma_buf_unmap(test->dma_buf);
+    dma_buf_destroy(test->dma_buf);
 
     vk_cleanup(vk);
 }
@@ -251,24 +234,18 @@ dma_heap_test_draw(struct dma_heap_test *test)
         vk_end_cmd(vk);
         vk_wait(vk);
 
-        struct dma_buf_sync args = {
-            .flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ,
-        };
-        if (ioctl(test->buf_fd, DMA_BUF_IOCTL_SYNC, &args))
-            vk_die("failed to start cpu access");
+        dma_buf_start(test->dma_buf, DMA_BUF_SYNC_READ);
 
         for (VkDeviceSize i = 0; i < test->size / sizeof(uint32_t); i++) {
-            const uint32_t real = ((const uint32_t *)test->buf_ptr)[i];
+            const uint32_t real = ((const uint32_t *)test->dma_buf->map)[i];
             if (real != val)
                 vk_die("index %d is 0x%x, not 0x%x", (int)i, real, val);
         }
 
-        args.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
-        if (ioctl(test->buf_fd, DMA_BUF_IOCTL_SYNC, &args))
-            vk_die("failed to end cpu access");
+        dma_buf_end(test->dma_buf);
     }
 
-    dma_heap_test_timed_read(test, test->buf_ptr, "dma-buf");
+    dma_heap_test_timed_read(test, test->dma_buf->map, "dma-buf");
     if (test->mem_ptr)
         dma_heap_test_timed_read(test, test->mem_ptr, "VkDeviceMemory");
 }
@@ -279,9 +256,7 @@ main(void)
     struct dma_heap_test test = {
         .size = 64,
         .handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
-        .heap_path = "/dev/dma_heap/system",
-
-        .buf_fd = -1,
+        .heap_name = "system",
     };
 
     dma_heap_test_init(&test);
