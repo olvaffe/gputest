@@ -466,10 +466,18 @@ drm_scan_resources(struct drm *drm)
         dst->width_mm = src->mmWidth;
         dst->height_mm = src->mmHeight;
 
-        for (int j = 0; j < res->count_encoders; j++) {
-            const drmModeEncoderPtr encoder = encoders[j];
-            dst->possible_crtcs |= encoder->possible_crtcs;
+        for (int j = 0; j < src->count_encoders; j++) {
+            drmModeEncoderPtr encoder = NULL;
+            for (int k = 0; k < res->count_encoders; k++) {
+                if (encoders[k]->encoder_id == src->encoders[j]) {
+                    encoder = encoders[k];
+                    break;
+                }
+            }
+            if (!encoder)
+                drm_die("bad encoder");
 
+            dst->possible_crtcs |= encoder->possible_crtcs;
             if (src->encoder_id == encoder->encoder_id)
                 dst->crtc_id = encoder->crtc_id;
         }
