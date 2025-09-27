@@ -867,4 +867,27 @@ drm_commit(struct drm *drm)
         drm_die("failed to commit");
 }
 
+static inline int
+drm_prime_export(struct drm *drm, uint32_t handle)
+{
+    int fd;
+    if (drmPrimeHandleToFD(drm->fd, handle, DRM_RDWR | DRM_CLOEXEC, &fd))
+        drm_die("failed to export");
+
+    return fd;
+}
+
+static inline uint32_t
+drm_prime_import(struct drm *drm, int fd)
+{
+    uint32_t handle;
+    if (drmPrimeFDToHandle(drm->fd, fd, &handle))
+        drm_die("failed to import");
+
+    /* take ownership */
+    close(fd);
+
+    return handle;
+}
+
 #endif /* DRMUTIL_H */

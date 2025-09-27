@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "dmautil.h"
 #include "drmutil.h"
 
 struct drmdumb_test {
@@ -141,6 +142,34 @@ drmdumb_test_cleanup(struct drmdumb_test *test)
 }
 
 static void
+drmdumb_test_prime(struct drmdumb_test *test)
+{
+    struct drm *drm = &test->drm;
+
+    const int fd = drm_prime_export(drm, test->dumb->handle);
+
+    /* test import */
+    {
+        const int fd2 = dup(fd);
+        if (fd2 < 0)
+            drm_die("failed to dup");
+
+        const uint32_t handle = drm_prime_import(drm, fd2);
+        if (test->dumb->handle != handle)
+            drm_die("re-import returned bad handle");
+    }
+
+    /* test access through dma-buf */
+    struct dma_buf *buf = dma_buf_create(fd);
+    dma_buf_map(buf);
+    dma_buf_start(buf, DMA_BUF_SYNC_WRITE);
+    memset(buf->map, 0xff, test->dumb->pitch * 10);
+    dma_buf_end(buf);
+    dma_buf_unmap(buf);
+    dma_buf_destroy(buf);
+}
+
+static void
 drmdumb_test_commit(struct drmdumb_test *test)
 {
     struct drm *drm = &test->drm;
@@ -158,6 +187,7 @@ main(int argc, char **argv)
     };
 
     drmdumb_test_init(&test);
+    drmdumb_test_prime(&test);
     drmdumb_test_commit(&test);
     drmdumb_test_cleanup(&test);
 
