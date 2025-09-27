@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "dmautil.h"
 #include "vkutil.h"
 
 struct residency_test {
     size_t size;
 
-    struct vk vk;
     uint32_t page_size;
+    struct vk vk;
 };
 
 struct statm {
@@ -58,9 +59,9 @@ residency_test_init(struct residency_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk, NULL);
-
     test->page_size = sysconf(_SC_PAGESIZE);
+
+    vk_init(vk, NULL);
 }
 
 static void
@@ -112,6 +113,32 @@ residency_test_run_vulkan(struct residency_test *test, uint32_t mt)
 }
 
 static void
+residency_test_run_dma_heap(struct residency_test *test)
+{
+    struct dma_heap heap;
+
+    dma_heap_init(&heap, "system");
+
+    residency_test_log_statm(test, "  before alloc");
+    struct dma_buf *buf = dma_heap_alloc(&heap, test->size);
+    residency_test_log_statm(test, "  after alloc");
+
+    dma_heap_cleanup(&heap);
+
+    dma_buf_map(buf);
+    residency_test_log_statm(test, "  after map");
+
+    memset(buf->map, 0x77, test->size);
+    residency_test_log_statm(test, "  after memset");
+
+    if (!madvise(buf->map, test->size, MADV_PAGEOUT))
+        residency_test_log_statm(test, "  after MADV_PAGEOUT");
+
+    dma_buf_destroy(buf);
+    residency_test_log_statm(test, "  after free");
+}
+
+static void
 residency_test_run_malloc(struct residency_test *test)
 {
     residency_test_log_statm(test, "  before alloc");
@@ -140,6 +167,9 @@ residency_test_run(struct residency_test *test)
 
     vk_log("malloc:");
     residency_test_run_malloc(test);
+
+    vk_log("system dma-heap: (check /proc/meminfo instead!)");
+    residency_test_run_dma_heap(test);
 
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
         vk_log("vulkan mt %d: (check fdinfo instead!)", i);
