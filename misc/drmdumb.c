@@ -208,7 +208,7 @@ main(int argc, char **argv)
     struct drmdumb_test test = {
         .dev_index = 0,
         .format = DRM_FORMAT_XRGB8888,
-        .heap_name = "system",
+        .heap_name = NULL,
     };
 
     drmdumb_test_init(&test);

@@ -355,8 +355,10 @@ drm_scan_resources(struct drm *drm)
 
     drmModeResPtr res = drmModeGetResources(drm->fd);
     drmModePlaneResPtr plane_res = drmModeGetPlaneResources(drm->fd);
-    if (!res || !plane_res)
-        drm_die("failed to get resources");
+    if (!res || !plane_res) {
+        drm_log("failed to get resources");
+        return;
+    }
 
     modeset->max_width = res->max_width;
     modeset->max_height = res->max_height;
@@ -590,6 +592,13 @@ drm_dump_device(struct drm *drm, uint32_t idx)
                 dev->deviceinfo.pci->vendor_id, dev->deviceinfo.pci->device_id,
                 dev->deviceinfo.pci->revision_id, dev->deviceinfo.pci->subvendor_id,
                 dev->deviceinfo.pci->subdevice_id);
+        break;
+    case DRM_BUS_PLATFORM:
+        drm_log("  bus type: platform");
+        drm_log("  bus info: %s", dev->businfo.platform->fullname);
+        drm_log("  dev info:");
+        for (int i = 0; dev->deviceinfo.platform->compatible[i]; i++)
+            drm_log("    %s", dev->deviceinfo.platform->compatible[i]);
         break;
     default:
         drm_log("  bus type %d", dev->bustype);
