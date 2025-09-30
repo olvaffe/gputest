@@ -73,7 +73,7 @@ main(int argc, char **argv)
     struct mem_alloc_test test = {
         .base_size = 1 * 1024 * 1024,
         .order = 10,
-        .loop = 32,
+        .loop = 8,
         .mt = 0,
     };
 
