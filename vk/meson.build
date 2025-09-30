@@ -25,6 +25,7 @@ tests = [
   'ktx',
   'loop',
   'mem',
+  'mem_alloc',
   'msaa',
   'pipeline_stats',
   'push_const',
