@@ -10,6 +10,7 @@
 
 #include <linux/dma-buf.h>
 #include <linux/dma-heap.h>
+#include <linux/sync_file.h>
 #include <sys/ioctl.h>
 
 #if defined(__cplusplus)
@@ -151,6 +152,26 @@ dma_heap_alloc(struct dma_heap *heap, size_t size)
         dma_die("failed to alloc dma-buf");
 
     return dma_buf_create(args.fd);
+}
+
+static inline struct sync_file_info *
+dma_sync_file_info(int fd)
+{
+    struct sync_file_info args = { 0 };
+    if (ioctl(fd, SYNC_IOC_FILE_INFO, &args))
+        dma_die("failed to get fence count");
+
+    struct sync_file_info *info =
+        calloc(1, sizeof(*info) + sizeof(struct sync_fence_info) * args.num_fences);
+    if (!info)
+        dma_die("failed to alloc sync file info");
+
+    info->num_fences = args.num_fences;
+    info->sync_fence_info = (uintptr_t)(info + 1);
+    if (ioctl(fd, SYNC_IOC_FILE_INFO, info))
+        dma_die("failed to get sync file info");
+
+    return info;
 }
 
 #if defined(__cplusplus)

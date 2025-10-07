@@ -73,6 +73,9 @@ PFN_EGL(WAITSYNC, WaitSync)
 /* EGL_ANDROID_get_native_client_buffer */
 PFN_EGL_EXT(GETNATIVECLIENTBUFFERANDROID, GetNativeClientBufferANDROID)
 
+/* EGL_ANDROID_native_fence_sync */
+PFN_EGL_EXT(DUPNATIVEFENCEFDANDROID, DupNativeFenceFDANDROID)
+
 /* EGL_EXT_device_enumeration */
 PFN_EGL_EXT(QUERYDEVICESEXT, QueryDevicesEXT)
 

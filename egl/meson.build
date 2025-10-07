@@ -3,6 +3,7 @@
 
 tests = [
   'clear',
+  'fence',
   'formats',
   'info',
   'ssbo',
