@@ -35,6 +35,7 @@ struct vk_init_params {
     bool tessellation_shader;
     bool fill_mode_non_solid;
     bool protected_memory;
+    bool high_priority;
 
     const char *const *instance_exts;
     uint32_t instance_ext_count;
@@ -77,6 +78,7 @@ struct vk {
     VkPhysicalDeviceHostQueryResetFeatures host_query_reset_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
     VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features;
+    VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR global_priority_query_features;
 
     VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t buf_mt_index;
@@ -372,6 +374,13 @@ vk_init_physical_device_features(struct vk *vk)
         pnext = &vk->protected_memory_features.pNext;
     }
 
+    if (vk->params.high_priority) {
+        vk->global_priority_query_features.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES_KHR;
+        *pnext = &vk->global_priority_query_features;
+        pnext = &vk->global_priority_query_features.pNext;
+    }
+
     vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
 }
 
@@ -517,6 +526,10 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
         *pnext = &vk->protected_memory_features;
         pnext = &vk->protected_memory_features.pNext;
     }
+    if (vk->params.high_priority) {
+        *pnext = &vk->global_priority_query_features;
+        pnext = &vk->global_priority_query_features.pNext;
+    }
 
     *pnext = NULL;
 }
@@ -529,21 +542,43 @@ vk_init_device(struct vk *vk)
 
     vk->queue_family_index = 0;
 
-    VkQueueFamilyProperties queue_props;
+    VkQueueFamilyGlobalPriorityPropertiesKHR prio_props = {
+        .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES_KHR,
+    };
+    VkQueueFamilyProperties2 queue_props = {
+        .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2,
+        .pNext = &prio_props,
+    };
     uint32_t queue_count = 1;
-    vk->GetPhysicalDeviceQueueFamilyProperties(vk->physical_dev, &queue_count, &queue_props);
-    if (!(queue_props.queueFlags & VK_QUEUE_GRAPHICS_BIT))
+    vk->GetPhysicalDeviceQueueFamilyProperties2(vk->physical_dev, &queue_count, &queue_props);
+    if (!(queue_props.queueFamilyProperties.queueFlags & VK_QUEUE_GRAPHICS_BIT))
         vk_die("queue family 0 does not support graphics");
-    if (vk->params.protected_memory && !(queue_props.queueFlags & VK_QUEUE_PROTECTED_BIT))
+    if (vk->params.protected_memory &&
+        !(queue_props.queueFamilyProperties.queueFlags & VK_QUEUE_PROTECTED_BIT))
         vk_die("queue family 0 does not support protected");
-    if (!queue_props.timestampValidBits)
+    if (!queue_props.queueFamilyProperties.timestampValidBits)
         vk_die("queue family 0 does not support timestamps");
+
+    VkQueueGlobalPriorityKHR global_priority = VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_KHR;
+    if (vk->params.high_priority) {
+        if (!vk->global_priority_query_features.globalPriorityQuery)
+            vk_die("no globalPriorityQuery");
+
+        global_priority = prio_props.priorities[prio_props.priorityCount - 1];
+        if (global_priority <= VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_KHR)
+            vk_die("queue family 0 does not support high priority");
+    }
 
     const VkDeviceQueueCreateFlags queue_flags =
         vk->params.protected_memory ? VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT : 0;
     const float queue_priority = 1.0f;
+    const VkDeviceQueueGlobalPriorityCreateInfoKHR global_prio_info = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_KHR,
+        .globalPriority = global_priority,
+    };
     const VkDeviceQueueCreateInfo queue_create_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .pNext = &global_prio_info,
         .flags = queue_flags,
         .queueFamilyIndex = vk->queue_family_index,
         .queueCount = 1,
