@@ -122,7 +122,12 @@ tess_test_init(struct tess_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk, NULL);
+    const struct vk_init_params params = {
+        .tessellation_shader = true,
+        .fill_mode_non_solid = true,
+    };
+    vk_init(vk, &params);
+
     tess_test_init_vb(test);
 
     tess_test_init_framebuffer(test);

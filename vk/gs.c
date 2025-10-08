@@ -121,7 +121,11 @@ gs_test_init(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk, NULL);
+    const struct vk_init_params params = {
+        .geometry_shader = true,
+    };
+    vk_init(vk, &params);
+
     gs_test_init_vb(test);
 
     gs_test_init_framebuffer(test);

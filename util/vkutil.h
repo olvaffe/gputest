@@ -31,6 +31,9 @@ struct vk_init_params {
 
     uint32_t api_version;
     bool enable_all_features;
+    bool geometry_shader;
+    bool tessellation_shader;
+    bool fill_mode_non_solid;
     bool protected_memory;
 
     const char *const *instance_exts;
@@ -455,13 +458,13 @@ vk_init_device_dispatch(struct vk *vk)
 static inline void
 vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *features)
 {
-    /* check minimum features */
-    if (!vk->features.features.tessellationShader)
-        vk_die("no tessellation shader support");
-    if (!vk->features.features.geometryShader)
+    if (vk->params.geometry_shader && !vk->features.features.geometryShader)
         vk_die("no geometry shader support");
-    if (!vk->features.features.fillModeNonSolid)
+    if (vk->params.tessellation_shader && !vk->features.features.tessellationShader)
+        vk_die("no tessellation shader support");
+    if (vk->params.fill_mode_non_solid && !vk->features.features.fillModeNonSolid)
         vk_die("no non-solid fill mode support");
+
     if (vk->params.api_version >= VK_API_VERSION_1_2) {
         if (vk->params.protected_memory && !vk->vulkan_11_features.protectedMemory)
             vk_die("no protected memory support");
@@ -487,9 +490,9 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     *features = (VkPhysicalDeviceFeatures2){
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
         .features = {
-            .geometryShader = true,
-            .tessellationShader = true,
-            .fillModeNonSolid = true,
+            .geometryShader = vk->params.geometry_shader,
+            .tessellationShader = vk->params.tessellation_shader,
+            .fillModeNonSolid = vk->params.fill_mode_non_solid,
         },
     };
 
