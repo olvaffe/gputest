@@ -5,8 +5,10 @@
 
 #include "vkutil.h"
 
+#include <linux/prctl.h>
 #include <sched.h>
 #include <stdatomic.h>
+#include <sys/prctl.h>
 #include <threads.h>
 
 static const uint32_t sched_test_cs[] = {
@@ -19,6 +21,7 @@ struct sched_test_push_consts {
 
 struct sched_test {
     /* cpu */
+    bool cpu_fifo;
     uint32_t cpu_loop;
     uint32_t cpu_pre_busy;
     uint32_t cpu_post_sleep;
@@ -46,7 +49,7 @@ static void
 sched_test_set_fifo(void)
 {
     const int policy = SCHED_FIFO;
-    const int prio = sched_get_priority_max(policy);
+    const int prio = sched_get_priority_min(policy);
     if (prio < 0)
         vk_die("failed to get max sched prio");
 
@@ -70,10 +73,13 @@ sched_test_thread(void *arg)
 {
     struct sched_test *test = arg;
 
-    sched_test_set_fifo();
+    prctl(PR_SET_NAME, "noise");
+
+    if (test->cpu_fifo)
+        sched_test_set_fifo();
     while (!atomic_load(&test->stop)) {
-        sched_test_busy_loop(test->cpu_pre_busy / 2);
-        u_sleep(test->cpu_post_sleep / 2);
+        sched_test_busy_loop(test->cpu_pre_busy);
+        u_sleep(test->cpu_post_sleep);
     }
 
     return 0;
@@ -88,7 +94,7 @@ sched_test_init_threads(struct sched_test *test)
     if (ret <= 0)
         vk_die("failed to get core count");
 
-    test->thread_count = ret - 1;
+    test->thread_count = ret * 2;
 
     test->threads = malloc(sizeof(*test->threads) * test->thread_count);
     if (!test->threads)
@@ -205,7 +211,8 @@ sched_test_dispatch_once(struct sched_test *test)
 static void
 sched_test_dispatch(struct sched_test *test)
 {
-    sched_test_set_fifo();
+    if (test->cpu_fifo)
+        sched_test_set_fifo();
 
     for (uint32_t i = 0; i < test->cpu_loop; i++) {
         sched_test_busy_loop(test->cpu_pre_busy);
@@ -218,13 +225,14 @@ int
 main(void)
 {
     struct sched_test test = {
-        .cpu_loop = 100,
-        .cpu_pre_busy = 5,
-        .cpu_post_sleep = 5,
+        .cpu_fifo = false,
+        .cpu_loop = 300,
+        .cpu_pre_busy = 3,
+        .cpu_post_sleep = 2,
         .group_count = 64,
         .local_size = 64,
         .type_size = 4,
-        .loop = 100000,
+        .loop = 50000,
     };
 
     sched_test_init(&test);
