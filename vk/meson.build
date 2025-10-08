@@ -30,6 +30,7 @@ tests = [
   'pipeline_stats',
   'push_const',
   'renderpass_ops',
+  'sched',
   'separate_ds',
   'ssbo_max',
   'stencil',
