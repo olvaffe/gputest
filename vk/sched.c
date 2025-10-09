@@ -94,7 +94,10 @@ sched_test_init_threads(struct sched_test *test)
     if (ret <= 0)
         vk_die("failed to get core count");
 
-    test->thread_count = ret * 2;
+    if (test->cpu_fifo)
+        test->thread_count = ret - 1;
+    else
+        test->thread_count = ret * 2;
 
     test->threads = malloc(sizeof(*test->threads) * test->thread_count);
     if (!test->threads)
