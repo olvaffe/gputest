@@ -25,6 +25,12 @@ info_physical_device(struct vk *vk)
     vk_log("  version: %d.%d.%d", VK_API_VERSION_MAJOR(vk->props.properties.apiVersion),
            VK_API_VERSION_MINOR(vk->props.properties.apiVersion),
            VK_API_VERSION_PATCH(vk->props.properties.apiVersion));
+
+    vk_log("  features:");
+    vk_log("    geometryShader: %d", vk->features.features.geometryShader);
+    vk_log("    tessellationShader: %d", vk->features.features.tessellationShader);
+    vk_log("    pipelineStatisticsQuery: %d", vk->features.features.pipelineStatisticsQuery);
+
     vk_log("  extensions:");
     for (uint32_t i = 0; i < ext_count; i++)
         vk_log("    %d: %s", i, exts[i].extensionName);
