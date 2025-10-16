@@ -222,7 +222,7 @@ sdl_test_redraw_window(struct sdl_test *test)
     if (!test->swapchain) {
         vk_log("create swapchain %dx%d", test->win_width, test->win_height);
         test->swapchain = vk_create_swapchain(
-            vk, test->surf, VK_FORMAT_B8G8R8A8_UNORM, test->win_width, test->win_height,
+            vk, 0, test->surf, VK_FORMAT_B8G8R8A8_UNORM, test->win_width, test->win_height,
             VK_PRESENT_MODE_FIFO_KHR, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     }
 

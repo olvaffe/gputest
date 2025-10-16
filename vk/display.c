@@ -8,6 +8,7 @@
 struct display_test {
     VkFormat format;
     VkPresentModeKHR present_mode;
+    bool protected;
 
     struct vk vk;
 
@@ -28,7 +29,11 @@ display_test_init_swapchain(struct display_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->swapchain = vk_create_swapchain(vk, test->surface, test->format,
+    VkSwapchainCreateFlagsKHR flags = 0;
+    if (test->protected)
+        flags |= VK_SWAPCHAIN_CREATE_PROTECTED_BIT_KHR;
+
+    test->swapchain = vk_create_swapchain(vk, flags, test->surface, test->format,
                                           test->mode_props.parameters.visibleRegion.width,
                                           test->mode_props.parameters.visibleRegion.height,
                                           test->present_mode, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
@@ -197,6 +202,7 @@ display_test_init(struct display_test *test)
     };
 
     const struct vk_init_params params = {
+        .protected_memory = test->protected,
         .instance_exts = instance_exts,
         .instance_ext_count = ARRAY_SIZE(instance_exts),
         .dev_exts = dev_exts,
@@ -232,7 +238,7 @@ display_test_draw(struct display_test *test)
     if (!img)
         vk_die("failed to acquire image");
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
+    VkCommandBuffer cmd = vk_begin_cmd(vk, test->protected);
 
     const VkImageSubresourceRange subres_range = {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -285,6 +291,7 @@ main(void)
     struct display_test test = {
         .format = VK_FORMAT_B8G8R8A8_SRGB,
         .present_mode = VK_PRESENT_MODE_FIFO_KHR,
+        .protected = false,
     };
 
     display_test_init(&test);

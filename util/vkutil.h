@@ -704,6 +704,7 @@ vk_cleanup(struct vk *vk)
     }
 
     vk->DestroyDescriptorPool(vk->dev, vk->desc_pool, NULL);
+    vk->DestroyCommandPool(vk->dev, vk->protected_cmd_pool, NULL);
     vk->DestroyCommandPool(vk->dev, vk->cmd_pool, NULL);
 
     vk->DestroyDevice(vk->dev, NULL);
@@ -2257,6 +2258,7 @@ vk_recreate_swapchain(struct vk *vk,
 
 static inline struct vk_swapchain *
 vk_create_swapchain(struct vk *vk,
+                    VkSwapchainCreateFlagsKHR flags,
                     VkSurfaceKHR surf,
                     VkFormat format,
                     uint32_t width,
@@ -2274,6 +2276,7 @@ vk_create_swapchain(struct vk *vk,
 
     swapchain->info = (VkSwapchainCreateInfoKHR){
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .flags = flags,
         .surface = surf,
         .minImageCount = surf_caps.minImageCount,
         .imageFormat = format,
