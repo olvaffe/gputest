@@ -1,12 +1,13 @@
 [constants]
 toolchain_prefix = '/usr/bin/aarch64-linux-gnu-'
-sysroot = '/chroots/debian-testing-arm64'
+sysroot = '/chroots/debian-trixie-arm64'
 arch = 'aarch64'
-common_flags = ['--sysroot', sysroot]
+common_flags = ['--sysroot=' + sysroot]
 
 [binaries]
 ar = toolchain_prefix + 'ar'
 c = toolchain_prefix + 'gcc'
+cpp = toolchain_prefix + 'g++'
 strip = toolchain_prefix + 'strip'
 pkgconfig = '/usr/bin/pkg-config'
 
