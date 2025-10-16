@@ -13,7 +13,9 @@ struct kms_test {
     const char *gbm_path;
     uint32_t drm_format;
     VkFormat vk_format;
+    uint64_t modifier;
     VkExternalMemoryHandleTypeFlagBits handle_type;
+    bool import;
     bool protected;
 
     struct drm drm;
@@ -39,30 +41,39 @@ kms_test_init_memory(struct kms_test *test)
     VkMemoryRequirements reqs;
     vk->GetImageMemoryRequirements(vk->dev, test->img, &reqs);
 
-    const int fd = dup(test->bo.fds[0]);
-    if (fd < 0)
-        vk_die("failed to dup dma-buf");
+    uint32_t mt_mask = reqs.memoryTypeBits;
+    int import_fd = -1;
+    if (test->import) {
+        import_fd = dup(test->bo.fds[0]);
+        if (import_fd < 0)
+            vk_die("failed to dup dma-buf");
 
-    VkMemoryFdPropertiesKHR fd_props = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR,
-    };
-    vk->result = vk->GetMemoryFdPropertiesKHR(vk->dev, test->handle_type, fd, &fd_props);
-    vk_check(vk, "invalid dma-buf");
+        VkMemoryFdPropertiesKHR fd_props = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR,
+        };
+        vk->result =
+            vk->GetMemoryFdPropertiesKHR(vk->dev, test->handle_type, import_fd, &fd_props);
+        vk_check(vk, "invalid dma-buf");
 
-    uint32_t mt_mask = reqs.memoryTypeBits & fd_props.memoryTypeBits;
-    if (!mt_mask)
-        vk_die("no valid mt");
+        mt_mask &= fd_props.memoryTypeBits;
+        if (!mt_mask)
+            vk_die("no valid mt");
+    }
 
     const uint32_t mt = ffs(mt_mask) - 1;
 
     const VkImportMemoryFdInfoKHR import_info = {
         .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR,
         .handleType = test->handle_type,
-        .fd = fd,
+        .fd = import_fd,
+    };
+    const VkExportMemoryAllocateInfo export_info = {
+        .sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO,
+        .handleTypes = test->handle_type,
     };
     const VkMemoryDedicatedAllocateInfo dedicated_info = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,
-        .pNext = &import_info,
+        .pNext = test->import ? (void *)&import_info : (void *)&export_info,
         .image = test->img,
     };
     const VkMemoryAllocateInfo alloc_info = {
@@ -88,16 +99,21 @@ kms_test_init_image(struct kms_test *test)
         explicit_layouts[i].offset = test->bo.offsets[i];
         explicit_layouts[i].rowPitch = test->bo.strides[i];
     }
-
     const VkImageDrmFormatModifierExplicitCreateInfoEXT explicit_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_EXPLICIT_CREATE_INFO_EXT,
         .drmFormatModifier = test->bo.modifier,
         .drmFormatModifierPlaneCount = test->bo.num_fds,
         .pPlaneLayouts = explicit_layouts,
     };
+    const VkImageDrmFormatModifierListCreateInfoEXT mod_list_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_LIST_CREATE_INFO_EXT,
+        .drmFormatModifierCount = 1,
+        .pDrmFormatModifiers = &test->modifier,
+    };
+
     const VkExternalMemoryImageCreateInfo external_info = {
         .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
-        .pNext = &explicit_info,
+        .pNext = test->import ? (void *)&explicit_info : (void *)&mod_list_info,
         .handleTypes = test->handle_type,
     };
     const VkImageCreateInfo info = {
@@ -163,7 +179,7 @@ kms_test_init_fb(struct kms_test *test)
 
     if (drmModeAddFB2WithModifiers(drm->fd, test->bo.width, test->bo.height, test->bo.format,
                                    handles, pitches, offsets, NULL, &test->fb_id, 0))
-        drm_die("failed to create fb");
+        vk_die("failed to create fb");
 
     for (uint32_t i = 0; i < test->bo.num_fds; i++)
         drmCloseBufferHandle(drm->fd, handles[i]);
@@ -172,6 +188,61 @@ kms_test_init_fb(struct kms_test *test)
 static void
 kms_test_init_bo(struct kms_test *test)
 {
+    if (!test->import) {
+        struct vk *vk = &test->vk;
+
+        test->bo.format = test->drm_format;
+        test->bo.modifier = test->modifier;
+
+        VkDrmFormatModifierPropertiesListEXT mod_props = {
+            .sType = VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT,
+        };
+        VkFormatProperties2 fmt_props = {
+            .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+            .pNext = &mod_props,
+
+        };
+        vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, test->vk_format, &fmt_props);
+        mod_props.pDrmFormatModifierProperties = malloc(
+            sizeof(*mod_props.pDrmFormatModifierProperties) * mod_props.drmFormatModifierCount);
+        if (!mod_props.pDrmFormatModifierProperties)
+            vk_die("failed to alloc mod props");
+        vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, test->vk_format, &fmt_props);
+        for (uint32_t i = 0; i < mod_props.drmFormatModifierCount; i++) {
+            const VkDrmFormatModifierPropertiesEXT *mod =
+                &mod_props.pDrmFormatModifierProperties[i];
+            if (mod->drmFormatModifier == test->modifier) {
+                test->bo.num_fds = mod->drmFormatModifierPlaneCount;
+                break;
+            }
+        }
+        if (!test->bo.num_fds)
+            vk_die("failed to get mem plane count");
+
+        free(mod_props.pDrmFormatModifierProperties);
+
+        const VkMemoryGetFdInfoKHR fd_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR,
+            .memory = test->mem,
+            .handleType = test->handle_type,
+        };
+        for (uint32_t i = 0; i < test->bo.num_fds; i++) {
+            vk->result = vk->GetMemoryFdKHR(vk->dev, &fd_info, &test->bo.fds[i]);
+            vk_check(vk, "failed to export dma-buf");
+
+            const VkImageSubresource subres = {
+                .aspectMask = VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT << i,
+            };
+            VkSubresourceLayout layout;
+            vk->GetImageSubresourceLayout(vk->dev, test->img, &subres, &layout);
+
+            test->bo.offsets[i] = layout.offset;
+            test->bo.strides[i] = layout.rowPitch;
+        }
+
+        return;
+    }
+
     struct gbm local_gbm;
     struct gbm *gbm = &local_gbm;
 
@@ -180,13 +251,12 @@ kms_test_init_bo(struct kms_test *test)
     };
     gbm_init(gbm, &gbm_params);
 
-    const uint64_t mod = DRM_FORMAT_MOD_LINEAR;
     uint32_t flags = GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING;
     if (test->protected)
         flags |= GBM_BO_USE_PROTECTED;
 
     struct gbm_bo *bo = gbm_create_bo(gbm, test->mode->hdisplay, test->mode->vdisplay,
-                                      test->drm_format, &mod, 1, flags);
+                                      test->drm_format, &test->modifier, 1, flags);
 
     gbm_export_bo(gbm, bo, &test->bo);
 
@@ -294,11 +364,19 @@ kms_test_init(struct kms_test *test)
     vk_init(vk, &vk_params);
 
     kms_test_init_pipe(test);
-    kms_test_init_bo(test);
+    if (test->import) {
+        kms_test_init_bo(test);
+        kms_test_init_image(test);
+        kms_test_init_memory(test);
+    } else {
+        test->bo.width = test->mode->hdisplay;
+        test->bo.height = test->mode->vdisplay;
+        kms_test_init_image(test);
+        kms_test_init_memory(test);
+        kms_test_init_bo(test);
+    }
     kms_test_init_fb(test);
     kms_test_init_req(test);
-    kms_test_init_image(test);
-    kms_test_init_memory(test);
 }
 
 static void
@@ -386,7 +464,9 @@ main(int argc, char **argv)
         .gbm_path = "/dev/dri/renderD128",
         .drm_format = DRM_FORMAT_XRGB8888,
         .vk_format = VK_FORMAT_B8G8R8A8_SRGB,
+        .modifier = DRM_FORMAT_MOD_LINEAR,
         .handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
+        .import = true,
         .protected = false,
     };
 
