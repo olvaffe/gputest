@@ -51,6 +51,9 @@ tests = [
 
 if idep_drmutil.found()
   tests += ['residency']
+  if idep_gbmutil.found()
+    tests += ['kms']
+  endif
 endif
 if idep_spvutil.found()
   tests += ['compile']
@@ -97,6 +100,8 @@ foreach t : tests
 
   if t == 'compile'
     test_deps += [idep_spvutil]
+  elif t == 'kms'
+    test_deps += [idep_drmutil, idep_gbmutil]
   elif t == 'ktx'
     if dep_ktx.found()
       test_deps += [dep_ktx]
