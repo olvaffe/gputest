@@ -280,13 +280,14 @@ kms_test_init(struct kms_test *test)
     drm_scan_resources(drm);
 
     const char *const dev_exts[] = {
+        VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,
         VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME,
         VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
         VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME,
         VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME,
     };
     const struct vk_init_params vk_params = {
-        .api_version = VK_API_VERSION_1_3,
+        .protected_memory = test->protected,
         .dev_exts = dev_exts,
         .dev_ext_count = ARRAY_SIZE(dev_exts),
     };
