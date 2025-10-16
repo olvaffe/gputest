@@ -94,6 +94,43 @@ kms_test_init_image(struct kms_test *test)
 {
     struct vk *vk = &test->vk;
 
+    const VkPhysicalDeviceExternalImageFormatInfo fmt_ext_info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO,
+        .handleType = test->handle_type,
+    };
+    const VkPhysicalDeviceImageDrmFormatModifierInfoEXT fmt_mod_info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT,
+        .pNext = &fmt_ext_info,
+        .drmFormatModifier = test->modifier,
+    };
+    const VkPhysicalDeviceImageFormatInfo2 fmt_info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
+        .pNext = &fmt_mod_info,
+        .format = test->vk_format,
+        .type = VK_IMAGE_TYPE_2D,
+        .tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT,
+        .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        .flags = test->protected ? VK_IMAGE_CREATE_PROTECTED_BIT : 0,
+    };
+    VkExternalImageFormatProperties fmt_ext_props = {
+        .sType = VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES,
+    };
+    VkImageFormatProperties2 fmt_props = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2,
+        .pNext = &fmt_ext_props,
+    };
+    vk->result =
+        vk->GetPhysicalDeviceImageFormatProperties2(vk->physical_dev, &fmt_info, &fmt_props);
+    vk_check(vk, "unsupported image");
+
+    const VkExternalMemoryFeatureFlags ext_mem_feats =
+        fmt_ext_props.externalMemoryProperties.externalMemoryFeatures;
+    const VkExternalMemoryFeatureFlags ext_mem_reqs =
+        test->import ? VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT
+                     : VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT;
+    if (!(ext_mem_feats & ext_mem_reqs))
+        vk_die("image does not support %s", test->import ? "import" : "export");
+
     VkSubresourceLayout explicit_layouts[GBM_MAX_PLANES] = { 0 };
     for (uint32_t i = 0; i < test->bo.num_fds; i++) {
         explicit_layouts[i].offset = test->bo.offsets[i];
