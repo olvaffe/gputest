@@ -250,6 +250,15 @@ PFN_DEVICE(GetDeviceImageSparseMemoryRequirements)
 PFN_DEVICE(GetCalibratedTimestampsEXT)
 PFN_INSTANCE(GetPhysicalDeviceCalibrateableTimeDomainsEXT)
 
+/* VK_KHR_display */
+PFN_INSTANCE(GetPhysicalDeviceDisplayPropertiesKHR)
+PFN_INSTANCE(GetPhysicalDeviceDisplayPlanePropertiesKHR)
+PFN_INSTANCE(GetDisplayPlaneSupportedDisplaysKHR)
+PFN_INSTANCE(GetDisplayModePropertiesKHR)
+PFN_INSTANCE(CreateDisplayModeKHR)
+PFN_INSTANCE(GetDisplayPlaneCapabilitiesKHR)
+PFN_INSTANCE(CreateDisplayPlaneSurfaceKHR)
+
 /* VK_KHR_surface */
 PFN_INSTANCE(DestroySurfaceKHR)
 PFN_INSTANCE(GetPhysicalDeviceSurfaceSupportKHR)

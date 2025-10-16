@@ -13,6 +13,7 @@ tests = [
   'convlayer',
   'depth_resolve',
   'desc_buf',
+  'display',
   'dma_heap',
   'dynamic_rendering',
   'dynamic_rendering_suspend_resume',
