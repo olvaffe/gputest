@@ -10,8 +10,8 @@ struct paced_test {
     uint32_t width;
     uint32_t height;
     uint32_t copy_count;
-    uint32_t refresh_rate;
-    uint32_t utilization;
+    uint32_t interval_ms;
+    uint32_t busy_ms;
 
     struct vk vk;
     struct vk_image *src;
@@ -137,7 +137,10 @@ paced_test_draw(struct paced_test *test)
 {
     struct vk *vk = &test->vk;
 
-    if (test->utilization == 100) {
+    vk_log("interval: %dms", test->interval_ms);
+    vk_log("busy: %dms", test->busy_ms);
+
+    if (test->interval_ms == test->busy_ms) {
         while (true)
             paced_test_draw_once(test);
         return;
@@ -149,35 +152,35 @@ paced_test_draw(struct paced_test *test)
     while (true) {
         paced_test_draw_once(test);
         draw_count++;
-        const uint64_t dur = u_now() - begin;
-        if (dur > 500 * 1000 * 1000)
+        const uint32_t dur_ms = (u_now() - begin) / 1000 / 1000;
+        if (dur_ms > 500)
             break;
     }
     vk_wait(vk);
-    const uint64_t draw_time = (u_now() - begin) / draw_count;
-    vk_log("calibrated draw time: %d.%dms", (int)(draw_time / 1000) / 1000,
-           (int)(draw_time / 1000) % 1000);
+    const uint32_t draw_ns = (u_now() - begin) / draw_count;
 
-    const uint64_t interval = 1000ull * 1000 * 1000 / test->refresh_rate;
-    const uint64_t busy_time = interval * test->utilization / 100;
-    draw_count = busy_time / draw_time;
+    draw_count = test->busy_ms * 1000 * 1000 / draw_ns;
     if (!draw_count)
         draw_count = 1;
+
+    vk_log("calibrated draw time: %d.%dms", (draw_ns / 1000) / 1000,
+           (draw_ns / 1000) % 1000);
+    vk_log("calibrated draw count: %d", draw_count);
 
     begin = u_now();
     while (true) {
         for (uint32_t i = 0; i < draw_count; i++)
             paced_test_draw_once(test);
 
-        const uint64_t dur = u_now() - begin;
-        if (dur < interval)
-            u_sleep((interval - dur) / 1000 / 1000);
+        const uint64_t dur_ms = (u_now() - begin) / 1000 / 1000;
+        if (dur_ms < test->interval_ms)
+            u_sleep(test->interval_ms - dur_ms);
         begin = u_now();
     }
 }
 
 int
-main(void)
+main(int argc, char **argv)
 {
     struct paced_test test = {
         .format = VK_FORMAT_B8G8R8A8_UNORM,
@@ -185,9 +188,14 @@ main(void)
         .height = 1024,
         .copy_count = 10,
 
-        .refresh_rate = 60,
-        .utilization = 50,
+        .interval_ms = 16,
+        .busy_ms = 8,
     };
+
+    if (argc > 1)
+        test.interval_ms = atoi(argv[1]);
+    if (argc > 2)
+        test.busy_ms = atoi(argv[2]);
 
     paced_test_init(&test);
     paced_test_draw(&test);
