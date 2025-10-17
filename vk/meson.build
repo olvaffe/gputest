@@ -28,6 +28,7 @@ tests = [
   'mem',
   'mem_alloc',
   'msaa',
+  'paced',
   'pipeline_stats',
   'push_const',
   'renderpass_ops',
