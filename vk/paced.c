@@ -135,21 +135,44 @@ paced_test_draw_once(struct paced_test *test)
 static void
 paced_test_draw(struct paced_test *test)
 {
-    const uint64_t interval = 1000ull * 1000 * 1000 / test->refresh_rate;
-    const uint64_t busy = interval * 100 / test->utilization;
+    struct vk *vk = &test->vk;
 
+    if (test->utilization == 100) {
+        while (true)
+            paced_test_draw_once(test);
+        return;
+    }
+
+    /* calibrate draw time */
+    uint32_t draw_count = 0;
     uint64_t begin = u_now();
     while (true) {
         paced_test_draw_once(test);
+        draw_count++;
+        const uint64_t dur = u_now() - begin;
+        if (dur > 500 * 1000 * 1000)
+            break;
+    }
+    vk_wait(vk);
+    const uint64_t draw_time = (u_now() - begin) / draw_count;
+    vk_log("calibrated draw time: %d.%dms", (int)(draw_time / 1000) / 1000,
+           (int)(draw_time / 1000) % 1000);
 
-        if (interval == busy)
-            continue;
+    const uint64_t interval = 1000ull * 1000 * 1000 / test->refresh_rate;
+    const uint64_t busy_time = interval * test->utilization / 100;
+    draw_count = busy_time / draw_time;
+    if (!draw_count)
+        draw_count = 1;
+
+    begin = u_now();
+    while (true) {
+        for (uint32_t i = 0; i < draw_count; i++)
+            paced_test_draw_once(test);
 
         const uint64_t dur = u_now() - begin;
-        if (dur > busy) {
-            u_sleep(interval - dur);
-            begin = u_now();
-        }
+        if (dur < interval)
+            u_sleep((interval - dur) / 1000 / 1000);
+        begin = u_now();
     }
 }
 
