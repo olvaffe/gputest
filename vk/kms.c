@@ -288,14 +288,27 @@ kms_test_init_bo(struct kms_test *test)
     };
     gbm_init(gbm, &gbm_params);
 
+    const uint64_t *mods = &test->modifier;
+    uint32_t mod_count = 1;
     uint32_t flags = GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING;
-    if (test->protected)
+    if (gbm->is_minigbm) {
+        mods = NULL;
+        mod_count = 0;
+        if (test->modifier == DRM_FORMAT_MOD_LINEAR)
+            flags |= GBM_BO_USE_LINEAR;
+        if (test->protected)
+            flags |= 1 << 8;
+    } else if (test->protected) {
         flags |= GBM_BO_USE_PROTECTED;
+    }
 
     struct gbm_bo *bo = gbm_create_bo(gbm, test->mode->hdisplay, test->mode->vdisplay,
-                                      test->drm_format, &test->modifier, 1, flags);
+                                      test->drm_format, mods, mod_count, flags);
 
     gbm_export_bo(gbm, bo, &test->bo);
+
+    if (test->bo.modifier != test->modifier)
+        vk_die("unexpected modifier");
 
     gbm_destroy_bo(gbm, bo);
 
@@ -414,6 +427,11 @@ kms_test_init(struct kms_test *test)
     }
     kms_test_init_fb(test);
     kms_test_init_req(test);
+
+    vk_log("import: %d", test->import);
+    vk_log("protected: %d", test->protected);
+    if (test->protected)
+      vk_log("protectedNoFault: %d", vk->protected_props.protectedNoFault);
 }
 
 static void

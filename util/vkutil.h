@@ -68,6 +68,7 @@ struct vk {
     VkPhysicalDeviceVulkan13Properties vulkan_13_props;
 
     VkPhysicalDeviceDrmPropertiesEXT drm_props;
+    VkPhysicalDeviceProtectedMemoryProperties protected_props;
 
     VkPhysicalDeviceFeatures2 features;
     VkPhysicalDeviceVulkan11Features vulkan_11_features;
@@ -409,6 +410,11 @@ vk_init_physical_device_properties(struct vk *vk)
         vk->drm_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRM_PROPERTIES_EXT;
         *pnext = &vk->drm_props;
         pnext = &vk->drm_props.pNext;
+    }
+    if (vk->params.protected_memory) {
+        vk->protected_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_PROPERTIES;
+        *pnext = &vk->protected_props;
+        pnext = &vk->protected_props.pNext;
     }
 
     vk->GetPhysicalDeviceProperties2(vk->physical_dev, &vk->props);
