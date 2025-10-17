@@ -12,6 +12,7 @@ struct paced_test {
     uint32_t copy_count;
     uint32_t interval_ms;
     uint32_t busy_ms;
+    bool high_priority;
 
     struct vk vk;
     struct vk_image *src;
@@ -36,7 +37,10 @@ paced_test_init(struct paced_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_init(vk, NULL);
+    struct vk_init_params params = {
+        .high_priority = test->high_priority,
+    };
+    vk_init(vk, &params);
     paced_test_init_image(test);
 }
 
@@ -139,6 +143,7 @@ paced_test_draw(struct paced_test *test)
 
     vk_log("interval: %dms", test->interval_ms);
     vk_log("busy: %dms", test->busy_ms);
+    vk_log("high priority: %d", test->high_priority);
 
     if (test->interval_ms == test->busy_ms) {
         while (true)
@@ -163,8 +168,7 @@ paced_test_draw(struct paced_test *test)
     if (!draw_count)
         draw_count = 1;
 
-    vk_log("calibrated draw time: %d.%dms", (draw_ns / 1000) / 1000,
-           (draw_ns / 1000) % 1000);
+    vk_log("calibrated draw time: %d.%dms", (draw_ns / 1000) / 1000, (draw_ns / 1000) % 1000);
     vk_log("calibrated draw count: %d", draw_count);
 
     begin = u_now();
@@ -190,12 +194,20 @@ main(int argc, char **argv)
 
         .interval_ms = 16,
         .busy_ms = 8,
+        .high_priority = false,
     };
 
     if (argc > 1)
         test.interval_ms = atoi(argv[1]);
     if (argc > 2)
         test.busy_ms = atoi(argv[2]);
+    if (argc > 3)
+        test.high_priority = atoi(argv[3]);
+
+    char mesa_process_name[64];
+    snprintf(mesa_process_name, sizeof(mesa_process_name), "%s-%d-%d%s", argv[0],
+             test.interval_ms, test.busy_ms, test.high_priority ? "-hi" : "");
+    setenv("MESA_PROCESS_NAME", mesa_process_name, true);
 
     paced_test_init(&test);
     paced_test_draw(&test);

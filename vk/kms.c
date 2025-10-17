@@ -431,7 +431,7 @@ kms_test_init(struct kms_test *test)
     vk_log("import: %d", test->import);
     vk_log("protected: %d", test->protected);
     if (test->protected)
-      vk_log("protectedNoFault: %d", vk->protected_props.protectedNoFault);
+        vk_log("protectedNoFault: %d", vk->protected_props.protectedNoFault);
 }
 
 static void
