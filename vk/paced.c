@@ -1,35 +1,125 @@
 /*
- * Copyright 2022 Google LLC
+ * Copyright 2025 Google LLC
  * SPDX-License-Identifier: MIT
  */
 
 #include "vkutil.h"
 
+static const uint32_t paced_test_vs[] = {
+#include "paced_test.vert.inc"
+};
+
+static const uint32_t paced_test_fs[] = {
+#include "paced_test.frag.inc"
+};
+
+static const uint32_t paced_test_cs[] = {
+#include "paced_test.comp.inc"
+};
+
+struct paced_push_const {
+    uint32_t vs_loop;
+    uint32_t fs_loop;
+    uint32_t cs_loop;
+    float val;
+};
+
 struct paced_test {
     VkFormat format;
     uint32_t width;
     uint32_t height;
+    VkDeviceSize size;
     uint32_t copy_count;
     uint32_t interval_ms;
     uint32_t busy_ms;
     bool high_priority;
 
+    uint32_t vertex_count;
+    uint32_t group_count;
+    struct paced_push_const push_const;
+
     struct vk vk;
-    struct vk_image *src;
-    struct vk_image *dst;
+
+    struct vk_image *img;
+    struct vk_framebuffer *fb;
+    struct vk_buffer *ssbo;
+
+    struct vk_pipeline *gfx;
+    struct vk_pipeline *comp;
+    struct vk_descriptor_set *comp_set;
 };
 
 static void
-paced_test_init_image(struct paced_test *test)
+paced_test_init_descriptor_set(struct paced_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->src =
+    test->comp_set = vk_create_descriptor_set(vk, test->comp->set_layouts[0]);
+    vk_write_descriptor_set_buffer(vk, test->comp_set, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                   test->ssbo, VK_WHOLE_SIZE);
+}
+
+static void
+paced_test_init_pipelines(struct paced_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    test->gfx = vk_create_pipeline(vk);
+
+    vk_add_pipeline_shader(vk, test->gfx, VK_SHADER_STAGE_VERTEX_BIT, paced_test_vs,
+                           sizeof(paced_test_vs));
+    vk_add_pipeline_shader(vk, test->gfx, VK_SHADER_STAGE_FRAGMENT_BIT, paced_test_fs,
+                           sizeof(paced_test_fs));
+
+    vk_set_pipeline_topology(vk, test->gfx, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+
+    vk_set_pipeline_viewport(vk, test->gfx, test->fb->width, test->fb->height);
+    vk_set_pipeline_rasterization(vk, test->gfx, VK_POLYGON_MODE_FILL);
+
+    vk_set_pipeline_push_const(vk, test->gfx,
+                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                               sizeof(test->push_const));
+
+    vk_set_pipeline_sample_count(vk, test->gfx, test->fb->samples);
+
+    vk_setup_pipeline(vk, test->gfx, test->fb);
+    vk_compile_pipeline(vk, test->gfx);
+
+    test->comp = vk_create_pipeline(vk);
+
+    vk_add_pipeline_shader(vk, test->comp, VK_SHADER_STAGE_COMPUTE_BIT, paced_test_cs,
+                           sizeof(paced_test_cs));
+
+    vk_add_pipeline_set_layout(vk, test->comp, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                               VK_SHADER_STAGE_COMPUTE_BIT, NULL);
+
+    vk_set_pipeline_push_const(vk, test->comp, VK_SHADER_STAGE_COMPUTE_BIT,
+                               sizeof(test->push_const));
+
+    vk_setup_pipeline(vk, test->comp, NULL);
+    vk_compile_pipeline(vk, test->comp);
+}
+
+static void
+paced_test_init_ssbo(struct paced_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    test->ssbo = vk_create_buffer(vk, 0, test->size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+}
+
+static void
+paced_test_init_framebuffer(struct paced_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    test->img =
         vk_create_image(vk, test->format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
-                        VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-    test->dst =
-        vk_create_image(vk, test->format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
-                        VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+                        VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vk_create_image_render_view(vk, test->img, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    test->fb = vk_create_framebuffer(vk, test->img, NULL, NULL, VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                     VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void
@@ -41,7 +131,11 @@ paced_test_init(struct paced_test *test)
         .high_priority = test->high_priority,
     };
     vk_init(vk, &params);
-    paced_test_init_image(test);
+
+    paced_test_init_framebuffer(test);
+    paced_test_init_ssbo(test);
+    paced_test_init_pipelines(test);
+    paced_test_init_descriptor_set(test);
 }
 
 static void
@@ -49,91 +143,108 @@ paced_test_cleanup(struct paced_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_destroy_image(vk, test->src);
-    vk_destroy_image(vk, test->dst);
+    vk_destroy_descriptor_set(vk, test->comp_set);
+
+    vk_destroy_pipeline(vk, test->gfx);
+    vk_destroy_pipeline(vk, test->comp);
+
+    vk_destroy_buffer(vk, test->ssbo);
+
+    vk_destroy_image(vk, test->img);
+    vk_destroy_framebuffer(vk, test->fb);
+
     vk_cleanup(vk);
 }
 
 static void
-paced_test_draw_once(struct paced_test *test)
+paced_test_draw_comp(struct paced_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
-    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
-
-    const VkImageCopy region = {
-        .srcSubresource = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .layerCount = 1,
-        },
-        .dstSubresource = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .layerCount = 1,
-        },
-        .extent = {
-            .width = test->width,
-            .height = test->height,
-            .depth = 1,
-        },
+    const VkBufferMemoryBarrier pre_barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .srcAccessMask = 0,
+        .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .buffer = test->ssbo->buf,
+        .size = VK_WHOLE_SIZE,
     };
+    const VkBufferMemoryBarrier post_barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+        .buffer = test->ssbo->buf,
+        .size = VK_WHOLE_SIZE,
+    };
+
+    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 1, &pre_barrier, 0,
+                           NULL);
+
+    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, test->comp->pipeline);
+    vk->CmdPushConstants(cmd, test->comp->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                         sizeof(test->push_const), &test->push_const);
+    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, test->comp->pipeline_layout, 0,
+                              1, &test->comp_set->set, 0, NULL);
+    vk->CmdDispatch(cmd, test->group_count, 1, 1);
+
+    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                           0, 0, NULL, 1, &post_barrier, 0, NULL);
+}
+
+static void
+paced_test_draw_gfx(struct paced_test *test, VkCommandBuffer cmd)
+{
+    struct vk *vk = &test->vk;
+
     const VkImageSubresourceRange subres_range = {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .levelCount = 1,
         .layerCount = 1,
     };
-    const VkImageMemoryBarrier pre_barriers[2] = {
-        [0] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            .image = test->src->img,
-            .subresourceRange = subres_range,
-        },
-        [1] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .image = test->dst->img,
-            .subresourceRange = subres_range,
+    const VkImageMemoryBarrier pre_barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .srcAccessMask = 0,
+        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .image = test->img->img,
+        .subresourceRange = subres_range,
+    };
+    const VkRenderPassBeginInfo pass_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .renderPass = test->fb->pass,
+        .framebuffer = test->fb->fb,
+        .renderArea = {
+            .extent = {
+                .width = test->width,
+                .height = test->height,
+            },
         },
     };
-    const VkImageMemoryBarrier post_barriers[2] = {
-        [0] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .dstAccessMask = VK_ACCESS_HOST_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-            .image = test->src->img,
-            .subresourceRange = subres_range,
-        },
-        [1] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-            .image = test->dst->img,
-            .subresourceRange = subres_range,
-        },
+    const VkImageMemoryBarrier post_barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        .image = test->img->img,
+        .subresourceRange = subres_range,
     };
 
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           0, 0, NULL, 0, NULL, ARRAY_SIZE(pre_barriers), pre_barriers);
+    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1,
+                           &pre_barrier);
 
-    for (uint32_t i = 0; i < test->copy_count; i++) {
-        vk->CmdCopyImage(cmd, test->src->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                         test->dst->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-    }
+    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->gfx->pipeline);
+    vk->CmdPushConstants(cmd, test->gfx->pipeline_layout,
+                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                         sizeof(test->push_const), &test->push_const);
+    vk->CmdDraw(cmd, test->vertex_count, 1, 0, 0);
+    vk->CmdEndRenderPass(cmd);
 
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0,
-                           NULL, 0, NULL, ARRAY_SIZE(post_barriers), post_barriers);
-
-    vk_end_cmd(vk);
+    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_HOST_BIT, 0, 0, NULL, 0, NULL, 1, &post_barrier);
 }
 
 static void
@@ -141,45 +252,59 @@ paced_test_draw(struct paced_test *test)
 {
     struct vk *vk = &test->vk;
 
+    VkCommandBuffer cmd = vk_begin_cmd(vk, false);
+    if (test->vertex_count)
+        paced_test_draw_gfx(test, cmd);
+    if (test->group_count)
+        paced_test_draw_comp(test, cmd);
+    vk_end_cmd(vk);
+}
+
+static void
+paced_test_loop(struct paced_test *test)
+{
+    struct vk *vk = &test->vk;
+
     vk_log("interval: %dms", test->interval_ms);
     vk_log("busy: %dms", test->busy_ms);
     vk_log("high priority: %d", test->high_priority);
 
-    if (test->interval_ms == test->busy_ms) {
-        while (true)
-            paced_test_draw_once(test);
-        return;
-    }
-
-    /* calibrate draw time */
-    uint32_t draw_count = 0;
-    uint64_t begin = u_now();
+    vk_log("calibrating...");
+    const uint64_t calib_min = u_now() + 100ull * 1000 * 1000;
+    uint32_t vertex_count_inc = test->vertex_count / 2;
+    uint32_t group_count_inc = test->group_count / 2;
     while (true) {
-        paced_test_draw_once(test);
-        draw_count++;
-        const uint32_t dur_ms = (u_now() - begin) / 1000 / 1000;
-        if (dur_ms > 500)
+        paced_test_draw(test);
+
+        const uint64_t begin = u_now();
+        vk_wait(vk);
+        const uint64_t end = u_now();
+        const uint32_t dur_ms = (end - begin) / 1000 / 1000;
+        if (dur_ms > test->busy_ms) {
+            if (end < calib_min)
+                continue;
             break;
+        }
+
+        if (dur_ms * 4 < test->busy_ms) {
+            vertex_count_inc *= 2;
+            group_count_inc *= 2;
+        }
+
+        test->vertex_count += vertex_count_inc;
+        test->group_count += group_count_inc;
     }
-    vk_wait(vk);
-    const uint32_t draw_ns = (u_now() - begin) / draw_count;
 
-    draw_count = test->busy_ms * 1000 * 1000 / draw_ns;
-    if (!draw_count)
-        draw_count = 1;
-
-    vk_log("calibrated draw time: %d.%dms", (draw_ns / 1000) / 1000, (draw_ns / 1000) % 1000);
-    vk_log("calibrated draw count: %d", draw_count);
-
-    begin = u_now();
+    vk_log("looping...");
     while (true) {
-        for (uint32_t i = 0; i < draw_count; i++)
-            paced_test_draw_once(test);
+        const uint64_t begin = u_now();
+        paced_test_draw(test);
+        if (test->interval_ms == test->busy_ms)
+            continue;
 
-        const uint64_t dur_ms = (u_now() - begin) / 1000 / 1000;
+        const uint32_t dur_ms = (u_now() - begin) / 1000 / 1000;
         if (dur_ms < test->interval_ms)
             u_sleep(test->interval_ms - dur_ms);
-        begin = u_now();
     }
 }
 
@@ -190,11 +315,21 @@ main(int argc, char **argv)
         .format = VK_FORMAT_B8G8R8A8_UNORM,
         .width = 1024,
         .height = 1024,
+        .size = sizeof(uint32_t),
         .copy_count = 10,
 
         .interval_ms = 16,
         .busy_ms = 8,
         .high_priority = false,
+
+        .vertex_count = 1 * 3,
+        .group_count = 100,
+        .push_const = {
+            .vs_loop = 100,
+            .fs_loop = 100,
+            .cs_loop = 10000,
+            .val = 0.0f,
+        },
     };
 
     if (argc > 1)
@@ -210,7 +345,7 @@ main(int argc, char **argv)
     setenv("MESA_PROCESS_NAME", mesa_process_name, true);
 
     paced_test_init(&test);
-    paced_test_draw(&test);
+    paced_test_loop(&test);
     paced_test_cleanup(&test);
 
     return 0;

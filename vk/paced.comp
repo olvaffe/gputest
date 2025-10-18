@@ -1,0 +1,31 @@
+#version 460 core
+
+/*
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: MIT
+ */
+
+layout(local_size_x = 64) in;
+
+layout(push_constant) uniform CONSTS {
+    uint vs_loop;
+    uint fs_loop;
+    uint cs_loop;
+    float val;
+} consts;
+
+layout(set = 0, binding = 0) buffer DST {
+    float data;
+} dst;
+
+void main()
+{
+    uint val = gl_GlobalInvocationID.x;
+
+    float tmp = 0.0;
+    for (uint i = 0; i < consts.cs_loop; i++)
+        tmp += consts.val;
+    val += uint(tmp);
+
+    dst.data = val;
+}
