@@ -32,6 +32,7 @@ struct paced_test {
     uint32_t interval_ms;
     uint32_t busy_ms;
     bool high_priority;
+    bool double_inner;
 
     uint32_t vertex_count;
     uint32_t group_count;
@@ -273,11 +274,12 @@ paced_test_loop(struct paced_test *test)
     vk_log("interval: %dms", test->interval_ms);
     vk_log("busy: %dms", test->busy_ms);
     vk_log("high priority: %d", test->high_priority);
+    vk_log("double inner: %d", test->double_inner);
 
     vk_log("calibrating...");
     struct vk_stopwatch *stopwatch = vk_create_stopwatch(vk, 2);
-    const uint32_t vertex_count_inc = test->vertex_count;
-    const uint32_t group_count_inc = test->group_count;
+    uint32_t vertex_count_inc = test->vertex_count / 2;
+    uint32_t group_count_inc = test->group_count / 2;
     const uint64_t calib_min = u_now() + 100ull * 1000 * 1000;
     while (true) {
         paced_test_draw(test, stopwatch);
@@ -294,13 +296,18 @@ paced_test_loop(struct paced_test *test)
         }
 
         if (dur_ms * 8 < test->busy_ms) {
-            test->push_const.vs_loop *= 2;
-            test->push_const.fs_loop *= 2;
-            test->push_const.cs_loop *= 2;
-        } else {
-            test->vertex_count += vertex_count_inc;
-            test->group_count += group_count_inc;
+            if (test->double_inner) {
+                test->push_const.vs_loop *= 2;
+                test->push_const.fs_loop *= 2;
+                test->push_const.cs_loop *= 2;
+                continue;
+            } else {
+                vertex_count_inc *= 2;
+                group_count_inc *= 2;
+            }
         }
+        test->vertex_count += vertex_count_inc;
+        test->group_count += group_count_inc;
     }
     vk_destroy_stopwatch(vk, stopwatch);
 
@@ -329,6 +336,7 @@ main(int argc, char **argv)
         .interval_ms = 16,
         .busy_ms = 8,
         .high_priority = false,
+        .double_inner = false,
 
         .vertex_count = 10 * 3,
         .group_count = 10,
@@ -340,12 +348,16 @@ main(int argc, char **argv)
         },
     };
 
-    if (argc > 1)
-        test.interval_ms = atoi(argv[1]);
-    if (argc > 2)
-        test.busy_ms = atoi(argv[2]);
-    if (argc > 3)
-        test.high_priority = atoi(argv[3]);
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--interval"))
+            test.interval_ms = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--busy"))
+            test.busy_ms = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--priority"))
+            test.high_priority = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--inner"))
+            test.double_inner = atoi(argv[++i]);
+    }
 
     char mesa_process_name[64];
     snprintf(mesa_process_name, sizeof(mesa_process_name), "%s-%d-%d%s", argv[0],
