@@ -29,7 +29,6 @@ struct paced_test {
     uint32_t width;
     uint32_t height;
     VkDeviceSize size;
-    uint32_t copy_count;
     uint32_t interval_ms;
     uint32_t busy_ms;
     bool high_priority;
@@ -248,15 +247,21 @@ paced_test_draw_gfx(struct paced_test *test, VkCommandBuffer cmd)
 }
 
 static void
-paced_test_draw(struct paced_test *test)
+paced_test_draw(struct paced_test *test, struct vk_stopwatch *stopwatch)
 {
     struct vk *vk = &test->vk;
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
+    if (stopwatch)
+        vk_write_stopwatch(vk, stopwatch, cmd);
+
     if (test->vertex_count)
         paced_test_draw_gfx(test, cmd);
     if (test->group_count)
         paced_test_draw_comp(test, cmd);
+
+    if (stopwatch)
+        vk_write_stopwatch(vk, stopwatch, cmd);
     vk_end_cmd(vk);
 }
 
@@ -270,24 +275,25 @@ paced_test_loop(struct paced_test *test)
     vk_log("high priority: %d", test->high_priority);
 
     vk_log("calibrating...");
-    const uint64_t calib_min = u_now() + 100ull * 1000 * 1000;
+    struct vk_stopwatch *stopwatch = vk_create_stopwatch(vk, 2);
     uint32_t vertex_count_inc = test->vertex_count / 2;
     uint32_t group_count_inc = test->group_count / 2;
+    const uint64_t calib_min = u_now() + 100ull * 1000 * 1000;
     while (true) {
-        paced_test_draw(test);
-
-        const uint64_t begin = u_now();
+        paced_test_draw(test, stopwatch);
         vk_wait(vk);
-        const uint64_t end = u_now();
-        const uint32_t dur_ms = (end - begin) / 1000 / 1000;
-        if (dur_ms > test->busy_ms) {
-            if (end < calib_min)
+
+        const bool cont = u_now() < calib_min;
+        const uint32_t dur_ms = vk_read_stopwatch(vk, stopwatch, 0) / 1000 / 1000;
+        vk_reset_stopwatch(vk, stopwatch);
+        if (dur_ms >= test->busy_ms) {
+            if (cont)
                 continue;
             vk_log("calibrated busy: %dms", dur_ms);
             break;
         }
 
-        if (dur_ms * 4 < test->busy_ms) {
+        if (dur_ms * 8 < test->busy_ms) {
             vertex_count_inc *= 2;
             group_count_inc *= 2;
         }
@@ -295,11 +301,12 @@ paced_test_loop(struct paced_test *test)
         test->vertex_count += vertex_count_inc;
         test->group_count += group_count_inc;
     }
+    vk_destroy_stopwatch(vk, stopwatch);
 
     vk_log("looping...");
     while (true) {
         const uint64_t begin = u_now();
-        paced_test_draw(test);
+        paced_test_draw(test, NULL);
         if (test->interval_ms == test->busy_ms)
             continue;
 
@@ -314,20 +321,19 @@ main(int argc, char **argv)
 {
     struct paced_test test = {
         .format = VK_FORMAT_B8G8R8A8_UNORM,
-        .width = 1024,
-        .height = 1024,
+        .width = 8,
+        .height = 8,
         .size = sizeof(uint32_t),
-        .copy_count = 10,
 
         .interval_ms = 16,
         .busy_ms = 8,
         .high_priority = false,
 
-        .vertex_count = 1 * 3,
-        .group_count = 100,
+        .vertex_count = 10 * 3,
+        .group_count = 10,
         .push_const = {
-            .vs_loop = 100,
-            .fs_loop = 100,
+            .vs_loop = 10000,
+            .fs_loop = 10000,
             .cs_loop = 10000,
             .val = 0.0f,
         },
