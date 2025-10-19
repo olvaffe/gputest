@@ -283,6 +283,7 @@ paced_test_loop(struct paced_test *test)
         if (dur_ms > test->busy_ms) {
             if (end < calib_min)
                 continue;
+            vk_log("calibrated busy: %dms", dur_ms);
             break;
         }
 
