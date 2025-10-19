@@ -276,8 +276,8 @@ paced_test_loop(struct paced_test *test)
 
     vk_log("calibrating...");
     struct vk_stopwatch *stopwatch = vk_create_stopwatch(vk, 2);
-    uint32_t vertex_count_inc = test->vertex_count / 2;
-    uint32_t group_count_inc = test->group_count / 2;
+    const uint32_t vertex_count_inc = test->vertex_count;
+    const uint32_t group_count_inc = test->group_count;
     const uint64_t calib_min = u_now() + 100ull * 1000 * 1000;
     while (true) {
         paced_test_draw(test, stopwatch);
@@ -294,12 +294,13 @@ paced_test_loop(struct paced_test *test)
         }
 
         if (dur_ms * 8 < test->busy_ms) {
-            vertex_count_inc *= 2;
-            group_count_inc *= 2;
+            test->push_const.vs_loop *= 2;
+            test->push_const.fs_loop *= 2;
+            test->push_const.cs_loop *= 2;
+        } else {
+            test->vertex_count += vertex_count_inc;
+            test->group_count += group_count_inc;
         }
-
-        test->vertex_count += vertex_count_inc;
-        test->group_count += group_count_inc;
     }
     vk_destroy_stopwatch(vk, stopwatch);
 
