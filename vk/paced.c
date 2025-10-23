@@ -17,7 +17,20 @@ static const uint32_t paced_test_cs[] = {
 #include "paced_test.comp.inc"
 };
 
-struct paced_push_const {
+enum paced_test_grow {
+    PACED_TEST_GROW_VERTEX = 1 << 0,
+    PACED_TEST_GROW_FRAGMENT = 1 << 1,
+    PACED_TEST_GROW_WORKGROUP = 1 << 2,
+    PACED_TEST_GROW_VS = 1 << 3,
+    PACED_TEST_GROW_FS = 1 << 4,
+    PACED_TEST_GROW_CS = 1 << 5,
+
+    PACED_TEST_GROW_DRAW = PACED_TEST_GROW_VERTEX | PACED_TEST_GROW_FRAGMENT |
+                           PACED_TEST_GROW_VS | PACED_TEST_GROW_FS,
+    PACED_TEST_GROW_DISPATCH = PACED_TEST_GROW_WORKGROUP | PACED_TEST_GROW_CS,
+};
+
+struct paced_test_push_const {
     uint32_t vs_loop;
     uint32_t fs_loop;
     uint32_t cs_loop;
@@ -32,11 +45,12 @@ struct paced_test {
     uint32_t interval_ms;
     uint32_t busy_ms;
     bool high_priority;
-    bool double_inner;
+    uint32_t grow;
 
+    bool discard;
     uint32_t vertex_count;
     uint32_t group_count;
-    struct paced_push_const push_const;
+    struct paced_test_push_const push_const;
 
     struct vk vk;
 
@@ -74,7 +88,7 @@ paced_test_init_pipelines(struct paced_test *test)
     vk_set_pipeline_topology(vk, test->gfx, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
     vk_set_pipeline_viewport(vk, test->gfx, test->fb->width, test->fb->height);
-    vk_set_pipeline_rasterization(vk, test->gfx, VK_POLYGON_MODE_FILL, false);
+    vk_set_pipeline_rasterization(vk, test->gfx, VK_POLYGON_MODE_FILL, test->discard);
 
     vk_set_pipeline_push_const(vk, test->gfx,
                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -267,49 +281,90 @@ paced_test_draw(struct paced_test *test, struct vk_stopwatch *stopwatch)
 }
 
 static void
-paced_test_loop(struct paced_test *test)
+paced_test_calibrate_grow(struct paced_test *test, uint32_t gpu_ms)
+{
+    uint32_t multi = 2;
+    uint32_t denom = 1;
+    if (gpu_ms * 8 >= test->busy_ms) {
+        multi = 5;
+        denom = 4;
+    }
+
+    if (test->grow & PACED_TEST_GROW_DRAW) {
+        if (!test->vertex_count)
+            test->vertex_count = 10;
+        if (!test->push_const.vs_loop && test->grow & PACED_TEST_GROW_VS)
+            test->push_const.vs_loop = 100;
+        if (!test->push_const.fs_loop && test->grow & PACED_TEST_GROW_FS)
+            test->push_const.fs_loop = 100;
+    }
+
+    if (test->grow & PACED_TEST_GROW_DISPATCH) {
+        if (!test->group_count)
+            test->group_count = 10;
+        if (!test->push_const.cs_loop && test->grow & PACED_TEST_GROW_CS)
+            test->push_const.cs_loop = 100;
+    }
+
+    /* we enable rasterizerDiscardEnable or use large fb when only one of them is set */
+    if (test->grow & (PACED_TEST_GROW_VERTEX | PACED_TEST_GROW_FRAGMENT))
+        test->vertex_count = test->vertex_count * multi / denom;
+
+    if (test->grow & PACED_TEST_GROW_WORKGROUP)
+        test->group_count = test->group_count * multi / denom;
+
+    if (test->grow & PACED_TEST_GROW_VS)
+        test->push_const.vs_loop = test->push_const.vs_loop * multi / denom;
+
+    if (test->grow & PACED_TEST_GROW_FS)
+        test->push_const.fs_loop = test->push_const.fs_loop * multi / denom;
+
+    if (test->grow & PACED_TEST_GROW_CS)
+        test->push_const.cs_loop = test->push_const.cs_loop * multi / denom;
+}
+
+static void
+paced_test_calibrate(struct paced_test *test)
 {
     struct vk *vk = &test->vk;
+    struct vk_stopwatch *stopwatch = vk_create_stopwatch(vk, 2);
 
+    vk_log("calibrating...");
+
+    const uint64_t calib_min = u_now() + 100ull * 1000 * 1000;
+    uint32_t dur_ms = 0;
+    while (true) {
+        paced_test_calibrate_grow(test, dur_ms);
+        paced_test_draw(test, stopwatch);
+        vk_wait(vk);
+        const bool force_cont = u_now() < calib_min;
+
+        dur_ms = vk_read_stopwatch(vk, stopwatch, 0) / 1000 / 1000;
+        vk_reset_stopwatch(vk, stopwatch);
+        const bool done = dur_ms >= test->busy_ms && !force_cont;
+
+        if (done || false) {
+            vk_log("calibrated busy: %dms (vertex: %d, group: %d, vs: %d, fs: %d, cs: %d)",
+                   dur_ms, test->vertex_count, test->group_count, test->push_const.vs_loop,
+                   test->push_const.fs_loop, test->push_const.cs_loop);
+
+            if (done)
+                break;
+        }
+    }
+
+    vk_destroy_stopwatch(vk, stopwatch);
+}
+
+static void
+paced_test_loop(struct paced_test *test)
+{
     vk_log("interval: %dms", test->interval_ms);
     vk_log("busy: %dms", test->busy_ms);
     vk_log("high priority: %d", test->high_priority);
-    vk_log("double inner: %d", test->double_inner);
+    vk_log("grow: 0x%x", test->grow);
 
-    vk_log("calibrating...");
-    struct vk_stopwatch *stopwatch = vk_create_stopwatch(vk, 2);
-    uint32_t vertex_count_inc = test->vertex_count / 2;
-    uint32_t group_count_inc = test->group_count / 2;
-    const uint64_t calib_min = u_now() + 100ull * 1000 * 1000;
-    while (true) {
-        paced_test_draw(test, stopwatch);
-        vk_wait(vk);
-
-        const bool cont = u_now() < calib_min;
-        const uint32_t dur_ms = vk_read_stopwatch(vk, stopwatch, 0) / 1000 / 1000;
-        vk_reset_stopwatch(vk, stopwatch);
-        if (dur_ms >= test->busy_ms) {
-            if (cont)
-                continue;
-            vk_log("calibrated busy: %dms", dur_ms);
-            break;
-        }
-
-        if (dur_ms * 8 < test->busy_ms) {
-            if (test->double_inner) {
-                test->push_const.vs_loop *= 2;
-                test->push_const.fs_loop *= 2;
-                test->push_const.cs_loop *= 2;
-                continue;
-            } else {
-                vertex_count_inc *= 2;
-                group_count_inc *= 2;
-            }
-        }
-        test->vertex_count += vertex_count_inc;
-        test->group_count += group_count_inc;
-    }
-    vk_destroy_stopwatch(vk, stopwatch);
+    paced_test_calibrate(test);
 
     vk_log("looping...");
     while (true) {
@@ -336,16 +391,7 @@ main(int argc, char **argv)
         .interval_ms = 16,
         .busy_ms = 8,
         .high_priority = false,
-        .double_inner = false,
-
-        .vertex_count = 10 * 3,
-        .group_count = 10,
-        .push_const = {
-            .vs_loop = 10000,
-            .fs_loop = 10000,
-            .cs_loop = 10000,
-            .val = 0.0f,
-        },
+        .grow = PACED_TEST_GROW_VERTEX | PACED_TEST_GROW_FRAGMENT,
     };
 
     for (int i = 1; i < argc; i++) {
@@ -355,8 +401,33 @@ main(int argc, char **argv)
             test.busy_ms = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--priority"))
             test.high_priority = atoi(argv[++i]);
-        else if (!strcmp(argv[i], "--inner"))
-            test.double_inner = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--grow")) {
+            const char *grow = argv[++i];
+
+            test.grow = 0;
+            if (strstr(grow, "vertex"))
+                test.grow |= PACED_TEST_GROW_VERTEX;
+            if (strstr(grow, "fragment"))
+                test.grow |= PACED_TEST_GROW_FRAGMENT;
+            if (strstr(grow, "workgroup"))
+                test.grow |= PACED_TEST_GROW_WORKGROUP;
+            if (strstr(grow, "vs"))
+                test.grow |= PACED_TEST_GROW_VS;
+            if (strstr(grow, "fs"))
+                test.grow |= PACED_TEST_GROW_FS;
+            if (strstr(grow, "cs"))
+                test.grow |= PACED_TEST_GROW_CS;
+        }
+    }
+
+    if (test.grow & PACED_TEST_GROW_DRAW) {
+        if (!(test.grow & (PACED_TEST_GROW_FRAGMENT | PACED_TEST_GROW_FS)))
+            test.discard = true;
+
+        if (test.grow & PACED_TEST_GROW_FRAGMENT && !(test.grow & PACED_TEST_GROW_VERTEX)) {
+            test.width = 256;
+            test.height = 256;
+        }
     }
 
     char mesa_process_name[64];
