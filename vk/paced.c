@@ -74,7 +74,7 @@ paced_test_init_pipelines(struct paced_test *test)
     vk_set_pipeline_topology(vk, test->gfx, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
     vk_set_pipeline_viewport(vk, test->gfx, test->fb->width, test->fb->height);
-    vk_set_pipeline_rasterization(vk, test->gfx, VK_POLYGON_MODE_FILL);
+    vk_set_pipeline_rasterization(vk, test->gfx, VK_POLYGON_MODE_FILL, false);
 
     vk_set_pipeline_push_const(vk, test->gfx,
                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,

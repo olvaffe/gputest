@@ -1611,10 +1611,12 @@ vk_set_pipeline_viewport(struct vk *vk,
 static inline void
 vk_set_pipeline_rasterization(struct vk *vk,
                               struct vk_pipeline *pipeline,
-                              VkPolygonMode poly_mode)
+                              VkPolygonMode poly_mode,
+                              bool discard)
 {
     pipeline->rast_info = (VkPipelineRasterizationStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .rasterizerDiscardEnable = discard,
         .polygonMode = poly_mode,
         .lineWidth = 1.0f,
     };

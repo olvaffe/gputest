@@ -84,7 +84,7 @@ tess_test_init_pipeline(struct tess_test *test)
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_PATCH_LIST);
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->fb->width, test->fb->height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_LINE);
+    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_LINE, false);
     vk_set_pipeline_tessellation(vk, test->pipeline, 3);
 
     vk_set_pipeline_sample_count(vk, test->pipeline, test->fb->samples);

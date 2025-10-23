@@ -171,7 +171,7 @@ ktx_test_init_pipeline(struct ktx_test *test)
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->rt_img->info.extent.width,
                              test->rt_img->info.extent.height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL);
+    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
     vk_set_pipeline_sample_count(vk, test->pipeline, test->rt_img->info.samples);
 

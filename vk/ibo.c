@@ -68,7 +68,7 @@ ibo_test_init_pipeline(struct ibo_test *test)
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->fb->width, test->fb->height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL);
+    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
     vk_set_pipeline_sample_count(vk, test->pipeline, test->fb->samples);
 
