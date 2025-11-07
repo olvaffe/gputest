@@ -344,16 +344,25 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
 
     std::string diag_log;
     llvm::raw_string_ostream diag_stream{ diag_log };
+#if LLVM_VERSION_MAJOR >= 21
+    clang::DiagnosticsEngine diag_engine{ new clang::DiagnosticIDs, c.getDiagnosticOpts(),
+                                          new clang::TextDiagnosticPrinter{
+                                              diag_stream, c.getDiagnosticOpts() } };
+#else
     clang::DiagnosticsEngine diag_engine{ new clang::DiagnosticIDs, new clang::DiagnosticOptions,
                                           new clang::TextDiagnosticPrinter{
                                               diag_stream, &c.getDiagnosticOpts() } };
+#endif
 
     if (!clang::CompilerInvocation::CreateFromArgs(c.getInvocation(), opts, diag_engine) ||
         diag_engine.hasErrorOccurred())
         spv_die("failed to create invocation: %s", diag_log.c_str());
 
     c.getDiagnosticOpts().ShowCarets = false;
-#if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 21
+    c.createDiagnostics(*llvm::vfs::getRealFileSystem(),
+                        new clang::TextDiagnosticPrinter{ diag_stream, c.getDiagnosticOpts() });
+#elif LLVM_VERSION_MAJOR >= 20
     c.createDiagnostics(*llvm::vfs::getRealFileSystem(),
                         new clang::TextDiagnosticPrinter{ diag_stream, &c.getDiagnosticOpts() });
 #else
