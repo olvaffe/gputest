@@ -201,7 +201,8 @@ model_test_init(struct model_test *test)
     struct egl *egl = &test->egl;
 
     egl_init(egl, NULL);
-    test->fb = egl_create_framebuffer(egl, test->width, test->height);
+    test->fb =
+        egl_create_framebuffer(egl, test->width, test->height, GL_RGBA8, GL_DEPTH_COMPONENT16);
     test->prog = egl_create_program(egl, model_test_vs, model_test_fs);
     test->stopwatch = egl_create_stopwatch(egl, 2);
 
@@ -237,10 +238,13 @@ model_test_draw(struct model_test *test)
     gl->BindFramebuffer(GL_FRAMEBUFFER, test->fb->fbo);
     gl->Viewport(0, 0, test->width, test->height);
 
-    gl->Clear(GL_COLOR_BUFFER_BIT);
+    gl->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     egl_check(egl, "clear");
 
     gl->UseProgram(test->prog->prog);
+
+    gl->Enable(GL_CULL_FACE);
+    gl->Enable(GL_DEPTH_TEST);
 
     gl->VertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(*test->model.vertices) * 3,
                             test->model.vertices);

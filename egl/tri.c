@@ -58,7 +58,7 @@ tri_test_init(struct tri_test *test)
 
     if (test->use_fbo) {
         egl_init(egl, NULL);
-        test->fb = egl_create_framebuffer(egl, test->width, test->height);
+        test->fb = egl_create_framebuffer(egl, test->width, test->height, GL_RGBA8, GL_NONE);
     } else {
         const struct egl_init_params params = {
             .pbuffer_width = test->width,

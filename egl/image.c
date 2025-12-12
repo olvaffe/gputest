@@ -190,7 +190,7 @@ image_test_init(struct image_test *test)
     struct egl_gl *gl = &egl->gl;
 
     egl_init(egl, NULL);
-    test->fb = egl_create_framebuffer(egl, test->width, test->height);
+    test->fb = egl_create_framebuffer(egl, test->width, test->height, GL_RGBA8, GL_NONE);
 
     if (!strstr(egl->gl_exts, "GL_OES_EGL_image_external"))
         egl_die("no GL_OES_EGL_image_external");

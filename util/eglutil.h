@@ -81,7 +81,8 @@ struct egl {
 
 struct egl_framebuffer {
     GLuint fbo;
-    GLuint tex;
+    GLuint rt_tex;
+    GLuint ds_rb;
 };
 
 struct egl_program {
@@ -524,7 +525,7 @@ egl_teximage_2d_from_ppm(struct egl *egl, GLenum target, const void *ppm_data, s
 }
 
 static inline struct egl_framebuffer *
-egl_create_framebuffer(struct egl *egl, int width, int height)
+egl_create_framebuffer(struct egl *egl, int width, int height, GLenum rt_format, GLenum ds_format)
 {
     struct egl_gl *gl = &egl->gl;
 
@@ -533,17 +534,30 @@ egl_create_framebuffer(struct egl *egl, int width, int height)
         egl_die("failed to alloc fb");
 
     const GLenum target = GL_FRAMEBUFFER;
-    const GLenum textarget = GL_TEXTURE_2D;
-    const GLenum att = GL_COLOR_ATTACHMENT0;
+    const GLenum rt_target = GL_TEXTURE_2D;
+    const GLenum rt_att = GL_COLOR_ATTACHMENT0;
+    const GLenum ds_target = GL_RENDERBUFFER;
+    const GLenum ds_att = GL_DEPTH_ATTACHMENT;
 
-    gl->GenTextures(1, &fb->tex);
-    gl->BindTexture(textarget, fb->tex);
-    gl->TexStorage2D(textarget, 1, GL_RGBA8, width, height);
-    gl->BindTexture(textarget, 0);
+    if (rt_format) {
+        gl->GenTextures(1, &fb->rt_tex);
+        gl->BindTexture(rt_target, fb->rt_tex);
+        gl->TexStorage2D(rt_target, 1, rt_format, width, height);
+        gl->BindTexture(rt_target, 0);
+    }
+    if (ds_format) {
+        gl->GenRenderbuffers(1, &fb->ds_rb);
+        gl->BindRenderbuffer(ds_target, fb->ds_rb);
+        gl->RenderbufferStorage(ds_target, ds_format, width, height);
+        gl->BindRenderbuffer(ds_target, 0);
+    }
 
     gl->GenFramebuffers(1, &fb->fbo);
     gl->BindFramebuffer(target, fb->fbo);
-    gl->FramebufferTexture(target, att, fb->tex, 0);
+    if (rt_format)
+        gl->FramebufferTexture(target, rt_att, fb->rt_tex, 0);
+    if (ds_format)
+        gl->FramebufferRenderbuffer(target, ds_att, ds_target, fb->ds_rb);
 
     if (gl->CheckFramebufferStatus(target) != GL_FRAMEBUFFER_COMPLETE)
         egl_die("incomplete fbo");
@@ -558,8 +572,9 @@ egl_destroy_framebuffer(struct egl *egl, struct egl_framebuffer *fb)
 {
     struct egl_gl *gl = &egl->gl;
 
-    gl->DeleteTextures(1, &fb->tex);
     gl->DeleteFramebuffers(1, &fb->fbo);
+    gl->DeleteTextures(1, &fb->rt_tex);
+    gl->DeleteRenderbuffers(1, &fb->ds_rb);
 
     free(fb);
 }

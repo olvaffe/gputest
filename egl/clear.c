@@ -22,7 +22,7 @@ clear_test_init(struct clear_test *test)
     struct egl *egl = &test->egl;
 
     egl_init(egl, NULL);
-    test->fb = egl_create_framebuffer(egl, test->width, test->height);
+    test->fb = egl_create_framebuffer(egl, test->width, test->height, GL_RGBA8, GL_NONE);
 }
 
 static void
