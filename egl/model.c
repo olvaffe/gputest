@@ -41,6 +41,7 @@ struct model_test {
     struct egl_framebuffer *fb;
 
     struct egl_program *prog;
+    GLuint prog_bones;
     GLuint prog_mvp;
 
     struct egl_stopwatch *stopwatch;
@@ -121,13 +122,33 @@ model_test_upload_model(struct model_test *test)
         face[2] -= 1;
     }
 
-    const GLsizeiptr vbo_size = sizeof(*test->model.vertices) * test->model.vertex_count * 3;
-    const GLsizeiptr ibo_size = sizeof(*test->model.faces) * test->model.face_count * 3;
+    const GLsizeiptr pos_size = sizeof(*model->vertices) * model->vertex_count * 3;
+    const GLsizeiptr bone_idx_size = sizeof(float) * model->vertex_count * 4;
+    const GLsizeiptr bone_weight_size = sizeof(float) * model->vertex_count * 4;
+    const GLsizeiptr vbo_size = pos_size + bone_idx_size + bone_weight_size;
+
+    float *bone_indices = malloc(bone_idx_size);
+    float *bone_weights = malloc(bone_weight_size);
+    if (!bone_indices || !bone_weights)
+        egl_die("failed to alloc bones");
+    for (int i = 0; i < model->vertex_count; i++) {
+        for (int j = 0; j < 4; j++) {
+            bone_indices[i * 4 + j] = (i * 4 + j) % 32;
+            bone_weights[i * 4 + j] = 0.25f;
+        }
+    }
 
     gl->GenBuffers(1, &model->vbo);
     gl->BindBuffer(GL_ARRAY_BUFFER, model->vbo);
-    gl->BufferData(GL_ARRAY_BUFFER, vbo_size, model->vertices, GL_STATIC_DRAW);
+    gl->BufferData(GL_ARRAY_BUFFER, vbo_size, NULL, GL_STATIC_DRAW);
+    gl->BufferSubData(GL_ARRAY_BUFFER, 0, pos_size, model->vertices);
+    gl->BufferSubData(GL_ARRAY_BUFFER, pos_size, bone_idx_size, bone_indices);
+    gl->BufferSubData(GL_ARRAY_BUFFER, pos_size + bone_idx_size, bone_weight_size, bone_weights);
 
+    free(bone_indices);
+    free(bone_weights);
+
+    const GLsizeiptr ibo_size = sizeof(*model->faces) * model->face_count * 3;
     gl->GenBuffers(1, &model->ibo);
     gl->BindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->ibo);
     gl->BufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_size, model->faces, GL_STATIC_DRAW);
@@ -214,6 +235,7 @@ model_test_init(struct model_test *test)
         egl_create_framebuffer(egl, test->width, test->height, GL_RGBA8, GL_DEPTH_COMPONENT16);
 
     test->prog = egl_create_program(egl, model_test_vs, model_test_fs);
+    test->prog_bones = gl->GetUniformLocation(test->prog->prog, "bones");
     test->prog_mvp = gl->GetUniformLocation(test->prog->prog, "mvp");
 
     test->stopwatch = egl_create_stopwatch(egl, 2);
@@ -254,6 +276,18 @@ model_test_draw(struct model_test *test)
     egl_check(egl, "clear");
 
     gl->UseProgram(test->prog->prog);
+
+    /* identity */
+    float bones[32 * 3 * 4];
+    for (uint32_t i = 0; i < 32; i++) {
+        for (uint32_t j = 0; j < 3; j++) {
+            for (uint32_t k = 0; k < 4; k++) {
+                const float val = j == k ? 1.0f : 0.0f;
+                bones[12 * i + 4 * j + k] = val;
+            }
+        }
+    }
+    gl->Uniform4fv(test->prog_bones, ARRAY_SIZE(bones) / 4, bones);
     gl->UniformMatrix4fv(test->prog_mvp, 1, false, model_test_mvp);
 
     gl->Enable(GL_CULL_FACE);
