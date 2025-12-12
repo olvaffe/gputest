@@ -6,6 +6,7 @@ tests = [
   'fence',
   'formats',
   'info',
+  'model',
   'ssbo',
   'tex',
   'timestamp',

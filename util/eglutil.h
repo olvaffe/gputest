@@ -109,6 +109,14 @@ struct egl_image {
     EGLImage img;
 };
 
+struct egl_stopwatch {
+    GLuint *queries;
+    uint32_t query_max;
+    uint32_t query_count;
+
+    uint64_t *ts;
+};
+
 static inline void PRINTFLIKE(1, 2) egl_log(const char *format, ...)
 {
     va_list ap;
@@ -698,6 +706,84 @@ egl_destroy_image(struct egl *egl, struct egl_image *img)
 {
     egl->DestroyImage(egl->dpy, img->img);
     free(img);
+}
+
+static inline struct egl_stopwatch *
+egl_create_stopwatch(struct egl *egl, uint32_t count)
+{
+    struct egl_gl *gl = &egl->gl;
+
+    if (!strstr(egl->gl_exts, "GL_EXT_disjoint_timer_query"))
+        egl_die("no GL_EXT_disjoint_timer_query support");
+
+    struct egl_stopwatch *stopwatch = calloc(1, sizeof(*stopwatch));
+    if (!stopwatch)
+        egl_die("failed to alloc stopwatch");
+
+    stopwatch->queries = malloc(sizeof(*stopwatch->queries) * count);
+    if (!stopwatch->queries)
+        egl_die("failed to alloc queries");
+
+    gl->GenQueries(count, stopwatch->queries);
+    stopwatch->query_max = count;
+
+    return stopwatch;
+}
+
+static inline void
+egl_destroy_stopwatch(struct egl *egl, struct egl_stopwatch *stopwatch)
+{
+    struct egl_gl *gl = &egl->gl;
+
+    free(stopwatch->ts);
+
+    gl->DeleteQueries(stopwatch->query_max, stopwatch->queries);
+    free(stopwatch->queries);
+    free(stopwatch);
+}
+
+static inline void
+egl_reset_stopwatch(struct egl *egl, struct egl_stopwatch *stopwatch)
+{
+    stopwatch->query_count = 0;
+    if (stopwatch->ts) {
+        free(stopwatch->ts);
+        stopwatch->ts = NULL;
+    }
+}
+
+static inline void
+egl_write_stopwatch(struct egl *egl, struct egl_stopwatch *stopwatch)
+{
+    struct egl_gl *gl = &egl->gl;
+
+    if (stopwatch->query_count >= stopwatch->query_max)
+        egl_die("not enough queries");
+    if (stopwatch->ts)
+        egl_die("cannot write anymore");
+
+    gl->QueryCounterEXT(stopwatch->queries[stopwatch->query_count++], GL_TIMESTAMP_EXT);
+}
+
+static inline uint64_t
+egl_read_stopwatch(struct egl *egl, struct egl_stopwatch *stopwatch, uint32_t idx)
+{
+    struct egl_gl *gl = &egl->gl;
+
+    if (!stopwatch->ts) {
+        stopwatch->ts = malloc(sizeof(*stopwatch->ts) * stopwatch->query_count);
+        if (!stopwatch->ts)
+            egl_die("failed to alloc ts");
+
+        for (uint32_t i = 0; i < stopwatch->query_count; i++)
+            gl->GetQueryObjecti64vEXT(stopwatch->queries[i], GL_QUERY_RESULT, &stopwatch->ts[i]);
+        egl_check(egl, "read stopwatch");
+    }
+
+    if (idx + 1 >= stopwatch->query_count)
+        egl_die("bad idx");
+
+    return stopwatch->ts[idx + 1] - stopwatch->ts[idx];
 }
 
 #endif /* EGLUTIL_H */
