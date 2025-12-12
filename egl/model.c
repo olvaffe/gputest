@@ -28,6 +28,11 @@ struct model {
     int *faces;
     int face_count;
 
+    GLsizei vertex_stride;
+    GLint attr_sizes[3];
+    GLenum attr_types[3];
+    GLsizei attr_offsets[3];
+
     GLuint vbo;
     GLuint ibo;
 };
@@ -124,31 +129,44 @@ model_test_upload_model(struct model_test *test)
         face[2] -= 1;
     }
 
-    const GLsizeiptr pos_size = sizeof(*model->vertices) * model->vertex_count * 3;
-    const GLsizeiptr bone_idx_size = sizeof(float) * model->vertex_count * 4;
-    const GLsizeiptr bone_weight_size = sizeof(float) * model->vertex_count * 4;
-    const GLsizeiptr vbo_size = pos_size + bone_idx_size + bone_weight_size;
+    struct vert {
+        float pos[3];
+        float pad1[2];
+        float bone_weights[4];
+        uint8_t bone_indices[4];
+        float pad2[2];
+    };
 
-    float *bone_indices = malloc(bone_idx_size);
-    float *bone_weights = malloc(bone_weight_size);
-    if (!bone_indices || !bone_weights)
-        egl_die("failed to alloc bones");
+    model->vertex_stride = sizeof(struct vert);
+    model->attr_sizes[0] = 3;
+    model->attr_offsets[0] = offsetof(struct vert, pos);
+    model->attr_types[0] = GL_FLOAT;
+    model->attr_sizes[1] = 4;
+    model->attr_offsets[1] = offsetof(struct vert, bone_indices);
+    model->attr_types[1] = GL_UNSIGNED_BYTE;
+    model->attr_sizes[2] = 4;
+    model->attr_types[2] = GL_FLOAT;
+    model->attr_offsets[2] = offsetof(struct vert, bone_weights);
+
+    struct vert *verts = calloc(model->vertex_count, sizeof(struct vert));
+    if (!verts)
+        egl_die("failed to alloc verts");
     for (int i = 0; i < model->vertex_count; i++) {
+        struct vert *vert = &verts[i];
+
+        memcpy(vert->pos, &model->vertices[i * 3], sizeof(vert->pos));
         for (int j = 0; j < 4; j++) {
-            bone_indices[i * 4 + j] = (i * 4 + j) % 32;
-            bone_weights[i * 4 + j] = 0.25f;
+            vert->bone_weights[j] = 0.25f;
+            vert->bone_indices[j] = (i * 4 + j) % 32;
         }
     }
 
+    const GLsizeiptr vbo_size = model->vertex_stride * model->vertex_count;
     gl->GenBuffers(1, &model->vbo);
     gl->BindBuffer(GL_ARRAY_BUFFER, model->vbo);
-    gl->BufferData(GL_ARRAY_BUFFER, vbo_size, NULL, GL_STATIC_DRAW);
-    gl->BufferSubData(GL_ARRAY_BUFFER, 0, pos_size, model->vertices);
-    gl->BufferSubData(GL_ARRAY_BUFFER, pos_size, bone_idx_size, bone_indices);
-    gl->BufferSubData(GL_ARRAY_BUFFER, pos_size + bone_idx_size, bone_weight_size, bone_weights);
+    gl->BufferData(GL_ARRAY_BUFFER, vbo_size, verts, GL_STATIC_DRAW);
 
-    free(bone_indices);
-    free(bone_weights);
+    free(verts);
 
     const GLsizeiptr ibo_size = sizeof(*model->faces) * model->face_count * 3;
     gl->GenBuffers(1, &model->ibo);
@@ -236,7 +254,7 @@ model_test_init(struct model_test *test)
     rdoc_init(rdoc);
     egl_init(egl, NULL);
     test->fb =
-        egl_create_framebuffer(egl, test->width, test->height, GL_RGBA8, GL_DEPTH_COMPONENT16);
+        egl_create_framebuffer(egl, test->width, test->height, GL_RGB8, GL_DEPTH_COMPONENT16);
 
     test->prog = egl_create_program(egl, model_test_vs, model_test_fs);
     test->prog_bones = gl->GetUniformLocation(test->prog->prog, "bones");
@@ -279,7 +297,7 @@ model_test_draw(struct model_test *test)
     rdoc_start(rdoc);
 
     gl->BindFramebuffer(GL_FRAMEBUFFER, test->fb->fbo);
-    gl->Viewport(0, 0, test->width, test->height);
+    gl->Viewport(1, 1, test->width - 2, test->height - 2);
 
     gl->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     egl_check(egl, "clear");
@@ -302,9 +320,12 @@ model_test_draw(struct model_test *test)
     gl->Enable(GL_CULL_FACE);
     gl->Enable(GL_DEPTH_TEST);
 
-    gl->VertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(*test->model.vertices) * 3,
-                            test->model.vertices);
-    gl->EnableVertexAttribArray(0);
+    for (int i = 0; i < 3; i++) {
+        gl->VertexAttribPointer(i, test->model.attr_sizes[i], test->model.attr_types[i], GL_FALSE,
+                                test->model.vertex_stride,
+                                (const void *)(intptr_t)test->model.attr_offsets[i]);
+        gl->EnableVertexAttribArray(i);
+    }
 
     egl_check(egl, "setup");
 
