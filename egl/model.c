@@ -40,6 +40,7 @@ struct model {
 struct model_test {
     uint32_t width;
     uint32_t height;
+    int loop;
 
     const char *filename;
 
@@ -260,7 +261,7 @@ model_test_init(struct model_test *test)
     test->prog_bones = gl->GetUniformLocation(test->prog->prog, "bones");
     test->prog_mvp = gl->GetUniformLocation(test->prog->prog, "mvp");
 
-    test->stopwatch = egl_create_stopwatch(egl, 2);
+    test->stopwatch = egl_create_stopwatch(egl, test->loop * 2);
 
     model_test_init_model(test);
 
@@ -329,14 +330,19 @@ model_test_draw(struct model_test *test)
 
     egl_check(egl, "setup");
 
-    egl_write_stopwatch(egl, test->stopwatch);
-    gl->DrawElements(GL_TRIANGLES, test->model.face_count * 3, GL_UNSIGNED_INT,
-                     test->model.faces);
+    for (int i = 0; i < test->loop; i++) {
+        egl_write_stopwatch(egl, test->stopwatch);
+        gl->DrawElements(GL_TRIANGLES, test->model.face_count * 3, GL_UNSIGNED_INT,
+                         test->model.faces);
+        egl_write_stopwatch(egl, test->stopwatch);
+    }
     egl_check(egl, "draw");
-    egl_write_stopwatch(egl, test->stopwatch);
 
     gl->Finish();
-    const uint64_t gpu_ns = egl_read_stopwatch(egl, test->stopwatch, 0);
+
+    uint64_t gpu_ns = 0;
+    for (int i = 0; i < test->loop; i++)
+        gpu_ns += egl_read_stopwatch(egl, test->stopwatch, i * 2);
     const int gpu_us = (int)(gpu_ns / 1000);
     egl_log("gpu time: %d.%dms", gpu_us / 1000, gpu_us % 1000);
 
@@ -353,6 +359,7 @@ main(int argc, const char **argv)
     struct model_test test = {
         .width = 1024,
         .height = 1024,
+        .loop = 20,
     };
 
     if (argc != 2)
