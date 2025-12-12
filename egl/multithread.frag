@@ -1,4 +1,4 @@
-#version 320 es
+#version 310 es
 
 /*
  * Copyright 2022 Google LLC

@@ -1,9 +1,11 @@
-#version 320 es
+#version 310 es
 
 /*
  * Copyright 2022 Google LLC
  * SPDX-License-Identifier: MIT
  */
+
+#extension GL_OES_shader_io_blocks: enable
 
 layout(location = 0) in vec2 in_position;
 layout(location = 1) in vec4 in_color;

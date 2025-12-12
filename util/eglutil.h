@@ -325,7 +325,7 @@ egl_init_context(struct egl *egl)
         egl_die("current api is not GLES");
 
     const EGLint ctx_attrs[] = {
-        EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 2, EGL_NONE,
+        EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 1, EGL_NONE,
     };
 
     EGLContext ctx = egl->CreateContext(egl->dpy, egl->config, EGL_NO_CONTEXT, ctx_attrs);
@@ -555,7 +555,7 @@ egl_create_framebuffer(struct egl *egl, int width, int height, GLenum rt_format,
     gl->GenFramebuffers(1, &fb->fbo);
     gl->BindFramebuffer(target, fb->fbo);
     if (rt_format)
-        gl->FramebufferTexture(target, rt_att, fb->rt_tex, 0);
+        gl->FramebufferTexture2D(target, rt_att, rt_target, fb->rt_tex, 0);
     if (ds_format)
         gl->FramebufferRenderbuffer(target, ds_att, ds_target, fb->ds_rb);
 

@@ -1,9 +1,11 @@
-#version 320 es
+#version 310 es
 
 /*
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: MIT
  */
+
+#extension GL_OES_shader_io_blocks: enable
 
 uniform vec4 bones[32 * 3];
 uniform mat4 mvp;
