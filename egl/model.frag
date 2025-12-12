@@ -11,5 +11,9 @@ layout(location = 0) out vec4 out_color;
 
 void main()
 {
-    out_color = vec4(1.0);
+    vec3 encoded = vec3(1.0, 255.0, 65025.0) * gl_FragCoord.z;
+    encoded = fract(encoded);
+    encoded.xy -= encoded.yz / 255.0;
+
+    out_color = vec4(encoded, 0.3);
 }
