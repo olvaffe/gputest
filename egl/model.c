@@ -4,6 +4,7 @@
  */
 
 #include "eglutil.h"
+#include "rdocutil.h"
 
 static const char model_test_vs[] = {
 #include "model_test.vert.inc"
@@ -37,6 +38,7 @@ struct model_test {
 
     const char *filename;
 
+    struct rdoc rdoc;
     struct egl egl;
     struct egl_framebuffer *fb;
 
@@ -227,9 +229,11 @@ model_test_init_model(struct model_test *test)
 static void
 model_test_init(struct model_test *test)
 {
+    struct rdoc *rdoc = &test->rdoc;
     struct egl *egl = &test->egl;
     struct egl_gl *gl = &egl->gl;
 
+    rdoc_init(rdoc);
     egl_init(egl, NULL);
     test->fb =
         egl_create_framebuffer(egl, test->width, test->height, GL_RGBA8, GL_DEPTH_COMPONENT16);
@@ -248,6 +252,7 @@ model_test_init(struct model_test *test)
 static void
 model_test_cleanup(struct model_test *test)
 {
+    struct rdoc *rdoc = &test->rdoc;
     struct egl *egl = &test->egl;
     struct egl_gl *gl = &egl->gl;
 
@@ -261,13 +266,17 @@ model_test_cleanup(struct model_test *test)
     gl->DeleteBuffers(1, &test->model.ibo);
 
     egl_cleanup(egl);
+    rdoc_cleanup(rdoc);
 }
 
 static void
 model_test_draw(struct model_test *test)
 {
+    struct rdoc *rdoc = &test->rdoc;
     struct egl *egl = &test->egl;
     struct egl_gl *gl = &egl->gl;
+
+    rdoc_start(rdoc);
 
     gl->BindFramebuffer(GL_FRAMEBUFFER, test->fb->fbo);
     gl->Viewport(0, 0, test->width, test->height);
@@ -313,6 +322,8 @@ model_test_draw(struct model_test *test)
     egl_dump_image(&test->egl, test->width, test->height, "rt.ppm");
 
     gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    rdoc_end(rdoc);
 }
 
 int
