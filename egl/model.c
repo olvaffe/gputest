@@ -13,6 +13,13 @@ static const char model_test_fs[] = {
 #include "model_test.frag.inc"
 };
 
+static const float model_test_mvp[16] = {
+    1.0f, 0.0f, 0.0f, 0.0f, /* col 0 */
+    0.0f, 1.0f, 0.0f, 0.0f, /* col 1 */
+    0.0f, 0.0f, 1.0f, 0.0f, /* col 2 */
+    0.0f, 0.0f, 0.0f, 1.0f, /* col 3 */
+};
+
 struct model {
     float *vertices;
     int vertex_count;
@@ -34,6 +41,7 @@ struct model_test {
     struct egl_framebuffer *fb;
 
     struct egl_program *prog;
+    GLuint prog_mvp;
 
     struct egl_stopwatch *stopwatch;
     struct model model;
@@ -199,11 +207,15 @@ static void
 model_test_init(struct model_test *test)
 {
     struct egl *egl = &test->egl;
+    struct egl_gl *gl = &egl->gl;
 
     egl_init(egl, NULL);
     test->fb =
         egl_create_framebuffer(egl, test->width, test->height, GL_RGBA8, GL_DEPTH_COMPONENT16);
+
     test->prog = egl_create_program(egl, model_test_vs, model_test_fs);
+    test->prog_mvp = gl->GetUniformLocation(test->prog->prog, "mvp");
+
     test->stopwatch = egl_create_stopwatch(egl, 2);
 
     model_test_init_model(test);
@@ -242,6 +254,7 @@ model_test_draw(struct model_test *test)
     egl_check(egl, "clear");
 
     gl->UseProgram(test->prog->prog);
+    gl->UniformMatrix4fv(test->prog_mvp, 1, false, model_test_mvp);
 
     gl->Enable(GL_CULL_FACE);
     gl->Enable(GL_DEPTH_TEST);
