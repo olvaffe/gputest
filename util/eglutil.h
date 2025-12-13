@@ -115,7 +115,7 @@ struct egl_stopwatch {
     uint32_t query_max;
     uint32_t query_count;
 
-    uint64_t *ts;
+    GLint64 *ts;
 };
 
 static inline void PRINTFLIKE(1, 2) egl_log(const char *format, ...)
