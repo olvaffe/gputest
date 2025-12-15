@@ -35,7 +35,8 @@ struct model {
 struct model_test {
     uint32_t width;
     uint32_t height;
-    int loop;
+    int outer_loop;
+    int inner_loop;
 
     const char *filename;
 
@@ -284,7 +285,7 @@ model_test_init(struct model_test *test)
     test->fb =
         egl_create_framebuffer(egl, test->width, test->height, GL_RGB8, GL_DEPTH_COMPONENT16);
     model_test_init_program(test);
-    test->stopwatch = egl_create_stopwatch(egl, test->loop * 2);
+    test->stopwatch = egl_create_stopwatch(egl, test->outer_loop * 2);
 
     model_test_init_model(test);
 
@@ -313,21 +314,11 @@ model_test_cleanup(struct model_test *test)
 }
 
 static void
-model_test_draw(struct model_test *test)
+model_test_draw_model(struct model_test *test)
 {
-    struct rdoc *rdoc = &test->rdoc;
     struct egl *egl = &test->egl;
     struct egl_gl *gl = &egl->gl;
-    struct model *model = &test->model;
-
-    rdoc_start(rdoc);
-
-    gl->BindFramebuffer(GL_FRAMEBUFFER, test->fb->fbo);
-
-    gl->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    egl_check(egl, "clear");
-
-    gl->Viewport(1, 1, test->width - 2, test->height - 2);
+    const struct model *model = &test->model;
 
     gl->Enable(GL_CULL_FACE);
     gl->Enable(GL_DEPTH_TEST);
@@ -345,27 +336,44 @@ model_test_draw(struct model_test *test)
 
     egl_check(egl, "setup");
 
-    for (int i = 0; i < test->loop; i++) {
-        egl_write_stopwatch(egl, test->stopwatch);
+    for (int i = 0; i < test->inner_loop; i++) {
         gl->DrawElements(GL_TRIANGLES, test->model.face_count * 3, GL_UNSIGNED_INT,
                          test->model.faces);
-        egl_write_stopwatch(egl, test->stopwatch);
     }
     egl_check(egl, "draw");
+}
+
+static void
+model_test_draw(struct model_test *test)
+{
+    struct rdoc *rdoc = &test->rdoc;
+    struct egl *egl = &test->egl;
+    struct egl_gl *gl = &egl->gl;
+
+    rdoc_start(rdoc);
+
+    for (int i = 0; i < test->outer_loop; i++) {
+        gl->BindFramebuffer(GL_FRAMEBUFFER, test->fb->fbo);
+
+        gl->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        egl_check(egl, "clear");
+
+        gl->Viewport(1, 1, test->width - 2, test->height - 2);
+
+        egl_write_stopwatch(egl, test->stopwatch);
+        model_test_draw_model(test);
+        egl_write_stopwatch(egl, test->stopwatch);
+    }
 
     gl->Finish();
 
-    uint64_t gpu_ns = 0;
-    for (int i = 0; i < test->loop; i++)
-        gpu_ns += egl_read_stopwatch(egl, test->stopwatch, i * 2);
-    const int gpu_us = (int)(gpu_ns / 1000);
-    egl_log("gpu time: %d.%dms", gpu_us / 1000, gpu_us % 1000);
+    for (int i = 0; i < test->outer_loop; i++) {
+        const uint64_t gpu_ns = egl_read_stopwatch(egl, test->stopwatch, i * 2);
+        const int gpu_us = (int)(gpu_ns / 1000);
+        egl_log("gpu time: %d.%dms", gpu_us / 1000, gpu_us % 1000);
+    }
 
     egl_dump_image(&test->egl, test->width, test->height, "rt.ppm");
-
-    gl->BindBuffer(GL_ARRAY_BUFFER, 0);
-    gl->BindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
 
     rdoc_end(rdoc);
 }
@@ -376,7 +384,8 @@ main(int argc, const char **argv)
     struct model_test test = {
         .width = 1024,
         .height = 1024,
-        .loop = 20,
+        .outer_loop = 20,
+        .inner_loop = 1,
     };
 
     if (argc != 2)
