@@ -40,8 +40,8 @@ void main()
         vec4(0.0, 0.0, 0.0, 1.0)
     );
     mat4 bone3 = mat4(
-        bones[bone_idx.z * 3 + 0],
-        bones[bone_idx.z * 3 + 1],
+        bones[bone_idx.w * 3 + 0],
+        bones[bone_idx.w * 3 + 1],
         bones[bone_idx.w * 3 + 2],
         vec4(0.0, 0.0, 0.0, 1.0)
     );

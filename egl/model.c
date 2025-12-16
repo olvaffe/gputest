@@ -118,7 +118,7 @@ model_test_process_model(struct model_test *test)
 {
     struct model *model = &test->model;
 
-    if (model->vertex_count) {
+    if (model->vertex_count && false) {
         /* find bounding box */
         float min[3];
         float max[3];
@@ -355,6 +355,7 @@ model_test_draw(struct model_test *test)
     for (int i = 0; i < test->outer_loop; i++) {
         gl->BindFramebuffer(GL_FRAMEBUFFER, test->fb->fbo);
 
+        gl->ClearColor(1.0, 1.0, 1.0, 1.0);
         gl->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         egl_check(egl, "clear");
 
