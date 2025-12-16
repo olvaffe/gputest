@@ -15,11 +15,11 @@ static const char model_test_fs[] = {
 };
 
 struct model {
-    float (*vertices)[3];
-    int vertex_count;
+    float (*v)[3];
+    int v_count;
 
-    int (*faces)[3];
-    int face_count;
+    int (*f)[3];
+    int f_count;
 
     GLuint vbo;
     GLsizei vertex_stride;
@@ -30,11 +30,19 @@ struct model {
     } attrs[3];
 
     GLuint ibo;
+    struct {
+        GLenum mode;
+        GLsizei count;
+        GLenum type;
+    } elem;
 };
 
 struct model_test {
     uint32_t width;
     uint32_t height;
+    GLenum rt_format;
+    GLenum ds_format;
+    bool normalize_model;
     int outer_loop;
     int inner_loop;
 
@@ -46,8 +54,8 @@ struct model_test {
     struct egl_framebuffer *fb;
 
     struct egl_program *prog;
-    GLuint prog_bones;
-    GLuint prog_mvp;
+    GLuint loc_bones;
+    GLuint loc_mvp;
 
     struct egl_stopwatch *stopwatch;
 
@@ -64,36 +72,25 @@ model_test_upload_model(struct model_test *test)
     struct hwvert {
         float pos[3];
         float pad1[2];
-        float bone_weights[4];
-        uint8_t bone_indices[4];
+        float bone_weight[4];
+        uint8_t bone_index[4];
         float pad2[2];
     };
 
-    model->vertex_stride = sizeof(struct hwvert);
-    model->attrs[0].size = 3;
-    model->attrs[0].type = GL_FLOAT;
-    model->attrs[0].offset = offsetof(struct hwvert, pos);
-    model->attrs[1].size = 4;
-    model->attrs[1].type = GL_UNSIGNED_BYTE;
-    model->attrs[1].offset = offsetof(struct hwvert, bone_indices);
-    model->attrs[2].size = 4;
-    model->attrs[2].type = GL_FLOAT;
-    model->attrs[2].offset = offsetof(struct hwvert, bone_weights);
-
-    struct hwvert *hwverts = calloc(model->vertex_count, sizeof(struct hwvert));
+    struct hwvert *hwverts = calloc(model->v_count, sizeof(*hwverts));
     if (!hwverts)
         egl_die("failed to alloc hwverts");
-    for (int i = 0; i < model->vertex_count; i++) {
+    for (int i = 0; i < model->v_count; i++) {
         struct hwvert *hwvert = &hwverts[i];
 
-        memcpy(hwvert->pos, model->vertices[i], sizeof(hwvert->pos));
+        memcpy(hwvert->pos, model->v[i], sizeof(hwvert->pos));
         for (int j = 0; j < 4; j++) {
-            hwvert->bone_weights[j] = 0.25f;
-            hwvert->bone_indices[j] = (i * 4 + j) % 32;
+            hwvert->bone_weight[j] = 0.25f;
+            hwvert->bone_index[j] = (i * 4 + j) % 32;
         }
     }
 
-    const GLsizeiptr vbo_size = model->vertex_stride * model->vertex_count;
+    const GLsizeiptr vbo_size = sizeof(*hwverts) * model->v_count;
     gl->GenBuffers(1, &model->vbo);
     gl->BindBuffer(GL_ARRAY_BUFFER, model->vbo);
     gl->BufferData(GL_ARRAY_BUFFER, vbo_size, hwverts, GL_STATIC_DRAW);
@@ -101,16 +98,31 @@ model_test_upload_model(struct model_test *test)
 
     free(hwverts);
 
-    const GLsizeiptr ibo_size = sizeof(*model->faces) * model->face_count;
+    model->vertex_stride = sizeof(struct hwvert);
+    model->attrs[0].size = 3;
+    model->attrs[0].type = GL_FLOAT;
+    model->attrs[0].offset = offsetof(struct hwvert, pos);
+    model->attrs[1].size = 4;
+    model->attrs[1].type = GL_UNSIGNED_BYTE;
+    model->attrs[1].offset = offsetof(struct hwvert, bone_index);
+    model->attrs[2].size = 4;
+    model->attrs[2].type = GL_FLOAT;
+    model->attrs[2].offset = offsetof(struct hwvert, bone_weight);
+
+    const GLsizeiptr ibo_size = sizeof(*model->f) * model->f_count;
     gl->GenBuffers(1, &model->ibo);
     gl->BindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->ibo);
-    gl->BufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_size, model->faces, GL_STATIC_DRAW);
+    gl->BufferData(GL_ELEMENT_ARRAY_BUFFER, ibo_size, model->f, GL_STATIC_DRAW);
     gl->BindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-    free(model->vertices);
-    free(model->faces);
-    model->vertices = NULL;
-    model->faces = NULL;
+    model->elem.mode = GL_TRIANGLES;
+    model->elem.count = model->f_count * 3;
+    model->elem.type = GL_UNSIGNED_INT;
+
+    free(model->v);
+    free(model->f);
+    model->v = NULL;
+    model->f = NULL;
 }
 
 static void
@@ -118,23 +130,23 @@ model_test_process_model(struct model_test *test)
 {
     struct model *model = &test->model;
 
-    if (model->vertex_count && false) {
+    if (test->normalize_model && model->v_count) {
         /* find bounding box */
         float min[3];
         float max[3];
         for (int dim = 0; dim < 3; dim++) {
-            const float *vert = model->vertices[0];
-            min[dim] = vert[dim];
-            max[dim] = vert[dim];
+            const float *v = model->v[0];
+            min[dim] = v[dim];
+            max[dim] = v[dim];
         }
-        for (int i = 1; i < model->vertex_count; i++) {
-            const float *vert = model->vertices[i];
+        for (int i = 1; i < model->v_count; i++) {
+            const float *v = model->v[i];
 
             for (int dim = 0; dim < 3; dim++) {
-                if (max[dim] < vert[dim])
-                    max[dim] = vert[dim];
-                if (min[dim] > vert[dim])
-                    min[dim] = vert[dim];
+                if (max[dim] < v[dim])
+                    max[dim] = v[dim];
+                if (min[dim] > v[dim])
+                    min[dim] = v[dim];
             }
         }
 
@@ -157,18 +169,19 @@ model_test_process_model(struct model_test *test)
         /* scale bounding box to [-1.0, 1.0] */
         const float scale = 2.0f / extent;
 
-        for (int i = 0; i < model->vertex_count; i++) {
-            float *vert = model->vertices[i];
+        for (int i = 0; i < model->v_count; i++) {
+            float *v = model->v[i];
             for (int dim = 0; dim < 3; dim++)
-                vert[dim] = (vert[dim] + xlate[dim]) * scale;
+                v[dim] = (v[dim] + xlate[dim]) * scale;
         }
     }
 
-    for (int i = 0; i < model->face_count; i++) {
-        int *face = model->faces[i];
-        face[0] -= 1;
-        face[1] -= 1;
-        face[2] -= 1;
+    for (int i = 0; i < model->f_count; i++) {
+        int *f = model->f[i];
+        /* zero-based */
+        f[0] -= 1;
+        f[1] -= 1;
+        f[2] -= 1;
     }
 }
 
@@ -176,43 +189,45 @@ static void
 model_test_parse_model(struct model_test *test, const char *ptr, size_t size)
 {
     struct model *model = &test->model;
+    const char *line = ptr;
+    const char *end = ptr + size;
 
-    while (size) {
-        const char *line = ptr;
-        const char *end = strchr(ptr, '\n');
-        if (!end)
+    while (line < end) {
+        const char *newline = memchr(line, '\n', end - line);
+        if (!newline)
             break;
 
         bool parsed = true;
         if (!strncmp(line, "v ", 2)) {
-            if (model->vertices) {
-                float *vert = model->vertices[model->vertex_count];
-                if (sscanf(line, "v %f %f %f", &vert[0], &vert[1], &vert[2]) != 3)
+            if (model->v) {
+                float *v = model->v[model->v_count];
+                if (sscanf(line, "v %f %f %f", &v[0], &v[1], &v[2]) != 3)
                     parsed = false;
             }
-            model->vertex_count++;
+            model->v_count++;
         } else if (!strncmp(line, "f ", 2)) {
-            if (model->faces) {
-                int *face = model->faces[model->face_count];
-                if (sscanf(line, "f %d %d %d", &face[0], &face[1], &face[2]) != 3)
+            if (model->f) {
+                int *f = model->f[model->f_count];
+                if (sscanf(line, "f %d %d %d", &f[0], &f[1], &f[2]) != 3)
                     parsed = false;
             }
-            model->face_count++;
+            model->f_count++;
         } else {
             parsed = false;
         }
 
         if (!parsed)
-            egl_die("unsupported line: %.*s", (int)(end - line), line);
+            egl_die("unsupported line: %.*s", (int)(newline - line), line);
 
-        ptr = end + 1;
-        size -= end - line + 1;
+        line = newline + 1;
     }
 }
 
 static void
 model_test_init_model(struct model_test *test)
 {
+    struct model *model = &test->model;
+
     size_t size;
     const char *ptr = u_map_file(test->filename, &size);
     if (!ptr)
@@ -220,16 +235,16 @@ model_test_init_model(struct model_test *test)
 
     model_test_parse_model(test, ptr, size);
 
-    test->model.vertices = malloc(sizeof(*test->model.vertices) * test->model.vertex_count);
-    if (!test->model.vertices)
-        egl_die("failed to alloc vertices");
+    model->v = malloc(sizeof(*model->v) * model->v_count);
+    if (!model->v)
+        egl_die("failed to alloc v");
 
-    test->model.faces = malloc(sizeof(*test->model.faces) * test->model.face_count);
-    if (!test->model.faces)
-        egl_die("failed to alloc faces");
+    model->f = malloc(sizeof(*model->f) * model->f_count);
+    if (!model->f)
+        egl_die("failed to alloc f");
 
-    test->model.vertex_count = 0;
-    test->model.face_count = 0;
+    model->v_count = 0;
+    model->f_count = 0;
     model_test_parse_model(test, ptr, size);
 
     u_unmap_file(ptr, size);
@@ -245,16 +260,18 @@ model_test_init_program(struct model_test *test)
     struct egl_gl *gl = &egl->gl;
 
     test->prog = egl_create_program(egl, model_test_vs, model_test_fs);
-    test->prog_bones = gl->GetUniformLocation(test->prog->prog, "bones");
-    test->prog_mvp = gl->GetUniformLocation(test->prog->prog, "mvp");
+    test->loc_bones = gl->GetUniformLocation(test->prog->prog, "bones");
+    test->loc_mvp = gl->GetUniformLocation(test->prog->prog, "mvp");
 
     /* identity */
-    float bones[32 * 3 * 4];
+    float bones[32 * 3][4];
     for (uint32_t i = 0; i < 32; i++) {
+        float (*bone)[4] = &bones[i * 3];
         for (uint32_t j = 0; j < 3; j++) {
+            float *col = bone[j];
             for (uint32_t k = 0; k < 4; k++) {
                 const float val = j == k ? 1.0f : 0.0f;
-                bones[12 * i + 4 * j + k] = val;
+                col[k] = val;
             }
         }
     }
@@ -267,9 +284,18 @@ model_test_init_program(struct model_test *test)
     };
 
     gl->UseProgram(test->prog->prog);
-    gl->Uniform4fv(test->prog_bones, ARRAY_SIZE(bones) / 4, bones);
-    gl->UniformMatrix4fv(test->prog_mvp, 1, false, mvp);
+    gl->Uniform4fv(test->loc_bones, ARRAY_SIZE(bones), (const float *)bones);
+    gl->UniformMatrix4fv(test->loc_mvp, 1, false, mvp);
     gl->UseProgram(0);
+}
+
+static void
+model_test_init_framebuffer(struct model_test *test)
+{
+    struct egl *egl = &test->egl;
+
+    test->fb =
+        egl_create_framebuffer(egl, test->width, test->height, test->rt_format, test->ds_format);
 }
 
 static void
@@ -282,8 +308,7 @@ model_test_init(struct model_test *test)
 
     egl_init(egl, NULL);
 
-    test->fb =
-        egl_create_framebuffer(egl, test->width, test->height, GL_RGB8, GL_DEPTH_COMPONENT16);
+    model_test_init_framebuffer(test);
     model_test_init_program(test);
     test->stopwatch = egl_create_stopwatch(egl, test->outer_loop * 2);
 
@@ -327,18 +352,17 @@ model_test_draw_model(struct model_test *test)
 
     gl->BindBuffer(GL_ARRAY_BUFFER, model->vbo);
     gl->BindBuffer(GL_ELEMENT_ARRAY_BUFFER, model->ibo);
-    for (int i = 0; i < (int)ARRAY_SIZE(test->model.attrs); i++) {
-        gl->VertexAttribPointer(i, test->model.attrs[i].size, test->model.attrs[i].type, GL_FALSE,
-                                test->model.vertex_stride,
-                                (const void *)(intptr_t)test->model.attrs[i].offset);
+    for (int i = 0; i < (int)ARRAY_SIZE(model->attrs); i++) {
+        gl->VertexAttribPointer(i, model->attrs[i].size, model->attrs[i].type, GL_FALSE,
+                                model->vertex_stride,
+                                (const void *)(intptr_t)model->attrs[i].offset);
         gl->EnableVertexAttribArray(i);
     }
 
     egl_check(egl, "setup");
 
     for (int i = 0; i < test->inner_loop; i++) {
-        gl->DrawElements(GL_TRIANGLES, test->model.face_count * 3, GL_UNSIGNED_INT,
-                         test->model.faces);
+        gl->DrawElements(model->elem.mode, model->elem.count, model->elem.type, NULL);
     }
     egl_check(egl, "draw");
 }
@@ -385,6 +409,9 @@ main(int argc, const char **argv)
     struct model_test test = {
         .width = 1024,
         .height = 1024,
+        .rt_format = GL_RGB8,
+        .ds_format = GL_DEPTH_COMPONENT16,
+        .normalize_model = false,
         .outer_loop = 20,
         .inner_loop = 1,
     };
