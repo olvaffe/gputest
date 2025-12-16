@@ -42,6 +42,7 @@ struct model_test {
     uint32_t height;
     GLenum rt_format;
     GLenum ds_format;
+    bool depth_test;
     bool normalize_model;
     int outer_loop;
     int inner_loop;
@@ -346,7 +347,8 @@ model_test_draw_model(struct model_test *test)
     const struct model *model = &test->model;
 
     gl->Enable(GL_CULL_FACE);
-    gl->Enable(GL_DEPTH_TEST);
+    if (test->depth_test)
+        gl->Enable(GL_DEPTH_TEST);
 
     gl->UseProgram(test->prog->prog);
 
@@ -377,10 +379,13 @@ model_test_draw(struct model_test *test)
     rdoc_start(rdoc);
 
     for (int i = 0; i < test->outer_loop; i++) {
+        const GLbitfield clear_mask =
+            GL_COLOR_BUFFER_BIT | (test->depth_test ? GL_DEPTH_BUFFER_BIT : 0);
+
         gl->BindFramebuffer(GL_FRAMEBUFFER, test->fb->fbo);
 
         gl->ClearColor(1.0, 1.0, 1.0, 1.0);
-        gl->Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        gl->Clear(clear_mask);
         egl_check(egl, "clear");
 
         gl->Viewport(1, 1, test->width - 2, test->height - 2);
@@ -411,15 +416,21 @@ main(int argc, const char **argv)
         .height = 1024,
         .rt_format = GL_RGB8,
         .ds_format = GL_DEPTH_COMPONENT16,
+        .depth_test = true,
         .normalize_model = false,
         .outer_loop = 20,
         .inner_loop = 1,
     };
 
-    if (argc != 2)
-        egl_die("usage: %s <obj>", argv[0]);
+    if (argc < 2 || argc > 3)
+        egl_die("usage: %s <obj> [<depth-test>]", argv[0]);
 
     test.filename = argv[1];
+    if (argc >= 3)
+        test.depth_test = atoi(argv[2]);
+
+    if (!test.depth_test)
+        test.ds_format = GL_NONE;
 
     model_test_init(&test);
     model_test_draw(&test);
