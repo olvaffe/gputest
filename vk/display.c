@@ -171,7 +171,7 @@ display_test_dump_info(struct display_test *test)
     const VkDisplayModeParametersKHR *params = &test->mode_props.parameters;
     vk_log("mode: 0x%" PRIxPTR, (uintptr_t)test->mode);
     vk_log("  visibleRegion %dx%d", params->visibleRegion.width, params->visibleRegion.height);
-    vk_log("  refreshRate %d.%d", params->refreshRate / 1000, params->refreshRate % 1000);
+    vk_log("  refreshRate %.3f", params->refreshRate / 1000.0f);
 
     const VkDisplayPlaneCapabilitiesKHR *caps = &test->plane_caps;
     vk_log("plane: %d", test->plane);

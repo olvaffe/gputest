@@ -50,7 +50,7 @@ memory_test_timed_memcpy(struct memory_test *test,
             const uint64_t end = u_now();
 
             const int us = (end - begin) / 1000;
-            vk_log("%s iter %d took %d.%dms", what, i, us / 1000, us % 1000);
+            vk_log("%s iter %d took %.3fms", what, i, us / 1000.0f);
         }
     } else {
         const uint64_t begin = u_now();
@@ -63,8 +63,7 @@ memory_test_timed_memcpy(struct memory_test *test,
 
         const uint64_t us = (end - begin) / 1000;
         const int avg = us / test->loop;
-        vk_log("%s took %d.%dms on average (total %d iters)", what, avg / 1000, avg % 1000,
-               test->loop);
+        vk_log("%s took %.3fms on average (total %d iters)", what, avg / 1000.0f, test->loop);
     }
 }
 

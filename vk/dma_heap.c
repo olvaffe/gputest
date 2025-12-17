@@ -194,7 +194,7 @@ dma_heap_test_timed_read(struct dma_heap_test *test, const void *src, const char
     free(dst);
 
     const int us = (end - begin) / 1000;
-    vk_log("%s took %d.%dms to read %d MB", what, us / 1000, us % 1000,
+    vk_log("%s took %.3fms to read %d MB", what, us / 1000.0f,
            (int)(loop * test->size) / 1024 / 1024);
 }
 

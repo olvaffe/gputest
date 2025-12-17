@@ -400,7 +400,7 @@ model_test_draw(struct model_test *test)
     for (int i = 0; i < test->outer_loop; i++) {
         const uint64_t gpu_ns = egl_read_stopwatch(egl, test->stopwatch, i * 2);
         const int gpu_us = (int)(gpu_ns / 1000);
-        egl_log("gpu time: %d.%dms", gpu_us / 1000, gpu_us % 1000);
+        egl_log("gpu time: %.3fms", gpu_us / 1000.0f);
     }
 
     egl_dump_image(&test->egl, test->width, test->height, "rt.ppm");

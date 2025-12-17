@@ -86,7 +86,7 @@ ffdec_test_decode(struct ffdec_test *test)
     const uint64_t decode_time = u_now() - start_time;
     const uint32_t decode_ms = decode_time / 1000000;
 
-    va_log("decoded %d frames in %d.%ds", frame_idx, decode_ms / 1000, decode_ms % 1000);
+    va_log("decoded %d frames in %.3fs", frame_idx, decode_ms / 1000.0f);
 }
 
 int

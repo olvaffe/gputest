@@ -63,8 +63,8 @@ mem_alloc_test_loop(struct mem_alloc_test *test)
     const VkDeviceSize total_size = test->loop * test->base_size * ((1 << test->order) - 1);
     const uint32_t us = (end - begin) / 1000;
 
-    vk_log("allocating %u VkDeviceMemory of total size %u MiB took %u.%ums", total_count,
-           (unsigned)(total_size / 1024 / 1024), us / 1000, us % 1000);
+    vk_log("allocating %u VkDeviceMemory of total size %u MiB took %.3fms", total_count,
+           (unsigned)(total_size / 1024 / 1024), us / 1000.0f);
 }
 
 int
