@@ -1,3 +1,8 @@
+/*
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: MIT
+ */
+
 #include <android/choreographer.h>
 #include <android/hardware_buffer.h>
 #include <android/input.h>
@@ -6,7 +11,6 @@
 #include <android/native_activity.h>
 #include <android/native_window.h>
 #include <android/surface_control.h>
-// #include <android/surface_control_input_receiver.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -182,6 +186,7 @@ android_test_thread(void *arg)
         android_die("failed to get choreographer");
 
     /* signal readiness */
+    test->run = true;
     cnd_signal(&test->cond);
     android_log("thread ready");
 
@@ -222,13 +227,12 @@ android_test_init(struct android_test *test)
     if (cnd_init(&test->cond) != thrd_success)
         android_die("failed to init cond");
 
-    test->run = true;
     if (thrd_create(&test->thread, android_test_thread, test) != thrd_success)
         android_die("failed to create thread");
 
     /* wait for readiness */
     mtx_lock(&test->mutex);
-    while (!test->looper)
+    while (!test->run)
         cnd_wait(&test->cond, &test->mutex);
     mtx_unlock(&test->mutex);
 
@@ -384,6 +388,10 @@ ANativeActivity_onNativeWindowRedrawNeeded(ANativeActivity *act, ANativeWindow *
 
     if (test->verbose)
         android_log("onNativeWindowRedrawNeeded: %p", win);
+
+    mtx_lock(&test->mutex);
+    AChoreographer_postFrameCallback64(test->choreo, android_test_handle_frame, test);
+    mtx_unlock(&test->mutex);
 }
 
 static void
