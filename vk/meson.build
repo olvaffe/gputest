@@ -50,6 +50,9 @@ tests = [
   'ycbcr',
 ]
 
+if idep_androidutil.found()
+  tests += ['android']
+endif
 if idep_drmutil.found()
   tests += ['residency']
   if idep_gbmutil.found()
@@ -99,7 +102,9 @@ foreach t : tests
   test_deps = [idep_vkutil]
   test_args = []
 
-  if t == 'compile'
+  if t == 'android'
+    test_deps += [idep_androidutil, dep_android, dep_log]
+  elif t == 'compile'
     test_deps += [idep_spvutil]
   elif t == 'kms'
     test_deps += [idep_drmutil, idep_gbmutil]
@@ -117,10 +122,19 @@ foreach t : tests
     test_deps += [idep_wlutil]
   endif
 
-  executable(
-    t,
-    sources: [t + '.c', test_incs],
-    dependencies: test_deps,
-    c_args: test_args,
-  )
+  if t == 'android'
+    shared_library(
+      t,
+      sources: [t + '.c', test_incs],
+      dependencies: test_deps,
+      c_args: test_args,
+    )
+  else
+    executable(
+      t,
+      sources: [t + '.c', test_incs],
+      dependencies: test_deps,
+      c_args: test_args,
+    )
+  endif
 endforeach

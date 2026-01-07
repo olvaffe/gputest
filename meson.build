@@ -32,6 +32,14 @@ dep_m = cc.find_library('m', required: false)
 dep_rt = cc.find_library('rt', required: false)
 
 # for androidutil
+dep_android = cc.find_library(
+  'android',
+  required: false
+)
+dep_log = cc.find_library(
+  'log',
+  required: false
+)
 dep_nativewindow = cc.find_library(
   'nativewindow',
   has_headers: ['android/hardware_buffer.h'],
