@@ -1,11 +1,11 @@
 #include <android/choreographer.h>
-// #include <android/hardware_buffer.h>
+#include <android/hardware_buffer.h>
 #include <android/input.h>
 #include <android/log.h>
 #include <android/looper.h>
 #include <android/native_activity.h>
 #include <android/native_window.h>
-// #include <android/surface_control.h>
+#include <android/surface_control.h>
 // #include <android/surface_control_input_receiver.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -35,6 +35,8 @@ struct android_test {
     AChoreographer *choreo;
     struct android_test_state cur;
     struct android_test_state next;
+
+    ASurfaceControl *ctrl;
 };
 
 static inline void
@@ -42,7 +44,7 @@ android_log(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    __android_log_vprint(ANDROID_LOG_INFO, "MY", format, ap);
+    __android_log_vprint(ANDROID_LOG_INFO, "My", format, ap);
     va_end(ap);
 }
 
@@ -51,7 +53,7 @@ android_die(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    __android_log_vprint(ANDROID_LOG_INFO, "MY", format, ap);
+    __android_log_vprint(ANDROID_LOG_INFO, "My", format, ap);
     va_end(ap);
 
     abort();
@@ -65,33 +67,50 @@ android_test_handle_frame(int64_t ts, void *arg)
     if (test->verbose)
         android_log("frame: %" PRIi64, ts);
 
-    if (!test->cur.win)
+    if (!test->ctrl)
         return;
 
-    ANativeWindow_Buffer buf;
-    if (ANativeWindow_lock(test->cur.win, &buf, NULL)) {
-        android_log("failed to lock window");
-        return;
-    }
+    const AHardwareBuffer_Desc desc = {
+        .width = ANativeWindow_getWidth(test->cur.win),
+        .height = ANativeWindow_getHeight(test->cur.win),
+        .layers = 1,
+        .format = test->format,
+        .usage = AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY |
+                 AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE | AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY,
+    };
+    AHardwareBuffer *ahb;
+    if (AHardwareBuffer_allocate(&desc, &ahb))
+        android_die("failed to alloc ahb");
 
-    const int cpp = buf.format == AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM ? 4 : 1;
-    for (int y = 0; y < buf.height; y++) {
-        void *row = buf.bits + y * buf.stride * cpp;
+    void *ptr;
+    int32_t cpp;
+    int32_t stride;
+    if (AHardwareBuffer_lockAndGetInfo(ahb, AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY, -1, NULL,
+                                       &ptr, &cpp, &stride))
+        android_die("failed to lock ahb");
 
-        if (buf.format == AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM) {
-            for (int x = 0; x < buf.width; x++) {
-                uint8_t *rgba = row + x * cpp;
+    for (uint32_t y = 0; y < desc.height; y++) {
+        void *row = ptr + stride * y;
+
+        if (desc.format == AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM) {
+            for (uint32_t x = 0; x < desc.width; x++) {
+                uint8_t *rgba = row + cpp * x;
                 rgba[0] = 0xff;
                 rgba[1] = 0x80;
                 rgba[2] = 0x80;
                 rgba[3] = 0xff;
             }
         } else {
-            memset(row, 0xff, buf.width * cpp);
+            memset(row, 0x80, cpp * desc.width);
         }
     }
 
-    ANativeWindow_unlockAndPost(test->cur.win);
+    ASurfaceTransaction *xact = ASurfaceTransaction_create();
+    ASurfaceTransaction_setBuffer(xact, test->ctrl, ahb, -1);
+    ASurfaceTransaction_apply(xact);
+    ASurfaceTransaction_delete(xact);
+
+    AHardwareBuffer_release(ahb);
 }
 
 static void
@@ -128,10 +147,20 @@ android_test_handle_state(struct android_test *test)
     }
 
     if (cur->win != next->win) {
+        if (cur->win) {
+            ASurfaceControl_release(test->ctrl);
+            test->ctrl = NULL;
+        }
+
         cur->win = next->win;
 
-        if (cur->win)
+        if (cur->win) {
+            test->ctrl = ASurfaceControl_createFromWindow(cur->win, "MySurfaceControl");
+            if (!test->ctrl)
+                android_die("failed to create surface control");
+
             AChoreographer_postFrameCallback64(test->choreo, android_test_handle_frame, test);
+        }
     }
 
     cnd_signal(&test->cond);
@@ -327,9 +356,6 @@ static void
 ANativeActivity_onNativeWindowCreated(ANativeActivity *act, ANativeWindow *win)
 {
     struct android_test *test = act->instance;
-
-    if (ANativeWindow_setBuffersGeometry(win, 0, 0, test->format))
-        android_die("failed to set window format");
 
     if (test->verbose) {
         android_log("onNativeWindowCreated: %p, %dx%d, format 0x%x", win,
