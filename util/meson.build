@@ -7,7 +7,7 @@ util_summary = {}
 
 idep_util = declare_dependency(
   sources: ['util.h'],
-  dependencies: [dep_m, dep_rt],
+  dependencies: [dep_m, dep_rt, dep_log],
   include_directories: ['.', inc_include],
 )
 

@@ -25,6 +25,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #define PRINTFLIKE(f, a) __attribute__((format(printf, f, a)))
 #define NORETURN __attribute__((noreturn))
 
@@ -47,6 +51,9 @@ u_logv(const char *tag, const char *format, va_list ap)
     printf("%s: ", tag);
     vprintf(format, ap);
     printf("\n");
+#ifdef __ANDROID__
+    __android_log_vprint(ANDROID_LOG_INFO, tag, format, ap);
+#endif
 }
 
 static inline void NORETURN
