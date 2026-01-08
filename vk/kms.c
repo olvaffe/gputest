@@ -5,8 +5,38 @@
 
 #include "dmautil.h"
 #include "drmutil.h"
+#ifdef __ANDROID__
+#include "androidutil.h"
+#else
 #include "gbmutil.h"
+#endif
 #include "vkutil.h"
+
+#ifdef __ANDROID__
+
+/* these are from VNDK */
+typedef struct native_handle {
+    int version;
+    int numFds;
+    int numInts;
+    int data[];
+} native_handle_t;
+const native_handle_t *
+AHardwareBuffer_getNativeHandle(const AHardwareBuffer *ahb);
+
+#define GBM_MAX_PLANES 4
+struct gbm_import_fd_modifier_data {
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+    uint32_t num_fds;
+    int fds[GBM_MAX_PLANES];
+    int strides[GBM_MAX_PLANES];
+    int offsets[GBM_MAX_PLANES];
+    uint64_t modifier;
+};
+
+#endif
 
 struct kms_test {
     int drm_index;
@@ -28,6 +58,9 @@ struct kms_test {
     bool plane_active;
 
     struct gbm_import_fd_modifier_data bo;
+#ifdef __ANDROID__
+    AHardwareBuffer *ahb;
+#endif
     uint32_t fb_id;
     VkImage img;
     VkDeviceMemory mem;
@@ -39,6 +72,29 @@ kms_test_init_memory(struct kms_test *test)
     struct vk *vk = &test->vk;
 
     VkMemoryRequirements reqs;
+#ifdef __ANDROID__
+    if (test->import) {
+        VkAndroidHardwareBufferPropertiesANDROID props = {
+            .sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID,
+        };
+        vk->GetAndroidHardwareBufferPropertiesANDROID(vk->dev, test->ahb, &props);
+
+        reqs.size = props.allocationSize;
+        reqs.alignment = 1;
+        reqs.memoryTypeBits = props.memoryTypeBits;
+    } else {
+        reqs.size = 0;
+        reqs.alignment = 1;
+        reqs.memoryTypeBits = 0x1;
+    }
+
+    const uint32_t mt = ffs(reqs.memoryTypeBits) - 1;
+
+    const VkImportAndroidHardwareBufferInfoANDROID import_info = {
+        .sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
+        .buffer = test->ahb,
+    };
+#else
     vk->GetImageMemoryRequirements(vk->dev, test->img, &reqs);
 
     uint32_t mt_mask = reqs.memoryTypeBits;
@@ -67,6 +123,8 @@ kms_test_init_memory(struct kms_test *test)
         .handleType = test->handle_type,
         .fd = import_fd,
     };
+#endif
+
     const VkExportMemoryAllocateInfo export_info = {
         .sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO,
         .handleTypes = test->handle_type,
@@ -92,23 +150,26 @@ kms_test_init_memory(struct kms_test *test)
 static void
 kms_test_init_image(struct kms_test *test)
 {
+    const bool has_mod = test->modifier != DRM_FORMAT_MOD_INVALID;
+    const VkImageTiling img_tiling =
+        has_mod ? VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT : VK_IMAGE_TILING_OPTIMAL;
     struct vk *vk = &test->vk;
 
-    const VkPhysicalDeviceExternalImageFormatInfo fmt_ext_info = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO,
-        .handleType = test->handle_type,
-    };
     const VkPhysicalDeviceImageDrmFormatModifierInfoEXT fmt_mod_info = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT,
-        .pNext = &fmt_ext_info,
         .drmFormatModifier = test->modifier,
+    };
+    const VkPhysicalDeviceExternalImageFormatInfo fmt_ext_info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO,
+        .pNext = has_mod ? &fmt_mod_info : NULL,
+        .handleType = test->handle_type,
     };
     const VkPhysicalDeviceImageFormatInfo2 fmt_info = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
-        .pNext = &fmt_mod_info,
+        .pNext = &fmt_ext_info,
         .format = test->vk_format,
         .type = VK_IMAGE_TYPE_2D,
-        .tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT,
+        .tiling = img_tiling,
         .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         .flags = test->protected ? VK_IMAGE_CREATE_PROTECTED_BIT : 0,
     };
@@ -150,7 +211,8 @@ kms_test_init_image(struct kms_test *test)
 
     const VkExternalMemoryImageCreateInfo external_info = {
         .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
-        .pNext = test->import ? (void *)&explicit_info : (void *)&mod_list_info,
+        .pNext =
+            has_mod ? (test->import ? (void *)&explicit_info : (void *)&mod_list_info) : NULL,
         .handleTypes = test->handle_type,
     };
     const VkImageCreateInfo info = {
@@ -167,7 +229,7 @@ kms_test_init_image(struct kms_test *test)
         .mipLevels = 1,
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,
-        .tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT,
+        .tiling = img_tiling,
         .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
@@ -225,6 +287,50 @@ kms_test_init_fb(struct kms_test *test)
 static void
 kms_test_init_bo(struct kms_test *test)
 {
+#ifdef __ANDROID__
+    AHardwareBuffer_Desc desc;
+
+    if (test->import) {
+        desc = (AHardwareBuffer_Desc){
+            .width = test->mode->hdisplay,
+            .height = test->mode->vdisplay,
+            .layers = 1,
+            .format = android_ahb_format_from_drm_format(test->drm_format),
+            .usage =
+                AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER | AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY,
+        };
+        if (AHardwareBuffer_allocate(&desc, &test->ahb))
+            android_die("failed to allocate ahb");
+    } else {
+        struct vk *vk = &test->vk;
+
+        const VkMemoryGetAndroidHardwareBufferInfoANDROID info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_GET_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
+            .memory = test->mem,
+        };
+        vk->result = vk->GetMemoryAndroidHardwareBufferANDROID(vk->dev, &info, &test->ahb);
+        vk_check(vk, "failed to export ahb");
+    }
+
+    AHardwareBuffer_describe(test->ahb, &desc);
+
+    const native_handle_t *handle = AHardwareBuffer_getNativeHandle(test->ahb);
+    /* assume there is a dma-buf fd */
+    if (!handle->numFds)
+        vk_die("unexpected ahb fd count");
+    const int export_fd = dup(handle->data[0]);
+    if (export_fd < 0)
+        vk_die("failed to dup ahb fd");
+
+    test->bo.width = desc.width;
+    test->bo.height = desc.height;
+    test->bo.format = test->drm_format;
+    test->bo.num_fds = 1;
+    test->bo.fds[0] = export_fd;
+    test->bo.strides[0] = desc.stride * u_drm_format_to_cpp(test->drm_format);
+    test->bo.offsets[0] = 0;
+    test->bo.modifier = test->modifier;
+#else
     if (!test->import) {
         struct vk *vk = &test->vk;
 
@@ -313,6 +419,7 @@ kms_test_init_bo(struct kms_test *test)
     gbm_destroy_bo(gbm, bo);
 
     gbm_cleanup(gbm);
+#endif
 }
 
 static void
@@ -400,10 +507,14 @@ kms_test_init(struct kms_test *test)
     drm_scan_resources(drm);
 
     const char *const dev_exts[] = {
+#ifdef __ANDROID__
+        VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME,
+#else
         VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,
         VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME,
         VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
         VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME,
+#endif
         VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME,
     };
     const struct vk_init_params vk_params = {
@@ -447,6 +558,10 @@ kms_test_cleanup(struct kms_test *test)
 
     for (uint32_t i = 0; i < test->bo.num_fds; i++)
         close(test->bo.fds[i]);
+
+#ifdef __ANDROID__
+    AHardwareBuffer_release(test->ahb);
+#endif
 
     vk_cleanup(vk);
 
@@ -517,10 +632,17 @@ main(int argc, char **argv)
     struct kms_test test = {
         .drm_index = 0,
         .gbm_path = "/dev/dri/renderD128",
+#ifdef __ANDROID__
+        .drm_format = DRM_FORMAT_XBGR8888,
+        .vk_format = VK_FORMAT_R8G8B8A8_UNORM,
+        .modifier = DRM_FORMAT_MOD_INVALID,
+        .handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+#else
         .drm_format = DRM_FORMAT_XRGB8888,
         .vk_format = VK_FORMAT_B8G8R8A8_SRGB,
         .modifier = DRM_FORMAT_MOD_LINEAR,
         .handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
+#endif
         .import = true,
         .protected = false,
     };
