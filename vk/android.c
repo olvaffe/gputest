@@ -368,13 +368,10 @@ android_test_handle_state(struct android_test *test)
     cnd_signal(&test->cond);
 }
 
-static int
-android_test_thread(void *arg)
+static void
+android_test_thread_init(struct android_test *test)
 {
-    struct android_test *test = arg;
     struct vk *vk = &test->vk;
-
-    mtx_lock(&test->mutex);
 
     test->looper = ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
     if (!test->looper)
@@ -394,6 +391,31 @@ android_test_thread(void *arg)
         .dev_ext_count = ARRAY_SIZE(dev_exts),
     };
     vk_init(vk, &vk_params);
+}
+
+static void
+android_test_thread_cleanup(struct android_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    test->next.queue = NULL;
+    test->next.win = NULL;
+    android_test_handle_state(test);
+
+    vk_cleanup(vk);
+
+    test->looper = NULL;
+    test->choreo = NULL;
+}
+
+static int
+android_test_thread(void *arg)
+{
+    struct android_test *test = arg;
+
+    mtx_lock(&test->mutex);
+
+    android_test_thread_init(test);
 
     /* signal readiness */
     test->run = true;
@@ -419,12 +441,7 @@ android_test_thread(void *arg)
         android_test_handle_state(test);
     }
 
-    vk_cleanup(vk);
-
-    if (test->cur.queue)
-        AInputQueue_detachLooper(test->cur.queue);
-    test->looper = NULL;
-    test->choreo = NULL;
+    android_test_thread_cleanup(test);
 
     mtx_unlock(&test->mutex);
 
