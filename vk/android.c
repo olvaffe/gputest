@@ -308,7 +308,11 @@ android_test_handle_frame(int64_t ts, void *arg)
     }
 
     ASurfaceTransaction *xact = ASurfaceTransaction_create();
+#if 1
     ASurfaceTransaction_setBuffer(xact, test->ctrl, ahb, -1);
+#else
+    ASurfaceTransaction_setColor(xact, test->ctrl, 0.5, 0.5, 0.5, 1.0, ADATASPACE_SRGB);
+#endif
     ASurfaceTransaction_apply(xact);
     ASurfaceTransaction_delete(xact);
 
