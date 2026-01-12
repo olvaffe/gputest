@@ -30,6 +30,7 @@ tests = [
   'msaa',
   'paced',
   'pipeline_stats',
+  'protected',
   'push_const',
   'renderpass_ops',
   'sched',
