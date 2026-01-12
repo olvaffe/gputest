@@ -1230,6 +1230,14 @@ vk_write_ppm(const char *filename,
     uint16_t max_val;
     bool packed;
     switch (format) {
+    case VK_FORMAT_R8G8B8A8_UNORM:
+        cpp = 4;
+        max_val = 255;
+        packed = false;
+        swizzle[0] = 0;
+        swizzle[1] = 1;
+        swizzle[2] = 2;
+        break;
     case VK_FORMAT_B8G8R8A8_UNORM:
         cpp = 4;
         max_val = 255;
