@@ -154,6 +154,9 @@ protected_test_init_buffers(struct protected_test *test)
     test->vb = vk_create_buffer(vk, 0, vb_size, VK_BUFFER_USAGE_2_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, protected_test_vertices, vb_size);
 
+    if (test->protected)
+        vk_die("VUID-VkBufferCreateInfo-flags-09641 violation");
+
     const VkDeviceSize ib_size = sizeof(protected_test_indices);
     const VkBufferCreateFlags ib_flags = test->protected ? VK_BUFFER_CREATE_PROTECTED_BIT : 0;
     const VkBufferUsageFlags2 ib_usage =
