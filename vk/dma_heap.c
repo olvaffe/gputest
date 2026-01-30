@@ -4,6 +4,7 @@
  */
 
 #include "dmautil.h"
+#include "rdocutil.h"
 #include "vkutil.h"
 
 struct dma_heap_test {
@@ -14,6 +15,8 @@ struct dma_heap_test {
     struct vk vk;
     VkBuffer buf;
     VkMemoryRequirements buf_reqs;
+
+    struct rdoc rdoc;
 
     struct dma_buf *dma_buf;
 
@@ -145,6 +148,7 @@ static void
 dma_heap_test_init(struct dma_heap_test *test)
 {
     struct vk *vk = &test->vk;
+    struct rdoc *rdoc = &test->rdoc;
 
     const char *const dev_exts[] = {
         VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
@@ -158,6 +162,8 @@ dma_heap_test_init(struct dma_heap_test *test)
     };
 
     vk_init(vk, &params);
+    rdoc_init(rdoc);
+
     dma_heap_test_init_buffer(test);
     dma_heap_test_init_dma_buf(test);
     dma_heap_test_init_memory(test);
@@ -166,6 +172,7 @@ dma_heap_test_init(struct dma_heap_test *test)
 static void
 dma_heap_test_cleanup(struct dma_heap_test *test)
 {
+    struct rdoc *rdoc = &test->rdoc;
     struct vk *vk = &test->vk;
 
     vk->FreeMemory(vk->dev, test->mem, NULL);
@@ -174,6 +181,7 @@ dma_heap_test_cleanup(struct dma_heap_test *test)
     dma_buf_unmap(test->dma_buf);
     dma_buf_destroy(test->dma_buf);
 
+    rdoc_cleanup(rdoc);
     vk_cleanup(vk);
 }
 
@@ -201,7 +209,10 @@ dma_heap_test_timed_read(struct dma_heap_test *test, const void *src, const char
 static void
 dma_heap_test_draw(struct dma_heap_test *test)
 {
+    struct rdoc *rdoc = &test->rdoc;
     struct vk *vk = &test->vk;
+
+    rdoc_start(rdoc);
 
     const VkBufferMemoryBarrier barriers[] = {
         [0] = {
@@ -248,6 +259,8 @@ dma_heap_test_draw(struct dma_heap_test *test)
     dma_heap_test_timed_read(test, test->dma_buf->map, "dma-buf");
     if (test->mem_ptr)
         dma_heap_test_timed_read(test, test->mem_ptr, "VkDeviceMemory");
+
+    rdoc_end(rdoc);
 }
 
 int
