@@ -134,7 +134,7 @@ profile_test_parse_args(struct profile_test *test, int argc, char **argv)
 int
 main(int argc, char **argv)
 {
-    struct profile_test test = { 0 };
+    struct profile_test test = {};
 
     profile_test_parse_args(&test, argc, argv);
     profile_test_init(&test);

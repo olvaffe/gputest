@@ -1027,9 +1027,9 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
         vk->GetImageSubresourceLayout(vk->dev, img->img, &y_subres, &y_layout);
         vk->GetImageSubresourceLayout(vk->dev, img->img, &uv_subres, &uv_layout);
 
-        conv.dst_plane_ptrs[0] = img->mem_ptr + y_layout.offset;
+        conv.dst_plane_ptrs[0] = (uint8_t *)img->mem_ptr + y_layout.offset;
         conv.dst_plane_strides[0] = y_layout.rowPitch;
-        conv.dst_plane_ptrs[1] = img->mem_ptr + uv_layout.offset;
+        conv.dst_plane_ptrs[1] = (uint8_t *)img->mem_ptr + uv_layout.offset;
         conv.dst_plane_strides[1] = uv_layout.rowPitch;
     } else {
         const VkImageSubresource subres = {
@@ -1038,7 +1038,7 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
         VkSubresourceLayout layout;
         vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
 
-        conv.dst_plane_ptrs[0] = img->mem_ptr + layout.offset;
+        conv.dst_plane_ptrs[0] = (uint8_t *)img->mem_ptr + layout.offset;
         conv.dst_plane_strides[0] = layout.rowPitch;
     }
 
@@ -1283,14 +1283,16 @@ vk_write_ppm(const char *filename,
     for (uint32_t y = 0; y < height; y++) {
         for (uint32_t x = 0; x < width; x++) {
             if (format == VK_FORMAT_R32G32B32A32_UINT) {
-                const uint32_t *pixel = (const uint32_t *)(data + pitch * y + cpp * x);
+                const uint32_t *pixel =
+                    (const uint32_t *)((const uint8_t *)data + pitch * y + cpp * x);
                 /* discard the higher bytes */
                 const char bytes[3] = { (char)pixel[swizzle[0]], (char)pixel[swizzle[1]],
                                         (char)pixel[swizzle[2]] };
                 if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
                     vk_die("failed to write pixel (%u, %u)", x, y);
             } else if (packed) {
-                const uint16_t *pixel = (const uint16_t *)(data + pitch * y + cpp * x);
+                const uint16_t *pixel =
+                    (const uint16_t *)((const uint8_t *)data + pitch * y + cpp * x);
                 uint16_t val = *pixel;
                 if (format == VK_FORMAT_R5G5B5A1_UNORM_PACK16)
                     val >>= 1;
@@ -1301,7 +1303,7 @@ vk_write_ppm(const char *filename,
                 if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
                     vk_die("failed to write pixel (%u, %u)", x, y);
             } else {
-                const char *pixel = (const char *)(data + pitch * y + cpp * x);
+                const char *pixel = (const char *)((const uint8_t *)data + pitch * y + cpp * x);
                 const char bytes[3] = { pixel[swizzle[0]], pixel[swizzle[1]], pixel[swizzle[2]] };
                 if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
                     vk_die("failed to write pixel (%u, %u)", x, y);
@@ -1333,7 +1335,7 @@ vk_dump_image(struct vk *vk,
     VkSubresourceLayout layout;
     vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
 
-    vk_write_ppm(filename, img->mem_ptr + layout.offset, img->info.format,
+    vk_write_ppm(filename, (const uint8_t *)img->mem_ptr + layout.offset, img->info.format,
                  img->info.extent.width * img->info.samples, img->info.extent.height,
                  layout.rowPitch);
 }
@@ -1375,7 +1377,7 @@ vk_dump_buffer_raw(struct vk *vk,
     FILE *fp = fopen(filename, "w");
     if (!fp)
         vk_die("failed to open %s", filename);
-    if (fwrite(buf->mem_ptr + offset, 1, size, fp) != size)
+    if (fwrite((const uint8_t *)buf->mem_ptr + offset, 1, size, fp) != size)
         vk_die("failed to write raw memory");
     fclose(fp);
 }
