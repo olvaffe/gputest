@@ -19366,6 +19366,7 @@ struct VpCapabilities_T : public VpVulkanFunctions {
     }
 
     void ImportVulkanFunctions_Static() {
+#if 0
         // Vulkan 1.1
         this->GetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)vkGetInstanceProcAddr;
         this->GetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)vkGetDeviceProcAddr;
@@ -19381,6 +19382,7 @@ struct VpCapabilities_T : public VpVulkanFunctions {
 
         this->CreateInstance = (PFN_vkCreateInstance)vkCreateInstance;
         this->CreateDevice = (PFN_vkCreateDevice)vkCreateDevice;
+#endif
     }
 
     void ImportVulkanFunctions_Custom(VpVulkanFunctions* pFunctions) {
@@ -19672,7 +19674,7 @@ VPAPI_ATTR VkResult vpGetInstanceProfileVariantsSupport(
 
     uint32_t api_version = VK_API_VERSION_1_0;
     PFN_vkEnumerateInstanceVersion pfnEnumerateInstanceVersion = vp.singleton ?
-        (PFN_vkEnumerateInstanceVersion)vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion") : vp.EnumerateInstanceVersion;
+        (PFN_vkEnumerateInstanceVersion)vp.GetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion") : vp.EnumerateInstanceVersion;
     if (pfnEnumerateInstanceVersion != nullptr) {
         result = pfnEnumerateInstanceVersion(&api_version);
         if (result != VK_SUCCESS) {
@@ -19962,25 +19964,25 @@ VPAPI_ATTR VkResult vpGetPhysicalDeviceProfileVariantsSupport(
     // Attempt to load core versions of the GPDP2 entry points
     if (userData.gpdp2.pfnGetPhysicalDeviceFeatures2 == nullptr) {
         userData.gpdp2.pfnGetPhysicalDeviceFeatures2 =
-            (PFN_vkGetPhysicalDeviceFeatures2KHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures2");
+            (PFN_vkGetPhysicalDeviceFeatures2KHR)vp.GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures2");
         userData.gpdp2.pfnGetPhysicalDeviceProperties2 =
-            (PFN_vkGetPhysicalDeviceProperties2KHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2");
+            (PFN_vkGetPhysicalDeviceProperties2KHR)vp.GetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2");
         userData.gpdp2.pfnGetPhysicalDeviceFormatProperties2 =
-            (PFN_vkGetPhysicalDeviceFormatProperties2KHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties2");
+            (PFN_vkGetPhysicalDeviceFormatProperties2KHR)vp.GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties2");
         userData.gpdp2.pfnGetPhysicalDeviceQueueFamilyProperties2 =
-            (PFN_vkGetPhysicalDeviceQueueFamilyProperties2KHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyProperties2");
+            (PFN_vkGetPhysicalDeviceQueueFamilyProperties2KHR)vp.GetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyProperties2");
     }
 
     // If not successful, try to load KHR variant
     if (userData.gpdp2.pfnGetPhysicalDeviceFeatures2 == nullptr) {
         userData.gpdp2.pfnGetPhysicalDeviceFeatures2 =
-            (PFN_vkGetPhysicalDeviceFeatures2KHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures2KHR");
+            (PFN_vkGetPhysicalDeviceFeatures2KHR)vp.GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures2KHR");
         userData.gpdp2.pfnGetPhysicalDeviceProperties2 =
-            (PFN_vkGetPhysicalDeviceProperties2KHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR");
+            (PFN_vkGetPhysicalDeviceProperties2KHR)vp.GetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR");
         userData.gpdp2.pfnGetPhysicalDeviceFormatProperties2 =
-            (PFN_vkGetPhysicalDeviceFormatProperties2KHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties2KHR");
+            (PFN_vkGetPhysicalDeviceFormatProperties2KHR)vp.GetInstanceProcAddr(instance, "vkGetPhysicalDeviceFormatProperties2KHR");
         userData.gpdp2.pfnGetPhysicalDeviceQueueFamilyProperties2 =
-            (PFN_vkGetPhysicalDeviceQueueFamilyProperties2KHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyProperties2KHR");
+            (PFN_vkGetPhysicalDeviceQueueFamilyProperties2KHR)vp.GetInstanceProcAddr(instance, "vkGetPhysicalDeviceQueueFamilyProperties2KHR");
     }
 
     if (userData.gpdp2.pfnGetPhysicalDeviceFeatures2 == nullptr ||
@@ -19991,7 +19993,7 @@ VPAPI_ATTR VkResult vpGetPhysicalDeviceProfileVariantsSupport(
     }
 
 #ifdef VK_KHR_video_queue
-    PFN_vkGetInstanceProcAddr gipa = vp.singleton ? vkGetInstanceProcAddr : vp.GetInstanceProcAddr;
+    PFN_vkGetInstanceProcAddr gipa = vp.singleton ? vp.GetInstanceProcAddr : vp.GetInstanceProcAddr;
     userData.video.pfnGetPhysicalDeviceVideoCapabilitiesKHR =
         (PFN_vkGetPhysicalDeviceVideoCapabilitiesKHR)gipa(instance, "vkGetPhysicalDeviceVideoCapabilitiesKHR");
     userData.video.pfnGetPhysicalDeviceVideoFormatPropertiesKHR =
