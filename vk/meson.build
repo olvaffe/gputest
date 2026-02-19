@@ -30,6 +30,7 @@ tests = [
   'msaa',
   'paced',
   'pipeline_stats',
+  'profile',
   'protected',
   'push_const',
   'renderpass_ops',
@@ -71,6 +72,11 @@ if idep_wlutil.found()
 endif
 
 foreach t : tests
+  test_src = t + '.c'
+  if not fs.exists(test_src)
+    test_src = t + '.cpp'
+  endif
+
   test_incs = []
 
   foreach suffix : ['vert', 'tesc', 'tese', 'geom', 'frag', 'comp']
@@ -132,14 +138,14 @@ foreach t : tests
   if t == 'android'
     shared_library(
       t,
-      sources: [t + '.c', test_incs],
+      sources: [test_src, test_incs],
       dependencies: test_deps,
       c_args: test_args,
     )
   else
     executable(
       t,
-      sources: [t + '.c', test_incs],
+      sources: [test_src, test_incs],
       dependencies: test_deps,
       c_args: test_args,
     )
