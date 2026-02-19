@@ -103,17 +103,37 @@ profile_test_draw(struct profile_test *test)
     vk->DestroyInstance(instance, NULL);
 }
 
-int
-main(void)
+static void
+profile_test_parse_args(struct profile_test *test, int argc, char **argv)
 {
-    struct profile_test test = {
-        .profile = {
-            .profileName = VP_KHR_ROADMAP_2024_NAME,
-            .specVersion = VP_KHR_ROADMAP_2024_SPEC_VERSION,
-        },
-        .api_version = VP_KHR_ROADMAP_2022_MIN_API_VERSION,
-    };
+    const char *name = argc == 2 ? argv[1] : NULL;
+    const detail::VpProfileDesc *desc = name ? detail::vpGetProfileDesc(name) : NULL;
+    if (!desc) {
+        if (name) {
+            vk_log("unsupported profile %s", name);
+            vk_log(NULL);
+        }
+        vk_log("usage: %s <profile>", argv[0]);
+        vk_log(NULL);
+        vk_log("supported profiles:");
+        for (uint32_t i = 0; i < detail::profileCount; i++) {
+            const detail::VpProfileDesc *desc = &detail::profiles[i];
+            vk_log("  %s", desc->props.profileName);
+        }
 
+        exit(name ? -1 : 0);
+    }
+
+    test->profile = desc->props;
+    test->api_version = desc->minApiVersion;
+}
+
+int
+main(int argc, char **argv)
+{
+    struct profile_test test = { 0 };
+
+    profile_test_parse_args(&test, argc, argv);
     profile_test_init(&test);
     profile_test_draw(&test);
     profile_test_cleanup(&test);
