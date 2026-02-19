@@ -48,6 +48,9 @@ u_isatty(void)
 static inline void
 u_logv(const char *tag, const char *format, va_list ap)
 {
+    if (!format)
+        format = "";
+
     printf("%s: ", tag);
     vprintf(format, ap);
     printf("\n");

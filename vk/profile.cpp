@@ -5,6 +5,7 @@
 
 #include "vkutil.h"
 
+#define VP_DEBUG_MESSAGE_CALLBACK profile_test_log
 #define VP_USE_OBJECT
 #include <vulkan/vulkan_profiles.hpp>
 
@@ -15,6 +16,12 @@ struct profile_test {
     struct vk vk;
     VpCapabilities caps;
 };
+
+void
+profile_test_log(const char *msg)
+{
+    vk_log("%s", msg);
+}
 
 static void
 profile_test_init(struct profile_test *test)
