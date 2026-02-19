@@ -1988,7 +1988,7 @@ vk_destroy_query(struct vk *vk, struct vk_query *query)
 static inline struct vk_stopwatch *
 vk_create_stopwatch(struct vk *vk, uint32_t count)
 {
-    struct vk_stopwatch *stopwatch = calloc(1, sizeof(*stopwatch));
+    struct vk_stopwatch *stopwatch = (struct vk_stopwatch *)calloc(1, sizeof(*stopwatch));
     if (!stopwatch)
         vk_die("failed to alloc stopwatch");
 
@@ -2036,7 +2036,7 @@ static inline uint64_t
 vk_read_stopwatch(struct vk *vk, struct vk_stopwatch *stopwatch, uint32_t idx)
 {
     if (!stopwatch->ts) {
-        stopwatch->ts = malloc(sizeof(*stopwatch->ts) * stopwatch->query_count);
+        stopwatch->ts = (uint64_t *)malloc(sizeof(*stopwatch->ts) * stopwatch->query_count);
         if (!stopwatch->ts)
             vk_die("failed to alloc ts");
 
