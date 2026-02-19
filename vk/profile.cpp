@@ -65,10 +65,8 @@ profile_test_draw(struct profile_test *test)
     vk->result = vpGetInstanceProfileSupport(test->caps, NULL, &test->profile, &supported);
     vk_check(vk, "failed to get instance profile support");
 
-    if (!supported) {
-        vk_log("%s is NOT supported at instance level", test->profile.profileName);
-        return;
-    }
+    vk_log("%s is %ssupported at instance level", test->profile.profileName,
+           supported ? "" : "NOT ");
 
     const VkApplicationInfo app_info = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -78,14 +76,18 @@ profile_test_draw(struct profile_test *test)
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo = &app_info,
     };
-    const VpInstanceCreateInfo info = {
-        .pCreateInfo = &instance_info,
-        .enabledFullProfileCount = 1,
-        .pEnabledFullProfiles = &test->profile,
-    };
 
     VkInstance instance;
-    vk->result = vpCreateInstance(test->caps, &info, NULL, &instance);
+    if (supported) {
+        const VpInstanceCreateInfo info = {
+            .pCreateInfo = &instance_info,
+            .enabledFullProfileCount = 1,
+            .pEnabledFullProfiles = &test->profile,
+        };
+        vk->result = vpCreateInstance(test->caps, &info, NULL, &instance);
+    } else {
+        vk->result = vk->CreateInstance(&instance_info, NULL, &instance);
+    }
     vk_check(vk, "failed to create instance");
 
     VkPhysicalDevice physical_dev;
@@ -98,7 +100,8 @@ profile_test_draw(struct profile_test *test)
                                                    &test->profile, &supported);
     vk_check(vk, "failed to get physical device profile support");
 
-    vk_log("%s is %ssupported", test->profile.profileName, supported ? "" : "NOT ");
+    vk_log("%s is %ssupported at physical device level", test->profile.profileName,
+           supported ? "" : "NOT ");
 
     vk->DestroyInstance(instance, NULL);
 }
