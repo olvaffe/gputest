@@ -6,6 +6,7 @@
 #include "vkutil.h"
 
 #include <linux/prctl.h>
+#include <errno.h>
 #include <sched.h>
 #include <stdatomic.h>
 #include <sys/prctl.h>
@@ -22,6 +23,7 @@ struct sched_test_push_consts {
 struct sched_test {
     /* cpu */
     bool cpu_fifo;
+    int cpu_nice;
     uint32_t cpu_loop;
     uint32_t cpu_pre_busy;
     uint32_t cpu_post_sleep;
@@ -61,6 +63,14 @@ sched_test_set_fifo(void)
 }
 
 static void
+sched_test_set_nice(int val)
+{
+    errno = 0;
+    if (nice(val) == -1 && errno)
+        vk_die("failed to set nice");
+}
+
+static void
 sched_test_busy_loop(uint32_t ms)
 {
     const uint64_t end = u_now() + (uint64_t)ms * 1000 * 1000;
@@ -77,6 +87,9 @@ sched_test_thread(void *arg)
 
     if (test->cpu_fifo)
         sched_test_set_fifo();
+    else if (test->cpu_nice)
+        sched_test_set_nice(test->cpu_nice);
+
     while (!atomic_load(&test->stop)) {
         sched_test_busy_loop(test->cpu_pre_busy);
         u_sleep(test->cpu_post_sleep);
@@ -216,6 +229,8 @@ sched_test_dispatch(struct sched_test *test)
 {
     if (test->cpu_fifo)
         sched_test_set_fifo();
+    else if (test->cpu_nice)
+        sched_test_set_nice(test->cpu_nice);
 
     for (uint32_t i = 0; i < test->cpu_loop; i++) {
         sched_test_busy_loop(test->cpu_pre_busy);
@@ -229,6 +244,7 @@ main(void)
 {
     struct sched_test test = {
         .cpu_fifo = false,
+        .cpu_nice = 0,
         .cpu_loop = 300,
         .cpu_pre_busy = 3,
         .cpu_post_sleep = 2,
@@ -237,6 +253,9 @@ main(void)
         .type_size = 4,
         .loop = 50000,
     };
+
+    if (test.cpu_fifo && test.cpu_nice)
+        vk_die("cpu fifo and nice are mutually exclusive");
 
     sched_test_init(&test);
     sched_test_dispatch(&test);
