@@ -299,6 +299,8 @@ kms_test_init_bo(struct kms_test *test)
             .usage =
                 AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER | AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY,
         };
+        if (test->protected)
+            desc.usage |= AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT;
         if (AHardwareBuffer_allocate(&desc, &test->ahb))
             android_die("failed to allocate ahb");
     } else {
