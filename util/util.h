@@ -51,12 +51,16 @@ u_logv(const char *tag, const char *format, va_list ap)
     if (!format)
         format = "";
 
+#ifdef __ANDROID__
+    va_list ap2;
+    va_copy(ap2, ap);
+    __android_log_vprint(ANDROID_LOG_INFO, tag, format, ap2);
+    va_end(ap2);
+#endif
+
     printf("%s: ", tag);
     vprintf(format, ap);
     printf("\n");
-#ifdef __ANDROID__
-    __android_log_vprint(ANDROID_LOG_INFO, tag, format, ap);
-#endif
 }
 
 static inline void NORETURN
