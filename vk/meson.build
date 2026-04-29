@@ -27,6 +27,7 @@ tests = [
   'loop',
   'mem',
   'mem_alloc',
+  'mem_hog',
   'msaa',
   'paced',
   'pipeline_stats',
