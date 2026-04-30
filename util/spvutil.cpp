@@ -359,7 +359,9 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
         spv_die("failed to create invocation: %s", diag_log.c_str());
 
     c.getDiagnosticOpts().ShowCarets = false;
-#if LLVM_VERSION_MAJOR >= 21
+#if LLVM_VERSION_MAJOR >= 22
+    c.createDiagnostics(new clang::TextDiagnosticPrinter{ diag_stream, c.getDiagnosticOpts() });
+#elif LLVM_VERSION_MAJOR >= 21
     c.createDiagnostics(*llvm::vfs::getRealFileSystem(),
                         new clang::TextDiagnosticPrinter{ diag_stream, c.getDiagnosticOpts() });
 #elif LLVM_VERSION_MAJOR >= 20
@@ -379,7 +381,9 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
         char *lib_path = realpath(lib_info.dli_fname, NULL);
         if (!lib_path)
             spv_die("failed to get real path of %s", lib_info.dli_fname);
-#if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 22
+        std::string res_path = clang::GetResourcesPath(lib_path);
+#elif LLVM_VERSION_MAJOR >= 20
         std::string res_path = clang::driver::Driver::GetResourcesPath(lib_path);
 #else
         std::string res_path =
