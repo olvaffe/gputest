@@ -115,7 +115,8 @@ if dep_llvm_spirv.found()
   ]
 
   dep_llvm = dependency('LLVM', version: version, method: 'cmake')
-  dep_clang = dependency('Clang', version: version, modules: ['clang-cpp'], method: 'cmake')
+  llvm_libdir = dep_llvm.get_variable('LLVM_LIBRARY_DIR')
+  dep_clang = cpp.find_library('clang-cpp', dirs: llvm_libdir)
 endif
 
 dep_spirv_reflect = dep_not_found
