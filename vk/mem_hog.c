@@ -51,9 +51,22 @@ struct mem_hog_test {
         uint32_t page_count;
     } cpu;
 
+    struct {
+        struct vk vk;
+        struct vk_buffer *buf;
+    } second;
+
     thrd_t thread;
     atomic_bool stop;
 };
+
+static void
+mem_hog_test_init_second(struct mem_hog_test *test)
+{
+    vk_init(&test->second.vk, NULL);
+    test->second.buf =
+        vk_create_buffer(&test->second.vk, 0, test->size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+}
 
 static void
 mem_hog_test_init_cpu(struct mem_hog_test *test)
@@ -145,12 +158,16 @@ mem_hog_test_init(struct mem_hog_test *test)
     mem_hog_test_init_buffers(test);
 
     mem_hog_test_init_cpu(test);
+    mem_hog_test_init_second(test);
 }
 
 static void
 mem_hog_test_cleanup(struct mem_hog_test *test)
 {
     struct vk *vk = &test->vk;
+
+    vk_destroy_buffer(&test->second.vk, test->second.buf);
+    vk_cleanup(&test->second.vk);
 
     for (uint32_t i = 0; i < test->cpu.count; i++)
         free(test->cpu.bufs[i]);
@@ -177,6 +194,19 @@ mem_hog_test_thread(void *arg)
             for (uint32_t j = 0; j < test->cpu.page_count; j++)
                 memset(test->cpu.bufs[i] + test->cpu.page_size * j, 0x37, 64);
         }
+
+        /* Force panthor to tick while
+         *
+         *  CSG 0
+         *   - CS 0: slow vs
+         *   - CS 1: sync wait for vs
+         *   - CS 2: don't care
+         *
+         * to trigger panthor_queue_eval_syncwait.
+         */
+        VkCommandBuffer cmd = vk_begin_cmd(&test->second.vk, false);
+        test->second.vk.CmdFillBuffer(cmd, test->second.buf->buf, 0, 64, 0x37);
+        vk_end_cmd(&test->second.vk);
 
         if (test->cpu.sleep)
             u_sleep(test->cpu.sleep);
@@ -255,10 +285,10 @@ mem_hog_test_draw(struct mem_hog_test *test)
         const float total_cpu_gb = cpu_mb * test->cpu.count / 1024.0f;
         vk_log("sys size %.1fMiB, sys count %u, total sys size %.1fGiB", cpu_mb, test->cpu.count,
                total_cpu_gb);
-
-        if (thrd_create(&test->thread, mem_hog_test_thread, test) != thrd_success)
-            vk_die("failed to create thread");
     }
+
+    if (thrd_create(&test->thread, mem_hog_test_thread, test) != thrd_success)
+        vk_die("failed to create thread");
 
     while (true) {
         VkCommandBuffer cmd = vk_begin_cmd(vk, false);
@@ -272,11 +302,9 @@ mem_hog_test_draw(struct mem_hog_test *test)
             u_sleep(test->sleep);
     }
 
-    if (test->cpu.count) {
-        atomic_store(&test->stop, true);
-        if (thrd_join(test->thread, NULL) != thrd_success)
-            vk_die("failed to join thread");
-    }
+    atomic_store(&test->stop, true);
+    if (thrd_join(test->thread, NULL) != thrd_success)
+        vk_die("failed to join thread");
 }
 
 int
