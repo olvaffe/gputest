@@ -315,7 +315,7 @@ main(int argc, char **argv)
         .width = 8,
         .height = 8,
         .push_const = {
-            .vs_loop = 10000,
+            .vs_loop = 100000,
             .fs_loop = 1,
             .val = 0.0f,
         },
