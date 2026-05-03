@@ -25,22 +25,20 @@ struct mem_hog_test_push_const {
 struct mem_hog_test {
     struct vk vk;
 
-    struct {
-        VkFormat format;
-        uint32_t width;
-        uint32_t height;
-        struct mem_hog_test_push_const push_const;
+    VkFormat format;
+    uint32_t width;
+    uint32_t height;
+    struct mem_hog_test_push_const push_const;
 
-        struct vk_image *img;
-        struct vk_framebuffer *fb;
-        struct vk_pipeline *pipeline;
+    struct vk_image *img;
+    struct vk_framebuffer *fb;
+    struct vk_pipeline *pipeline;
 
-        VkDeviceSize size;
-        uint32_t count;
-        struct vk_buffer **bufs;
+    VkDeviceSize size;
+    uint32_t count;
+    struct vk_buffer **bufs;
 
-        uint32_t sleep;
-    } gpu;
+    uint32_t sleep;
 
     struct {
         size_t size;
@@ -82,16 +80,15 @@ mem_hog_test_init_buffers(struct mem_hog_test *test)
 {
     struct vk *vk = &test->vk;
 
-    if (!test->gpu.count)
+    if (!test->count)
         return;
 
-    test->gpu.bufs = calloc(test->gpu.count, sizeof(*test->gpu.bufs));
-    if (!test->gpu.bufs)
+    test->bufs = calloc(test->count, sizeof(*test->bufs));
+    if (!test->bufs)
         vk_die("failed to alloc bufs");
 
-    for (uint32_t i = 0; i < test->gpu.count; i++)
-        test->gpu.bufs[i] =
-            vk_create_buffer(vk, 0, test->gpu.size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    for (uint32_t i = 0; i < test->count; i++)
+        test->bufs[i] = vk_create_buffer(vk, 0, test->size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 }
 
 static void
@@ -99,26 +96,26 @@ mem_hog_test_init_pipeline(struct mem_hog_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->gpu.pipeline = vk_create_pipeline(vk);
+    test->pipeline = vk_create_pipeline(vk);
 
-    vk_add_pipeline_shader(vk, test->gpu.pipeline, VK_SHADER_STAGE_VERTEX_BIT, mem_hog_test_vs,
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, mem_hog_test_vs,
                            sizeof(mem_hog_test_vs));
-    vk_add_pipeline_shader(vk, test->gpu.pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, mem_hog_test_fs,
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, mem_hog_test_fs,
                            sizeof(mem_hog_test_fs));
 
-    vk_set_pipeline_topology(vk, test->gpu.pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+    vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
-    vk_set_pipeline_viewport(vk, test->gpu.pipeline, test->gpu.width, test->gpu.height);
-    vk_set_pipeline_rasterization(vk, test->gpu.pipeline, VK_POLYGON_MODE_FILL, false);
+    vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
+    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
-    vk_set_pipeline_push_const(vk, test->gpu.pipeline,
+    vk_set_pipeline_push_const(vk, test->pipeline,
                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                               sizeof(test->gpu.push_const));
+                               sizeof(test->push_const));
 
-    vk_set_pipeline_sample_count(vk, test->gpu.pipeline, VK_SAMPLE_COUNT_1_BIT);
+    vk_set_pipeline_sample_count(vk, test->pipeline, VK_SAMPLE_COUNT_1_BIT);
 
-    vk_setup_pipeline(vk, test->gpu.pipeline, test->gpu.fb);
-    vk_compile_pipeline(vk, test->gpu.pipeline);
+    vk_setup_pipeline(vk, test->pipeline, test->fb);
+    vk_compile_pipeline(vk, test->pipeline);
 }
 
 static void
@@ -126,14 +123,13 @@ mem_hog_test_init_framebuffer(struct mem_hog_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->gpu.img = vk_create_image(vk, test->gpu.format, test->gpu.width, test->gpu.height,
-                                    VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    vk_create_image_render_view(vk, test->gpu.img, VK_IMAGE_ASPECT_COLOR_BIT);
+    test->img =
+        vk_create_image(vk, test->format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
+                        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vk_create_image_render_view(vk, test->img, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    test->gpu.fb =
-        vk_create_framebuffer(vk, test->gpu.img, NULL, NULL, VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                              VK_ATTACHMENT_STORE_OP_STORE);
+    test->fb = vk_create_framebuffer(vk, test->img, NULL, NULL, VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                     VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void
@@ -160,13 +156,13 @@ mem_hog_test_cleanup(struct mem_hog_test *test)
         free(test->cpu.bufs[i]);
     free(test->cpu.bufs);
 
-    for (uint32_t i = 0; i < test->gpu.count; i++)
-        vk_destroy_buffer(vk, test->gpu.bufs[i]);
-    free(test->gpu.bufs);
+    for (uint32_t i = 0; i < test->count; i++)
+        vk_destroy_buffer(vk, test->bufs[i]);
+    free(test->bufs);
 
-    vk_destroy_pipeline(vk, test->gpu.pipeline);
-    vk_destroy_framebuffer(vk, test->gpu.fb);
-    vk_destroy_image(vk, test->gpu.img);
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_framebuffer(vk, test->fb);
+    vk_destroy_image(vk, test->img);
 
     vk_cleanup(vk);
 }
@@ -194,8 +190,8 @@ mem_hog_test_draw_buffers(struct mem_hog_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
-    for (uint32_t i = 0; i < test->gpu.count; i++)
-        vk->CmdFillBuffer(cmd, test->gpu.bufs[i]->buf, 0, 64, 0x37);
+    for (uint32_t i = 0; i < test->count; i++)
+        vk->CmdFillBuffer(cmd, test->bufs[i]->buf, 0, 64, 0x37);
 }
 
 static void
@@ -214,17 +210,17 @@ mem_hog_test_draw_triangle(struct mem_hog_test *test, VkCommandBuffer cmd)
         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .image = test->gpu.img->img,
+        .image = test->img->img,
         .subresourceRange = subres_range,
     };
     const VkRenderPassBeginInfo pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = test->gpu.fb->pass,
-        .framebuffer = test->gpu.fb->fb,
+        .renderPass = test->fb->pass,
+        .framebuffer = test->fb->fb,
         .renderArea = {
             .extent = {
-                .width = test->gpu.width,
-                .height = test->gpu.height,
+                .width = test->width,
+                .height = test->height,
             },
         },
     };
@@ -234,10 +230,10 @@ mem_hog_test_draw_triangle(struct mem_hog_test *test, VkCommandBuffer cmd)
                            &barrier);
 
     vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->gpu.pipeline->pipeline);
-    vk->CmdPushConstants(cmd, test->gpu.pipeline->pipeline_layout,
+    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout,
                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(test->gpu.push_const), &test->gpu.push_const);
+                         sizeof(test->push_const), &test->push_const);
     vk->CmdDraw(cmd, 3, 1, 0, 0);
     vk->CmdEndRenderPass(cmd);
 }
@@ -247,10 +243,10 @@ mem_hog_test_draw(struct mem_hog_test *test)
 {
     struct vk *vk = &test->vk;
 
-    if (test->gpu.count) {
-        const float gpu_mb = test->gpu.size / 1024.0f / 1024.0f;
-        const float total_gpu_gb = gpu_mb * test->gpu.count / 1024.0f;
-        vk_log("buf size %.1fMiB, buf count %u, total buf size %.1fGiB", gpu_mb, test->gpu.count,
+    if (test->count) {
+        const float gpu_mb = test->size / 1024.0f / 1024.0f;
+        const float total_gpu_gb = gpu_mb * test->count / 1024.0f;
+        vk_log("buf size %.1fMiB, buf count %u, total buf size %.1fGiB", gpu_mb, test->count,
                total_gpu_gb);
     }
 
@@ -272,8 +268,8 @@ mem_hog_test_draw(struct mem_hog_test *test)
 
         vk_end_cmd(vk);
 
-        if (test->gpu.sleep)
-            u_sleep(test->gpu.sleep);
+        if (test->sleep)
+            u_sleep(test->sleep);
     }
 
     if (test->cpu.count) {
@@ -287,20 +283,18 @@ int
 main(int argc, char **argv)
 {
     struct mem_hog_test test = {
-        .gpu = {
-            .format = VK_FORMAT_B8G8R8A8_UNORM,
-            .width = 8,
-            .height = 8,
-            .push_const = {
-                .vs_loop = 10000,
-                .fs_loop = 1,
-                .val = 0.0f,
-            },
-
-            .size = 1ull * 1024 * 1024,
-            .count = 1024,
-            .sleep = 10,
+        .format = VK_FORMAT_B8G8R8A8_UNORM,
+        .width = 8,
+        .height = 8,
+        .push_const = {
+            .vs_loop = 10000,
+            .fs_loop = 1,
+            .val = 0.0f,
         },
+
+        .size = 1ull * 1024 * 1024,
+        .count = 1024,
+        .sleep = 10,
         .cpu = {
             .size = 1ull * 1024 * 1024,
             .count = 1024,
@@ -309,8 +303,8 @@ main(int argc, char **argv)
     };
 
     if (argc > 1) {
-        test.gpu.count = atoi(argv[1]);
-        test.cpu.count = argc > 2 ? (uint32_t)atoi(argv[2]) : test.gpu.count;
+        test.count = atoi(argv[1]);
+        test.cpu.count = argc > 2 ? (uint32_t)atoi(argv[2]) : test.count;
     }
 
     mem_hog_test_init(&test);
