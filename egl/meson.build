@@ -7,6 +7,7 @@ tests = [
   'formats',
   'info',
   'model',
+  'scissor',
   'ssbo',
   'tex',
   'timestamp',
