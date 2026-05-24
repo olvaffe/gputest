@@ -116,37 +116,46 @@ static void
 ahb_test_init_image(struct ahb_test *test)
 {
     struct vk *vk = &test->vk;
+    bool ahb_ext_fmt = test->ahb_fmt_props.format == VK_FORMAT_UNDEFINED;
 
-    const VkPhysicalDeviceExternalImageFormatInfo fmt_ext_info = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO,
-        .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
-    };
-    const VkPhysicalDeviceImageFormatInfo2 fmt_info = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
-        .pNext = &fmt_ext_info,
-        .format = test->ahb_fmt_props.format,
-        .type = VK_IMAGE_TYPE_2D,
-        .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-    };
-    VkExternalImageFormatProperties fmt_ext_props = {
-        .sType = VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES,
-    };
-    VkImageFormatProperties2 fmt_props = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2,
-        .pNext = &fmt_ext_props,
-    };
-    vk->result =
-        vk->GetPhysicalDeviceImageFormatProperties2(vk->physical_dev, &fmt_info, &fmt_props);
-    vk_check(vk, "unsupported image");
+    /* the validity is implied */
+    if (!ahb_ext_fmt) {
+        const VkPhysicalDeviceExternalImageFormatInfo fmt_ext_info = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO,
+            .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+        };
+        const VkPhysicalDeviceImageFormatInfo2 fmt_info = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
+            .pNext = &fmt_ext_info,
+            .format = test->ahb_fmt_props.format,
+            .type = VK_IMAGE_TYPE_2D,
+            .tiling = VK_IMAGE_TILING_OPTIMAL,
+            .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        };
+        VkExternalImageFormatProperties fmt_ext_props = {
+            .sType = VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES,
+        };
+        VkImageFormatProperties2 fmt_props = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2,
+            .pNext = &fmt_ext_props,
+        };
+        vk->result =
+            vk->GetPhysicalDeviceImageFormatProperties2(vk->physical_dev, &fmt_info, &fmt_props);
+        vk_check(vk, "unsupported image");
 
-    const VkExternalMemoryFeatureFlags ext_mem_feats =
-        fmt_ext_props.externalMemoryProperties.externalMemoryFeatures;
-    if (!(ext_mem_feats & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT))
-        vk_die("image does not support import");
+        const VkExternalMemoryFeatureFlags ext_mem_feats =
+            fmt_ext_props.externalMemoryProperties.externalMemoryFeatures;
+        if (!(ext_mem_feats & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT))
+            vk_die("image does not support import");
+    }
 
+    const VkExternalFormatANDROID external_fmt = {
+        .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
+        .externalFormat = test->ahb_fmt_props.externalFormat,
+    };
     const VkExternalMemoryImageCreateInfo external_info = {
         .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
+        .pNext = ahb_ext_fmt ? &external_fmt : NULL,
         .handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
     };
     const VkImageCreateInfo info = {
@@ -326,6 +335,7 @@ main(void)
 {
     struct ahb_test test = {
         .ahb_format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM,
+        //.ahb_format = AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420,
         .width = 300,
         .height = 300,
     };
