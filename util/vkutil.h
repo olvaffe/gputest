@@ -68,6 +68,7 @@ struct vk {
     VkPhysicalDeviceVulkan13Properties vulkan_13_props;
     VkPhysicalDeviceVulkan14Properties vulkan_14_props;
 
+    VkPhysicalDeviceExternalFormatResolvePropertiesANDROID external_format_resolve_props;
     VkPhysicalDeviceDrmPropertiesEXT drm_props;
     VkPhysicalDeviceProtectedMemoryProperties protected_props;
 
@@ -80,6 +81,7 @@ struct vk {
     VkPhysicalDeviceSamplerYcbcrConversionFeatures sampler_ycbcr_conversion_features;
     VkPhysicalDeviceHostQueryResetFeatures host_query_reset_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
+    VkPhysicalDeviceExternalFormatResolveFeaturesANDROID external_format_resolve_features;
     VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features;
     VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR global_priority_query_features;
 
@@ -166,6 +168,7 @@ struct vk_pipeline {
     /* fragment output state */
     VkPipelineColorBlendAttachmentState color_att;
     VkPipelineRenderingCreateInfo rendering_info;
+    VkExternalFormatANDROID external_format;
     const struct vk_framebuffer *fb;
 
     VkDescriptorSetLayout set_layouts[4];
@@ -371,6 +374,11 @@ vk_init_physical_device_features(struct vk *vk)
         pnext = &vk->vulkan_14_features.pNext;
     }
 
+    vk->external_format_resolve_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FORMAT_RESOLVE_FEATURES_ANDROID;
+    *pnext = &vk->external_format_resolve_features;
+    pnext = &vk->external_format_resolve_features.pNext;
+
     vk->custom_border_color_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
     *pnext = &vk->custom_border_color_features;
@@ -419,6 +427,11 @@ vk_init_physical_device_properties(struct vk *vk)
         *pnext = &vk->vulkan_14_props;
         pnext = &vk->vulkan_14_props.pNext;
     }
+
+    vk->external_format_resolve_props.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FORMAT_RESOLVE_PROPERTIES_ANDROID;
+    *pnext = &vk->external_format_resolve_props;
+    pnext = &vk->external_format_resolve_props.pNext;
 
     if (vk->EXT_physical_device_drm) {
         vk->drm_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRM_PROPERTIES_EXT;
@@ -1747,6 +1760,10 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
     };
 
+    pipeline->external_format = (VkExternalFormatANDROID){
+        .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
+    };
+
     pipeline->fb = fb;
 }
 
@@ -1787,9 +1804,8 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pAttachments = &pipeline->color_att,
     };
 
-    const VkGraphicsPipelineCreateInfo pipeline_info = {
+    VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext = pipeline->fb ? NULL : &pipeline->rendering_info,
         .stageCount = pipeline->stage_count,
         .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,
@@ -1803,6 +1819,16 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .layout = pipeline->pipeline_layout,
         .renderPass = pipeline->fb ? pipeline->fb->pass : VK_NULL_HANDLE,
     };
+
+    const void **pnext = &pipeline_info.pNext;
+    if (!pipeline->fb) {
+        *pnext = &pipeline->rendering_info;
+        pnext = &pipeline->rendering_info.pNext;
+    }
+    if (pipeline->external_format.externalFormat) {
+        *pnext = &pipeline->external_format;
+        pnext = (const void **)&pipeline->external_format.pNext;
+    }
 
     vk->result = vk->CreateGraphicsPipelines(vk->dev, VK_NULL_HANDLE, 1, &pipeline_info, NULL,
                                              &pipeline->pipeline);
