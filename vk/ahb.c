@@ -25,10 +25,13 @@ struct ahb_test {
     struct android_ahb *ahb;
     VkAndroidHardwareBufferPropertiesANDROID ahb_props;
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props;
+    VkAndroidHardwareBufferFormatResolvePropertiesANDROID ahb_resolve_props;
 
     VkImage img;
     VkDeviceMemory mem;
-    VkImageView view;
+    VkSamplerYcbcrConversion conv;
+    VkImageView rt_view;
+    VkImageView resolve_view;
 
     struct vk_pipeline *pipeline;
 };
@@ -58,6 +61,15 @@ ahb_test_init_pipeline(struct ahb_test *test)
         .colorAttachmentCount = 1,
         .pColorAttachmentFormats = &test->ahb_fmt_props.format,
     };
+    if (test->ahb_fmt_props.format == VK_FORMAT_UNDEFINED) {
+        test->pipeline->rendering_info.pColorAttachmentFormats =
+            &test->ahb_resolve_props.colorAttachmentFormat;
+
+        test->pipeline->external_format = (VkExternalFormatANDROID){
+            .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
+            .externalFormat = test->ahb_fmt_props.externalFormat,
+        };
+    }
 
     vk_compile_pipeline(vk, test->pipeline);
 }
@@ -67,8 +79,13 @@ ahb_test_init_image_view(struct ahb_test *test)
 {
     struct vk *vk = &test->vk;
 
+    const VkSamplerYcbcrConversionInfo ycbcr_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO,
+        .conversion = test->conv,
+    };
     const VkImageViewCreateInfo view_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .pNext = test->conv ? &ycbcr_info : NULL,
         .image = test->img,
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .format = test->ahb_fmt_props.format,
@@ -78,8 +95,44 @@ ahb_test_init_image_view(struct ahb_test *test)
             .layerCount = 1,
         },
     };
-    vk->result = vk->CreateImageView(vk->dev, &view_info, NULL, &test->view);
+
+    VkImageView view;
+    vk->result = vk->CreateImageView(vk->dev, &view_info, NULL, &view);
     vk_check(vk, "failed to create image render view");
+
+    if (test->ahb_fmt_props.format != VK_FORMAT_UNDEFINED) {
+        test->rt_view = view;
+    } else if (vk->external_format_resolve_props.nullColorAttachmentWithExternalFormatResolve)
+        test->resolve_view = view;
+    else
+        vk_die("only nullColorAttachmentWithExternalFormatResolve support");
+}
+
+static void
+ahb_test_init_ycbcr_conv(struct ahb_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    if (test->ahb_fmt_props.format != VK_FORMAT_UNDEFINED)
+        return;
+
+    const VkExternalFormatANDROID external_fmt = {
+        .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
+        .externalFormat = test->ahb_fmt_props.externalFormat,
+    };
+    const VkSamplerYcbcrConversionCreateInfo conv_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_CREATE_INFO,
+        .pNext = &external_fmt,
+        .format = test->ahb_fmt_props.format,
+        .ycbcrModel = test->ahb_fmt_props.suggestedYcbcrModel,
+        .ycbcrRange = test->ahb_fmt_props.suggestedYcbcrRange,
+        .xChromaOffset = test->ahb_fmt_props.suggestedXChromaOffset,
+        .yChromaOffset = test->ahb_fmt_props.suggestedYChromaOffset,
+        .chromaFilter = VK_FILTER_NEAREST,
+    };
+
+    vk->result = vk->CreateSamplerYcbcrConversion(vk->dev, &conv_info, NULL, &test->conv);
+    vk_check(vk, "failed to create VkSamplerYcbcrConversion");
 }
 
 static void
@@ -190,8 +243,12 @@ ahb_test_init_ahb(struct ahb_test *test)
         android, test->width, test->height, test->ahb_format,
         AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT);
 
+    test->ahb_resolve_props = (VkAndroidHardwareBufferFormatResolvePropertiesANDROID){
+        .sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_FORMAT_RESOLVE_PROPERTIES_ANDROID,
+    };
     test->ahb_fmt_props = (VkAndroidHardwareBufferFormatPropertiesANDROID){
         .sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_FORMAT_PROPERTIES_ANDROID,
+        .pNext = &test->ahb_resolve_props,
     };
     test->ahb_props = (VkAndroidHardwareBufferPropertiesANDROID){
         .sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID,
@@ -199,6 +256,9 @@ ahb_test_init_ahb(struct ahb_test *test)
     };
 
     vk->GetAndroidHardwareBufferPropertiesANDROID(vk->dev, test->ahb->ahb, &test->ahb_props);
+
+    if (test->ahb_resolve_props.colorAttachmentFormat == VK_FORMAT_UNDEFINED)
+        vk_die("unsupported ahb format");
 }
 
 static void
@@ -210,6 +270,7 @@ ahb_test_init(struct ahb_test *test)
     const char *dev_exts[] = {
         VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME,
         VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME,
+        VK_ANDROID_EXTERNAL_FORMAT_RESOLVE_EXTENSION_NAME,
     };
     const struct vk_init_params params = {
         .api_version = VK_API_VERSION_1_3,
@@ -224,6 +285,7 @@ ahb_test_init(struct ahb_test *test)
     ahb_test_init_ahb(test);
     ahb_test_init_image(test);
     ahb_test_init_memory(test);
+    ahb_test_init_ycbcr_conv(test);
     ahb_test_init_image_view(test);
     ahb_test_init_pipeline(test);
 }
@@ -236,7 +298,9 @@ ahb_test_cleanup(struct ahb_test *test)
 
     vk_destroy_pipeline(vk, test->pipeline);
 
-    vk->DestroyImageView(vk->dev, test->view, NULL);
+    vk->DestroyImageView(vk->dev, test->rt_view, NULL);
+    vk->DestroyImageView(vk->dev, test->resolve_view, NULL);
+    vk->DestroySamplerYcbcrConversion(vk->dev, test->conv, NULL);
     vk->FreeMemory(vk->dev, test->mem, NULL);
     vk->DestroyImage(vk->dev, test->img, NULL);
 
@@ -283,8 +347,12 @@ ahb_test_draw_triangle(struct ahb_test *test, VkCommandBuffer cmd)
 
     const VkRenderingAttachmentInfo att_info = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = test->view,
+        .imageView = test->rt_view,
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .resolveMode = test->resolve_view ? VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_BIT_ANDROID
+                                          : VK_RESOLVE_MODE_NONE,
+        .resolveImageView = test->resolve_view,
+        .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
         .clearValue = {
