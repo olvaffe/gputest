@@ -488,7 +488,7 @@ egl_dump_image(struct egl *egl, int width, int height, const char *filename)
     egl->gl.ReadPixels(0, 0, width, height, format, type, data);
     egl_check(egl, "dump");
 
-    u_write_ppm(filename, data, width, height);
+    u_write_ppm(filename, data, width, height, width * 4);
 
     free(data);
 }

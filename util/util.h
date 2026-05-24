@@ -195,7 +195,7 @@ u_parse_ppm(const void *ppm_data, size_t ppm_size, uint32_t *width, uint32_t *he
 }
 
 static inline void
-u_write_ppm(const char *filename, const void *data, int width, int height)
+u_write_ppm(const char *filename, const void *data, int width, int height, int stride)
 {
     FILE *fp = fopen(filename, "w");
     if (!fp)
@@ -204,7 +204,7 @@ u_write_ppm(const char *filename, const void *data, int width, int height)
     fprintf(fp, "P6 %d %d 255\n", width, height);
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            const void *pixel = (const char *)data + ((width * y) + x) * 4;
+            const void *pixel = (const char *)data + stride * y + x * 4;
             if (fwrite(pixel, 3, 1, fp) != 1)
                 u_die("util", "failed to write pixel (%d, %x)", x, y);
         }
