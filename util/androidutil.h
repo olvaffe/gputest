@@ -300,4 +300,30 @@ android_create_ahb_from_ppm(struct android *android,
     return ahb;
 }
 
+static inline void
+android_dump_ahb(struct android *android, struct android_ahb *ahb, const char *filename)
+{
+    AHardwareBuffer_Planes planes;
+    android_map_ahb(android, ahb, &planes);
+
+    char local_fn[1024];
+    for (uint32_t i = 0; i < planes.planeCount; i++) {
+        const AHardwareBuffer_Plane *plane = &planes.planes[i];
+
+        if (plane->pixelStride != 4) {
+            android_die("plane %d/%d: unexpected pixel stride %d", i, planes.planeCount,
+                        plane->pixelStride);
+        }
+
+        const char *fn = filename;
+        if (i > 0) {
+            snprintf(local_fn, ARRAY_SIZE(local_fn), "%s.%d", fn, i);
+            fn = local_fn;
+        }
+        u_write_ppm(fn, plane->data, ahb->desc.width, ahb->desc.height, plane->rowStride);
+    }
+
+    android_unmap_ahb(android, ahb);
+}
+
 #endif /* ANDROIDUTIL_H */

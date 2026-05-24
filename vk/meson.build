@@ -54,7 +54,7 @@ tests = [
 ]
 
 if idep_androidutil.found()
-  tests += ['android']
+  tests += ['ahb', 'android']
 endif
 if idep_drmutil.found()
   tests += ['residency']
@@ -110,7 +110,7 @@ foreach t : tests
   test_deps = [idep_vkutil]
   test_args = []
 
-  if t == 'android'
+  if t == 'ahb' or t == 'android'
     test_deps += [idep_androidutil, dep_android]
   elif t == 'compile'
     test_deps += [idep_spvutil]
