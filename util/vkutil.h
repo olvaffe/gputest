@@ -66,6 +66,7 @@ struct vk {
     VkPhysicalDeviceVulkan11Properties vulkan_11_props;
     VkPhysicalDeviceVulkan12Properties vulkan_12_props;
     VkPhysicalDeviceVulkan13Properties vulkan_13_props;
+    VkPhysicalDeviceVulkan14Properties vulkan_14_props;
 
     VkPhysicalDeviceDrmPropertiesEXT drm_props;
     VkPhysicalDeviceProtectedMemoryProperties protected_props;
@@ -74,6 +75,7 @@ struct vk {
     VkPhysicalDeviceVulkan11Features vulkan_11_features;
     VkPhysicalDeviceVulkan12Features vulkan_12_features;
     VkPhysicalDeviceVulkan13Features vulkan_13_features;
+    VkPhysicalDeviceVulkan14Features vulkan_14_features;
 
     VkPhysicalDeviceSamplerYcbcrConversionFeatures sampler_ycbcr_conversion_features;
     VkPhysicalDeviceHostQueryResetFeatures host_query_reset_features;
@@ -362,6 +364,12 @@ vk_init_physical_device_features(struct vk *vk)
         *pnext = &vk->vulkan_13_features;
         pnext = &vk->vulkan_13_features.pNext;
     }
+    if (vk->params.api_version >= VK_API_VERSION_1_4) {
+        vk->vulkan_14_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
+
+        *pnext = &vk->vulkan_14_features;
+        pnext = &vk->vulkan_14_features.pNext;
+    }
 
     vk->custom_border_color_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
@@ -404,6 +412,12 @@ vk_init_physical_device_properties(struct vk *vk)
 
         *pnext = &vk->vulkan_13_props;
         pnext = &vk->vulkan_13_props.pNext;
+    }
+    if (vk->params.api_version >= VK_API_VERSION_1_4) {
+        vk->vulkan_14_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_PROPERTIES;
+
+        *pnext = &vk->vulkan_14_props;
+        pnext = &vk->vulkan_14_props.pNext;
     }
 
     if (vk->EXT_physical_device_drm) {
@@ -523,6 +537,10 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     if (vk->params.api_version >= VK_API_VERSION_1_3) {
         *pnext = &vk->vulkan_13_features;
         pnext = &vk->vulkan_13_features.pNext;
+    }
+    if (vk->params.api_version >= VK_API_VERSION_1_4) {
+        *pnext = &vk->vulkan_14_features;
+        pnext = &vk->vulkan_14_features.pNext;
     }
     if (vk->EXT_custom_border_color) {
         *pnext = &vk->custom_border_color_features;
