@@ -15,7 +15,6 @@ static const uint32_t ahb_test_fs[] = {
 };
 
 struct ahb_test {
-    VkFormat vk_format;
     enum AHardwareBuffer_Format ahb_format;
     uint32_t width;
     uint32_t height;
@@ -24,6 +23,8 @@ struct ahb_test {
     struct android android;
 
     struct android_ahb *ahb;
+    VkAndroidHardwareBufferPropertiesANDROID ahb_props;
+    VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props;
 
     VkImage img;
     VkDeviceMemory mem;
@@ -55,7 +56,7 @@ ahb_test_init_pipeline(struct ahb_test *test)
     test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &test->vk_format,
+        .pColorAttachmentFormats = &test->ahb_fmt_props.format,
     };
 
     vk_compile_pipeline(vk, test->pipeline);
@@ -70,7 +71,7 @@ ahb_test_init_image_view(struct ahb_test *test)
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = test->img,
         .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = test->vk_format,
+        .format = test->ahb_fmt_props.format,
         .subresourceRange = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             .levelCount = 1,
@@ -86,12 +87,7 @@ ahb_test_init_memory(struct ahb_test *test)
 {
     struct vk *vk = &test->vk;
 
-    VkAndroidHardwareBufferPropertiesANDROID props = {
-        .sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID,
-    };
-    vk->GetAndroidHardwareBufferPropertiesANDROID(vk->dev, test->ahb->ahb, &props);
-
-    const uint32_t mt = ffs(props.memoryTypeBits) - 1;
+    const uint32_t mt = ffs(test->ahb_props.memoryTypeBits) - 1;
 
     const VkImportAndroidHardwareBufferInfoANDROID import_info = {
         .sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
@@ -105,7 +101,7 @@ ahb_test_init_memory(struct ahb_test *test)
     const VkMemoryAllocateInfo alloc_info = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .pNext = &dedicated_info,
-        .allocationSize = props.allocationSize,
+        .allocationSize = test->ahb_props.allocationSize,
         .memoryTypeIndex = mt,
     };
 
@@ -128,7 +124,7 @@ ahb_test_init_image(struct ahb_test *test)
     const VkPhysicalDeviceImageFormatInfo2 fmt_info = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
         .pNext = &fmt_ext_info,
-        .format = test->vk_format,
+        .format = test->ahb_fmt_props.format,
         .type = VK_IMAGE_TYPE_2D,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -157,7 +153,7 @@ ahb_test_init_image(struct ahb_test *test)
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = &external_info,
         .imageType = VK_IMAGE_TYPE_2D,
-        .format = test->vk_format,
+        .format = test->ahb_fmt_props.format,
         .extent = {
             .width = test->width,
             .height = test->height,
@@ -178,11 +174,22 @@ ahb_test_init_image(struct ahb_test *test)
 static void
 ahb_test_init_ahb(struct ahb_test *test)
 {
+    struct vk *vk = &test->vk;
     struct android *android = &test->android;
 
     test->ahb = android_create_ahb(
         android, test->width, test->height, test->ahb_format,
         AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT);
+
+    test->ahb_fmt_props = (VkAndroidHardwareBufferFormatPropertiesANDROID){
+        .sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_FORMAT_PROPERTIES_ANDROID,
+    };
+    test->ahb_props = (VkAndroidHardwareBufferPropertiesANDROID){
+        .sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID,
+        .pNext = &test->ahb_fmt_props,
+    };
+
+    vk->GetAndroidHardwareBufferPropertiesANDROID(vk->dev, test->ahb->ahb, &test->ahb_props);
 }
 
 static void
@@ -319,7 +326,6 @@ main(void)
 {
     struct ahb_test test = {
         .ahb_format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM,
-        .vk_format = VK_FORMAT_R8G8B8A8_UNORM,
         .width = 300,
         .height = 300,
     };
