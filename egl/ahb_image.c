@@ -8,6 +8,8 @@
 
 struct ahb_image_test {
     AHardwareBuffer_Desc desc;
+    float color1[4];
+    float color2[4];
 
     struct android android;
     struct egl egl;
@@ -18,7 +20,27 @@ struct ahb_image_test {
 
     GLenum tex_target;
     GLuint tex;
+
+    GLuint fbo_target;
+    GLuint fbo;
 };
+
+static void
+ahb_image_test_init_fbo(struct ahb_image_test *test)
+{
+    struct egl *egl = &test->egl;
+    struct egl_gl *gl = &egl->gl;
+
+    test->fbo_target = GL_FRAMEBUFFER;
+    gl->GenFramebuffers(1, &test->fbo);
+    gl->BindFramebuffer(test->fbo_target, test->fbo);
+
+    gl->FramebufferTexture2D(test->fbo_target, GL_COLOR_ATTACHMENT0, test->tex_target, test->tex,
+                             0);
+
+    if (gl->CheckFramebufferStatus(test->fbo_target) != GL_FRAMEBUFFER_COMPLETE)
+        egl_die("incomplete fbo");
+}
 
 static void
 ahb_image_test_init_texture(struct ahb_image_test *test)
@@ -83,6 +105,7 @@ ahb_image_test_init(struct ahb_image_test *test)
     ahb_image_test_init_ahb(test);
     ahb_image_test_init_image(test);
     ahb_image_test_init_texture(test);
+    ahb_image_test_init_fbo(test);
 
     egl_check(egl, "init");
 }
@@ -96,6 +119,8 @@ ahb_image_test_cleanup(struct ahb_image_test *test)
 
     egl_check(egl, "cleanup");
 
+    gl->DeleteFramebuffers(1, &test->fbo);
+
     gl->DeleteTextures(1, &test->tex);
 
     egl_destroy_image(egl, test->img);
@@ -108,6 +133,23 @@ ahb_image_test_cleanup(struct ahb_image_test *test)
 static void
 ahb_image_test_draw(struct ahb_image_test *test)
 {
+    struct egl_gl *gl = &test->egl.gl;
+
+    gl->BindFramebuffer(GL_FRAMEBUFFER, test->fbo);
+
+    gl->Enable(GL_SCISSOR_TEST);
+    for (uint32_t i = 0; i < test->desc.height; i++) {
+        const float *color = i % 2 ? test->color1 : test->color2;
+        gl->ClearColor(color[0], color[1], color[2], color[3]);
+
+        gl->Scissor(0, i, test->desc.width, 1);
+        gl->Clear(GL_COLOR_BUFFER_BIT);
+    }
+    egl_check(&test->egl, "clear");
+
+    egl_dump_image(&test->egl, test->desc.width, test->desc.height, "rt.ppm");
+
+    gl->BindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 int
@@ -116,12 +158,15 @@ main(int argc, const char **argv)
     struct ahb_image_test test = {
         .desc = {
             .format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM,
-            .height = 16,
+            .height = 320,
             .layers = 1,
-            .usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
-                     AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY,
-            .width = 16,
+            .usage = AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER |
+                     AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+                     AHARDWAREBUFFER_USAGE_CPU_READ_RARELY,
+            .width = 320,
         },
+        .color1 = { 1.0f, 1.0f, 1.0f, 1.0f },
+        .color2 = { 0.0f, 0.0f, 0.0f, 1.0f },
     };
 
     ahb_image_test_init(&test);
