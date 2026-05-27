@@ -12,6 +12,7 @@ tests = [
   'tex',
   'timestamp',
   'tri',
+  'uni',
 ]
 
 if idep_androidutil.found() or idep_gbmutil.found()
