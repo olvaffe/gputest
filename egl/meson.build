@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 tests = [
+  'angle_vk',
   'clear',
   'fence',
   'formats',
