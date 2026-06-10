@@ -13,6 +13,8 @@ main(void)
     egl_init(&egl, NULL);
 
     egl_log("client EGL_EXTENSIONS: %s", egl.QueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS));
+    if (egl.dev != EGL_NO_DEVICE_EXT)
+        egl_log("device EGL_EXTENSIONS: %s", egl.QueryDeviceStringEXT(egl.dev, EGL_EXTENSIONS));
     egl_log("--");
     egl_log("EGL_VENDOR: %s", egl.QueryString(egl.dpy, EGL_VENDOR));
     egl_log("EGL_VERSION: %s", egl.QueryString(egl.dpy, EGL_VERSION));

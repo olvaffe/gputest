@@ -39,6 +39,7 @@ struct egl_drm_format {
 };
 
 struct egl_init_params {
+    const char *libegl_name;
     EGLint pbuffer_width;
     EGLint pbuffer_height;
 };
@@ -57,6 +58,8 @@ struct egl {
     };
 
     EGLDeviceEXT dev;
+    const char *dev_exts;
+
     EGLDisplay dpy;
     EGLint major;
     EGLint minor;
@@ -170,9 +173,9 @@ egl_init_library_dispatch(struct egl *egl)
 static inline void
 egl_init_library(struct egl *egl)
 {
-    egl->handle = dlopen(LIBEGL_NAME, RTLD_LOCAL | RTLD_LAZY);
+    egl->handle = dlopen(egl->params.libegl_name, RTLD_LOCAL | RTLD_LAZY);
     if (!egl->handle)
-        egl_die("failed to load %s: %s", LIBEGL_NAME, dlerror());
+        egl_die("failed to load %s: %s", egl->params.libegl_name, dlerror());
 
     const char gipa_name[] = "eglGetProcAddress";
     egl->GetProcAddress = (PFNEGLGETPROCADDRESSPROC)dlsym(egl->handle, gipa_name);
@@ -234,6 +237,7 @@ egl_init_display(struct egl *egl)
             const bool swrast = strstr(exts, "software");
             if (!swrast) {
                 egl->dev = devs[i];
+                egl->dev_exts = exts;
                 break;
             }
         }
@@ -257,6 +261,14 @@ egl_init_display(struct egl *egl)
 
     if (!egl->Initialize(egl->dpy, &egl->major, &egl->minor))
         egl_die("failed to initialize display");
+
+    if (egl->dev == EGL_NO_DEVICE_EXT && EXT_device_query) {
+        EGLAttrib val;
+        if (egl->QueryDisplayAttribEXT(egl->dpy, EGL_DEVICE_EXT, &val)) {
+            egl->dev = (EGLDeviceEXT)val;
+            egl->dev_exts = egl->QueryDeviceStringEXT(egl->dev, EGL_EXTENSIONS);
+        }
+    }
 
     egl_init_display_extensions(egl);
 
@@ -403,6 +415,8 @@ egl_init(struct egl *egl, const struct egl_init_params *params)
 
     if (params)
         egl->params = *params;
+    if (!egl->params.libegl_name)
+        egl->params.libegl_name = LIBEGL_NAME;
 
     egl_init_library(egl);
     egl_check(egl, "init library");
