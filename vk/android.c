@@ -13,6 +13,7 @@
 #include <android/native_activity.h>
 #include <android/native_window.h>
 #include <android/surface_control.h>
+#include <string.h>
 #include <threads.h>
 
 enum android_test_looper_ident {
@@ -255,6 +256,9 @@ android_test_ahb_draw_cpu(struct android_test *test, AHardwareBuffer *ahb)
             memset(row, 0x80, cpp * desc.width);
         }
     }
+
+    if (AHardwareBuffer_unlock(ahb, NULL))
+        android_die("failed to unlock ahb");
 }
 
 static AHardwareBuffer *
