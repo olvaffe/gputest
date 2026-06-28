@@ -287,6 +287,14 @@ ahb_rt_test_init_ahb(struct ahb_rt_test *test)
     vk_log("VkAndroidHardwareBufferFormatResolvePropertiesANDROID:");
     vk_log("  colorAttachmentFormat: %d", test->ahb_resolve_props.colorAttachmentFormat);
 
+    vk_log("VkPhysicalDeviceExternalFormatResolvePropertiesANDROID:");
+    vk_log("  nullColorAttachmentWithExternalFormatResolve: %d",
+           vk->external_format_resolve_props.nullColorAttachmentWithExternalFormatResolve);
+    vk_log("  externalFormatResolveChromaOffsetX: %d",
+           vk->external_format_resolve_props.externalFormatResolveChromaOffsetX);
+    vk_log("  externalFormatResolveChromaOffsetY: %d",
+           vk->external_format_resolve_props.externalFormatResolveChromaOffsetY);
+
     if (test->ahb_resolve_props.colorAttachmentFormat == VK_FORMAT_UNDEFINED)
         vk_die("unsupported ahb format");
 }

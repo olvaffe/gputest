@@ -206,7 +206,7 @@ u_write_ppm(const char *filename, const void *data, int width, int height, int s
         for (int x = 0; x < width; x++) {
             const void *pixel = (const char *)data + stride * y + x * 4;
             if (fwrite(pixel, 3, 1, fp) != 1)
-                u_die("util", "failed to write pixel (%d, %x)", x, y);
+                u_die("util", "failed to write pixel (%d, %d)", x, y);
         }
     }
 

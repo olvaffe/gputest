@@ -377,21 +377,51 @@ android_dump_ahb(struct android *android, struct android_ahb *ahb, const char *f
     AHardwareBuffer_Planes planes;
     android_map_ahb(android, ahb, &planes);
 
-    char local_fn[1024];
     for (uint32_t i = 0; i < planes.planeCount; i++) {
         const AHardwareBuffer_Plane *plane = &planes.planes[i];
 
-        if (plane->pixelStride != 4) {
-            android_die("plane %d/%d: unexpected pixel stride %d", i, planes.planeCount,
-                        plane->pixelStride);
-        }
+        if (planes.planeCount > 1) {
+            /* assume 8-bit, 4:2:0
+             *
+             * To convert to RGB,
+             *
+             *   $ cat filename.* > filename.yuv
+             *   $ magick convert -size WxH -sampling-factor 4:2:0 -depth 8 filename.yuv filename.ppm
+             */
+            char plane_fn[1024];
+            snprintf(plane_fn, ARRAY_SIZE(plane_fn), "%s.%d", filename, i);
 
-        const char *fn = filename;
-        if (i > 0) {
-            snprintf(local_fn, ARRAY_SIZE(local_fn), "%s.%d", fn, i);
-            fn = local_fn;
+            FILE *fp = fopen(plane_fn, "w");
+            if (!fp)
+                android_die("failed to open %s", plane_fn);
+
+            uint32_t plane_width = ahb->desc.width;
+            uint32_t plane_height = ahb->desc.height;
+            if (i > 0) {
+                plane_width /= 2;
+                plane_height /= 2;
+            }
+            for (uint32_t y = 0; y < plane_height; y++) {
+                const char *row = (const char *)plane->data + plane->rowStride * y;
+
+                for (uint32_t x = 0; x < plane_width; x++) {
+                    const char *pixel = row + x * plane->pixelStride;
+                    if (fwrite(pixel, 1, 1, fp) != 1)
+                        android_die("failed to write pixel (%d, %d)", x, y);
+                }
+            }
+
+            fclose(fp);
+        } else {
+            /* assume R8G8B8A8 */
+            if (plane->pixelStride != 4) {
+                android_die("plane %d/%d: unexpected pixel stride %d", i, planes.planeCount,
+                            plane->pixelStride);
+            }
+
+            u_write_ppm(filename, plane->data, ahb->desc.width, ahb->desc.height,
+                        plane->rowStride);
         }
-        u_write_ppm(fn, plane->data, ahb->desc.width, ahb->desc.height, plane->rowStride);
     }
 
     android_unmap_ahb(android, ahb);
