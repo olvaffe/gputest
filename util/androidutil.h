@@ -56,158 +56,187 @@ static const struct {
     const char *name;
     enum AHardwareBuffer_Format ahb_format;
     uint32_t drm_format;
+    bool is_ycbcr;
 } android_ahb_format_table[] = {
     {
-        "AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM",
-        AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM,
-        DRM_FORMAT_ABGR8888,
+        .name = "AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM,
+        .drm_format = DRM_FORMAT_ABGR8888,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM",
-        AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM,
-        DRM_FORMAT_XBGR8888,
+        .name = "AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM,
+        .drm_format = DRM_FORMAT_XBGR8888,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM",
-        AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM,
-        DRM_FORMAT_BGR888,
+        .name = "AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM,
+        .drm_format = DRM_FORMAT_BGR888,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM",
-        AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM,
-        DRM_FORMAT_RGB565,
+        .name = "AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM,
+        .drm_format = DRM_FORMAT_RGB565,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT",
-        AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT,
-        DRM_FORMAT_ABGR16161616F,
+        .name = "AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT,
+        .drm_format = DRM_FORMAT_ABGR16161616F,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM",
-        AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM,
-        DRM_FORMAT_ABGR2101010,
+        .name = "AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM,
+        .drm_format = DRM_FORMAT_ABGR2101010,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_BLOB",
-        AHARDWAREBUFFER_FORMAT_BLOB,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_BLOB",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_BLOB,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_D16_UNORM",
-        AHARDWAREBUFFER_FORMAT_D16_UNORM,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_D16_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_D16_UNORM,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_D24_UNORM",
-        AHARDWAREBUFFER_FORMAT_D24_UNORM,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_D24_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_D24_UNORM,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT",
-        AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_D32_FLOAT",
-        AHARDWAREBUFFER_FORMAT_D32_FLOAT,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_D32_FLOAT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_D32_FLOAT,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT",
-        AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_S8_UINT",
-        AHARDWAREBUFFER_FORMAT_S8_UINT,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_S8_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_S8_UINT,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
 #if __ANDROID_API__ >= 29
     /* AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420 is flexible and is not 1:1 */
     {
-        "AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420",
-        AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420,
-        DRM_FORMAT_NV12,
+        .name = "AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420,
+        .drm_format = DRM_FORMAT_NV12,
+        .is_ycbcr = true,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420",
-        AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420,
-        DRM_FORMAT_YVU420,
+        .name = "AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420,
+        .drm_format = DRM_FORMAT_YVU420,
+        .is_ycbcr = true,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_YCbCr_P010",
-        AHARDWAREBUFFER_FORMAT_YCbCr_P010,
-        DRM_FORMAT_P010,
+        .name = "AHARDWAREBUFFER_FORMAT_YCbCr_P010",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_YCbCr_P010,
+        .drm_format = DRM_FORMAT_P010,
+        .is_ycbcr = true,
     },
 #if __ANDROID_API__ >= 36
     {
-        "AHARDWAREBUFFER_FORMAT_YCbCr_P210",
-        AHARDWAREBUFFER_FORMAT_YCbCr_P210,
-        DRM_FORMAT_P210,
+        .name = "AHARDWAREBUFFER_FORMAT_YCbCr_P210",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_YCbCr_P210,
+        .drm_format = DRM_FORMAT_P210,
+        .is_ycbcr = true,
     },
 #endif
 #endif
     {
-        "AHARDWAREBUFFER_FORMAT_R8_UNORM",
-        AHARDWAREBUFFER_FORMAT_R8_UNORM,
-        DRM_FORMAT_R8,
+        .name = "AHARDWAREBUFFER_FORMAT_R8_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R8_UNORM,
+        .drm_format = DRM_FORMAT_R8,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R16_UINT",
-        AHARDWAREBUFFER_FORMAT_R16_UINT,
-        DRM_FORMAT_R16,
+        .name = "AHARDWAREBUFFER_FORMAT_R16_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R16_UINT,
+        .drm_format = DRM_FORMAT_R16,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R16G16_UINT",
-        AHARDWAREBUFFER_FORMAT_R16G16_UINT,
-        DRM_FORMAT_GR1616,
+        .name = "AHARDWAREBUFFER_FORMAT_R16G16_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R16G16_UINT,
+        .drm_format = DRM_FORMAT_GR1616,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R10G10B10A10_UNORM",
-        AHARDWAREBUFFER_FORMAT_R10G10B10A10_UNORM,
-        DRM_FORMAT_AXBXGXRX106106106106,
+        .name = "AHARDWAREBUFFER_FORMAT_R10G10B10A10_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R10G10B10A10_UNORM,
+        .drm_format = DRM_FORMAT_AXBXGXRX106106106106,
+        .is_ycbcr = false,
     },
 #if __ANDROID_API__ >= 37
     {
-        "AHARDWAREBUFFER_FORMAT_R12_UINT",
-        AHARDWAREBUFFER_FORMAT_R12_UINT,
-        DRM_FORMAT_R12,
+        .name = "AHARDWAREBUFFER_FORMAT_R12_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R12_UINT,
+        .drm_format = DRM_FORMAT_R12,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R14_UINT",
-        AHARDWAREBUFFER_FORMAT_R14_UINT,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_R14_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R14_UINT,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R12G12_UINT",
-        AHARDWAREBUFFER_FORMAT_R12G12_UINT,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_R12G12_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R12G12_UINT,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R14G14_UINT",
-        AHARDWAREBUFFER_FORMAT_R14G14_UINT,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_R14G14_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R14G14_UINT,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R12G12B12A12_UINT",
-        AHARDWAREBUFFER_FORMAT_R12G12B12A12_UINT,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_R12G12B12A12_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R12G12B12A12_UINT,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_R14G14B14A14_UINT",
-        AHARDWAREBUFFER_FORMAT_R14G14B14A14_UINT,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_R14G14B14A14_UINT",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R14G14B14A14_UINT,
+        .drm_format = 0,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_B10G10R10A2_UNORM",
-        AHARDWAREBUFFER_FORMAT_B10G10R10A2_UNORM,
-        DRM_FORMAT_ARGB2101010,
+        .name = "AHARDWAREBUFFER_FORMAT_B10G10R10A2_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_B10G10R10A2_UNORM,
+        .drm_format = DRM_FORMAT_ARGB2101010,
+        .is_ycbcr = false,
     },
     {
-        "AHARDWAREBUFFER_FORMAT_B10G10R10X2_UNORM",
-        AHARDWAREBUFFER_FORMAT_B10G10R10X2_UNORM,
-        DRM_FORMAT_XRGB2101010,
-        0,
+        .name = "AHARDWAREBUFFER_FORMAT_B10G10R10X2_UNORM",
+        .ahb_format = AHARDWAREBUFFER_FORMAT_B10G10R10X2_UNORM,
+        .drm_format = DRM_FORMAT_XRGB2101010,
+        .is_ycbcr = false,
     },
 #endif
 };
@@ -229,6 +258,17 @@ android_ahb_format_to_drm_format(enum AHardwareBuffer_Format ahb_format)
     for (uint32_t i = 0; i < ARRAY_SIZE(android_ahb_format_table); i++) {
         if (android_ahb_format_table[i].ahb_format == ahb_format)
             return android_ahb_format_table[i].drm_format;
+    }
+
+    android_die("unknown ahb format 0x%x", ahb_format);
+}
+
+static inline bool
+android_ahb_format_is_ycbcr(enum AHardwareBuffer_Format ahb_format)
+{
+    for (uint32_t i = 0; i < ARRAY_SIZE(android_ahb_format_table); i++) {
+        if (android_ahb_format_table[i].ahb_format == ahb_format)
+            return android_ahb_format_table[i].is_ycbcr;
     }
 
     android_die("unknown ahb format 0x%x", ahb_format);
@@ -385,8 +425,8 @@ android_dump_ahb(struct android *android, struct android_ahb *ahb, const char *f
              *
              * To convert to RGB,
              *
-             *   $ cat filename.* > filename.yuv
-             *   $ magick convert -size WxH -sampling-factor 4:2:0 -depth 8 filename.yuv filename.ppm
+             *   $ cat fn.* > fn.yuv
+             *   $ magick convert -size WxH -sampling-factor 4:2:0 -depth 8 fn.yuv fn.ppm
              */
             char plane_fn[1024];
             snprintf(plane_fn, ARRAY_SIZE(plane_fn), "%s.%d", filename, i);

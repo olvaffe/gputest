@@ -14,11 +14,34 @@ static const uint32_t ahb_rt_test_fs[] = {
 #include "ahb_rt_test.frag.inc"
 };
 
+static const float ahb_rt_test_matrices[][16] = {
+    [false] = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    },
+    /*
+     * BT.709 specifies
+     *
+     *   Y  =  0.2126R + 0.7152G + 0.0722B;
+     *   Cb = -0.1146R - 0.3854G + 0.5000B + 0.5;
+     *   Cr =  0.5000R - 0.4542G - 0.0458B + 0.5;
+     */
+    [true] = {
+         0.5000f, -0.4542f, -0.0458f, 0.5f, /* Cr */
+         0.2126f,  0.7152f,  0.0722f, 0.0f, /* Y */
+        -0.1146f, -0.3854f,  0.5000f, 0.5f, /* Cb */
+         0.0f,     0.0f, 0.0f, 1.0f,
+    },
+};
+
 struct ahb_rt_test {
     uint32_t width;
     uint32_t height;
     enum AHardwareBuffer_Format ahb_format;
     uint64_t ahb_usage;
+    bool is_ycbcr;
 
     struct vk vk;
     struct android android;
@@ -54,6 +77,9 @@ ahb_rt_test_init_pipeline(struct ahb_rt_test *test)
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
+
+    vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
+                               sizeof(ahb_rt_test_matrices[0]));
 
     vk_set_pipeline_sample_count(vk, test->pipeline, VK_SAMPLE_COUNT_1_BIT);
 
@@ -415,6 +441,16 @@ ahb_rt_test_draw_triangle(struct ahb_rt_test *test, VkCommandBuffer cmd)
         att_info.resolveImageView = test->view;
     }
 
+    if (test->is_ycbcr) {
+        float n[4];
+        for (uint32_t i = 0; i < 3; i++) {
+            const float *row = &ahb_rt_test_matrices[test->is_ycbcr][i * 4];
+            const float *v = att_info.clearValue.color.float32;
+            n[i] = row[0] * v[0] + row[1] * v[1] + row[2] * v[2] + row[3] * v[3];
+        }
+        memcpy(att_info.clearValue.color.float32, n, sizeof(n));
+    }
+
     const VkRenderingInfo rendering_info = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {
@@ -429,6 +465,8 @@ ahb_rt_test_draw_triangle(struct ahb_rt_test *test, VkCommandBuffer cmd)
     };
     vk->CmdBeginRendering(cmd, &rendering_info);
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                         sizeof(ahb_rt_test_matrices[0]), ahb_rt_test_matrices[test->is_ycbcr]);
     vk->CmdDraw(cmd, 3, 1, 0, 0);
     vk->CmdEndRendering(cmd);
 
@@ -463,6 +501,8 @@ main(void)
         .ahb_usage =
             AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
     };
+
+    test.is_ycbcr = android_ahb_format_is_ycbcr(test.ahb_format);
 
     ahb_rt_test_init(&test);
     ahb_rt_test_draw(&test);
