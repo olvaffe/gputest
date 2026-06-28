@@ -5,6 +5,10 @@
 
 #include "eglutil.h"
 
+#ifndef GL_REQUESTABLE_EXTENSIONS_ANGLE
+#define GL_REQUESTABLE_EXTENSIONS_ANGLE 0x93A8
+#endif
+
 int
 main(void)
 {
@@ -25,7 +29,13 @@ main(void)
     egl_log("GL_RENDERER: %s", egl.gl.GetString(GL_RENDERER));
     egl_log("GL_VERSION: %s", egl.gl.GetString(GL_VERSION));
     egl_log("GL_SHADING_LANGUAGE_VERSION: %s", egl.gl.GetString(GL_SHADING_LANGUAGE_VERSION));
-    egl_log("GL_EXTENSIONS: %s", egl.gl.GetString(GL_EXTENSIONS));
+
+    const char *exts = (const char *)egl.gl.GetString(GL_EXTENSIONS);
+    egl_log("GL_EXTENSIONS: %s", exts);
+    if (strstr(exts, "GL_ANGLE_request_extension")) {
+        egl_log("GL_REQUESTABLE_EXTENSIONS_ANGLE: %s",
+                egl.gl.GetString(GL_REQUESTABLE_EXTENSIONS_ANGLE));
+    }
 
     egl_cleanup(&egl);
 
