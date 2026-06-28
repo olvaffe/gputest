@@ -15,9 +15,10 @@ static const uint32_t ahb_rt_test_fs[] = {
 };
 
 struct ahb_rt_test {
-    enum AHardwareBuffer_Format ahb_format;
     uint32_t width;
     uint32_t height;
+    enum AHardwareBuffer_Format ahb_format;
+    uint64_t ahb_usage;
 
     struct vk vk;
     struct android android;
@@ -30,8 +31,9 @@ struct ahb_rt_test {
     VkImage img;
     VkDeviceMemory mem;
     VkSamplerYcbcrConversion conv;
-    VkImageView rt_view;
-    VkImageView resolve_view;
+    VkImageView view;
+
+    struct vk_image *rt;
 
     struct vk_pipeline *pipeline;
 };
@@ -75,6 +77,21 @@ ahb_rt_test_init_pipeline(struct ahb_rt_test *test)
 }
 
 static void
+ahb_rt_test_init_rt(struct ahb_rt_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    if (test->ahb_fmt_props.format != VK_FORMAT_UNDEFINED ||
+        vk->external_format_resolve_props.nullColorAttachmentWithExternalFormatResolve)
+        return;
+
+    test->rt = vk_create_image(vk, test->ahb_resolve_props.colorAttachmentFormat, test->width,
+                               test->height, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
+                               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
+}
+
+static void
 ahb_rt_test_init_image_view(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
@@ -96,16 +113,8 @@ ahb_rt_test_init_image_view(struct ahb_rt_test *test)
         },
     };
 
-    VkImageView view;
-    vk->result = vk->CreateImageView(vk->dev, &view_info, NULL, &view);
+    vk->result = vk->CreateImageView(vk->dev, &view_info, NULL, &test->view);
     vk_check(vk, "failed to create image render view");
-
-    if (test->ahb_fmt_props.format != VK_FORMAT_UNDEFINED) {
-        test->rt_view = view;
-    } else if (vk->external_format_resolve_props.nullColorAttachmentWithExternalFormatResolve)
-        test->resolve_view = view;
-    else
-        vk_die("only nullColorAttachmentWithExternalFormatResolve support");
 }
 
 static void
@@ -171,7 +180,7 @@ ahb_rt_test_init_image(struct ahb_rt_test *test)
     struct vk *vk = &test->vk;
     bool ahb_ext_fmt = test->ahb_fmt_props.format == VK_FORMAT_UNDEFINED;
 
-    /* the validity is implied */
+    /* the validity is implied if external format */
     if (!ahb_ext_fmt) {
         const VkPhysicalDeviceExternalImageFormatInfo fmt_ext_info = {
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO,
@@ -239,9 +248,8 @@ ahb_rt_test_init_ahb(struct ahb_rt_test *test)
     struct vk *vk = &test->vk;
     struct android *android = &test->android;
 
-    test->ahb = android_create_ahb(
-        android, test->width, test->height, test->ahb_format,
-        AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT);
+    test->ahb =
+        android_create_ahb(android, test->width, test->height, test->ahb_format, test->ahb_usage);
 
     test->ahb_resolve_props = (VkAndroidHardwareBufferFormatResolvePropertiesANDROID){
         .sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_FORMAT_RESOLVE_PROPERTIES_ANDROID,
@@ -256,6 +264,28 @@ ahb_rt_test_init_ahb(struct ahb_rt_test *test)
     };
 
     vk->GetAndroidHardwareBufferPropertiesANDROID(vk->dev, test->ahb->ahb, &test->ahb_props);
+
+    vk_log("AHardwareBuffer_Desc:");
+    vk_log("  width: %d", test->ahb->desc.width);
+    vk_log("  height: %d", test->ahb->desc.height);
+    vk_log("  format: 0x%x", test->ahb->desc.format);
+    vk_log("  usage: 0x%" PRIx64, test->ahb->desc.usage);
+
+    vk_log("VkAndroidHardwareBufferPropertiesANDROID:");
+    vk_log("  allocationSize: %" PRIu64, test->ahb_props.allocationSize);
+    vk_log("  memoryTypeBits: 0x%x", test->ahb_props.memoryTypeBits);
+
+    vk_log("VkAndroidHardwareBufferFormatPropertiesANDROID:");
+    vk_log("  format: %d", test->ahb_fmt_props.format);
+    vk_log("  externalFormat: 0x%" PRIx64, test->ahb_fmt_props.externalFormat);
+    vk_log("  formatFeatures: 0x%x", test->ahb_fmt_props.formatFeatures);
+    vk_log("  suggestedYcbcrModel: %d", test->ahb_fmt_props.suggestedYcbcrModel);
+    vk_log("  suggestedYcbcrRange: %d", test->ahb_fmt_props.suggestedYcbcrRange);
+    vk_log("  suggestedXChromaOffset: %d", test->ahb_fmt_props.suggestedXChromaOffset);
+    vk_log("  suggestedYChromaOffset: %d", test->ahb_fmt_props.suggestedYChromaOffset);
+
+    vk_log("VkAndroidHardwareBufferFormatResolvePropertiesANDROID:");
+    vk_log("  colorAttachmentFormat: %d", test->ahb_resolve_props.colorAttachmentFormat);
 
     if (test->ahb_resolve_props.colorAttachmentFormat == VK_FORMAT_UNDEFINED)
         vk_die("unsupported ahb format");
@@ -288,6 +318,8 @@ ahb_rt_test_init(struct ahb_rt_test *test)
     ahb_rt_test_init_ycbcr_conv(test);
     ahb_rt_test_init_image_view(test);
     ahb_rt_test_init_pipeline(test);
+
+    ahb_rt_test_init_rt(test);
 }
 
 static void
@@ -298,8 +330,10 @@ ahb_rt_test_cleanup(struct ahb_rt_test *test)
 
     vk_destroy_pipeline(vk, test->pipeline);
 
-    vk->DestroyImageView(vk->dev, test->rt_view, NULL);
-    vk->DestroyImageView(vk->dev, test->resolve_view, NULL);
+    if (test->rt)
+        vk_destroy_image(vk, test->rt);
+
+    vk->DestroyImageView(vk->dev, test->view, NULL);
     vk->DestroySamplerYcbcrConversion(vk->dev, test->conv, NULL);
     vk->FreeMemory(vk->dev, test->mem, NULL);
     vk->DestroyImage(vk->dev, test->img, NULL);
@@ -345,13 +379,17 @@ ahb_rt_test_draw_triangle(struct ahb_rt_test *test, VkCommandBuffer cmd)
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1,
                            &barrier1);
 
-    const VkRenderingAttachmentInfo att_info = {
+    if (test->rt) {
+        VkImageMemoryBarrier rt_barrier = barrier1;
+        rt_barrier.image = test->rt->img;
+        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL,
+                               1, &rt_barrier);
+    }
+
+    VkRenderingAttachmentInfo att_info = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = test->rt_view,
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .resolveMode = test->resolve_view ? VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_BIT_ANDROID
-                                          : VK_RESOLVE_MODE_NONE,
-        .resolveImageView = test->resolve_view,
         .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -361,6 +399,14 @@ ahb_rt_test_draw_triangle(struct ahb_rt_test *test, VkCommandBuffer cmd)
             },
         },
     };
+    if (test->ahb_fmt_props.format != VK_FORMAT_UNDEFINED) {
+        att_info.imageView = test->view;
+    } else {
+        att_info.imageView = test->rt ? test->rt->render_view : VK_NULL_HANDLE;
+        att_info.resolveMode = VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_BIT_ANDROID;
+        att_info.resolveImageView = test->view;
+    }
+
     const VkRenderingInfo rendering_info = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {
@@ -402,10 +448,12 @@ int
 main(void)
 {
     struct ahb_rt_test test = {
-        .ahb_format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM,
-        //.ahb_format = AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420,
         .width = 300,
         .height = 300,
+        .ahb_format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM,
+        //.ahb_format = AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420,
+        .ahb_usage =
+            AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
     };
 
     ahb_rt_test_init(&test);
