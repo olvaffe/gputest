@@ -6,15 +6,15 @@
 #include "androidutil.h"
 #include "vkutil.h"
 
-static const uint32_t ahb_test_vs[] = {
-#include "ahb_test.vert.inc"
+static const uint32_t ahb_rt_test_vs[] = {
+#include "ahb_rt_test.vert.inc"
 };
 
-static const uint32_t ahb_test_fs[] = {
-#include "ahb_test.frag.inc"
+static const uint32_t ahb_rt_test_fs[] = {
+#include "ahb_rt_test.frag.inc"
 };
 
-struct ahb_test {
+struct ahb_rt_test {
     enum AHardwareBuffer_Format ahb_format;
     uint32_t width;
     uint32_t height;
@@ -37,16 +37,16 @@ struct ahb_test {
 };
 
 static void
-ahb_test_init_pipeline(struct ahb_test *test)
+ahb_rt_test_init_pipeline(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
 
     test->pipeline = vk_create_pipeline(vk);
 
-    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, ahb_test_vs,
-                           sizeof(ahb_test_vs));
-    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, ahb_test_fs,
-                           sizeof(ahb_test_fs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_VERTEX_BIT, ahb_rt_test_vs,
+                           sizeof(ahb_rt_test_vs));
+    vk_add_pipeline_shader(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, ahb_rt_test_fs,
+                           sizeof(ahb_rt_test_fs));
 
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
@@ -75,7 +75,7 @@ ahb_test_init_pipeline(struct ahb_test *test)
 }
 
 static void
-ahb_test_init_image_view(struct ahb_test *test)
+ahb_rt_test_init_image_view(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -109,7 +109,7 @@ ahb_test_init_image_view(struct ahb_test *test)
 }
 
 static void
-ahb_test_init_ycbcr_conv(struct ahb_test *test)
+ahb_rt_test_init_ycbcr_conv(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -136,7 +136,7 @@ ahb_test_init_ycbcr_conv(struct ahb_test *test)
 }
 
 static void
-ahb_test_init_memory(struct ahb_test *test)
+ahb_rt_test_init_memory(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -166,7 +166,7 @@ ahb_test_init_memory(struct ahb_test *test)
 }
 
 static void
-ahb_test_init_image(struct ahb_test *test)
+ahb_rt_test_init_image(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
     bool ahb_ext_fmt = test->ahb_fmt_props.format == VK_FORMAT_UNDEFINED;
@@ -234,7 +234,7 @@ ahb_test_init_image(struct ahb_test *test)
 }
 
 static void
-ahb_test_init_ahb(struct ahb_test *test)
+ahb_rt_test_init_ahb(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
     struct android *android = &test->android;
@@ -262,7 +262,7 @@ ahb_test_init_ahb(struct ahb_test *test)
 }
 
 static void
-ahb_test_init(struct ahb_test *test)
+ahb_rt_test_init(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
     struct android *android = &test->android;
@@ -282,16 +282,16 @@ ahb_test_init(struct ahb_test *test)
     vk_init(vk, &params);
     android_init(android, NULL);
 
-    ahb_test_init_ahb(test);
-    ahb_test_init_image(test);
-    ahb_test_init_memory(test);
-    ahb_test_init_ycbcr_conv(test);
-    ahb_test_init_image_view(test);
-    ahb_test_init_pipeline(test);
+    ahb_rt_test_init_ahb(test);
+    ahb_rt_test_init_image(test);
+    ahb_rt_test_init_memory(test);
+    ahb_rt_test_init_ycbcr_conv(test);
+    ahb_rt_test_init_image_view(test);
+    ahb_rt_test_init_pipeline(test);
 }
 
 static void
-ahb_test_cleanup(struct ahb_test *test)
+ahb_rt_test_cleanup(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
     struct android *android = &test->android;
@@ -311,7 +311,7 @@ ahb_test_cleanup(struct ahb_test *test)
 }
 
 static void
-ahb_test_draw_triangle(struct ahb_test *test, VkCommandBuffer cmd)
+ahb_rt_test_draw_triangle(struct ahb_rt_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
@@ -383,14 +383,14 @@ ahb_test_draw_triangle(struct ahb_test *test, VkCommandBuffer cmd)
 }
 
 static void
-ahb_test_draw(struct ahb_test *test)
+ahb_rt_test_draw(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
     struct android *android = &test->android;
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
-    ahb_test_draw_triangle(test, cmd);
+    ahb_rt_test_draw_triangle(test, cmd);
 
     vk_end_cmd(vk);
     vk_wait(vk);
@@ -401,16 +401,16 @@ ahb_test_draw(struct ahb_test *test)
 int
 main(void)
 {
-    struct ahb_test test = {
+    struct ahb_rt_test test = {
         .ahb_format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM,
         //.ahb_format = AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420,
         .width = 300,
         .height = 300,
     };
 
-    ahb_test_init(&test);
-    ahb_test_draw(&test);
-    ahb_test_cleanup(&test);
+    ahb_rt_test_init(&test);
+    ahb_rt_test_draw(&test);
+    ahb_rt_test_cleanup(&test);
 
     return 0;
 }
