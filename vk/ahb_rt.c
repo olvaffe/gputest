@@ -90,13 +90,15 @@ ahb_rt_test_init_pipeline(struct ahb_rt_test *test)
         .pColorAttachmentFormats = &test->ahb_fmt_props.format,
     };
     if (test->ahb_fmt_props.format == VK_FORMAT_UNDEFINED) {
-        test->pipeline->rendering_info.pColorAttachmentFormats =
-            &test->ahb_resolve_props.colorAttachmentFormat;
-
-        test->pipeline->external_format = (VkExternalFormatANDROID){
-            .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
-            .externalFormat = test->ahb_fmt_props.externalFormat,
-        };
+        if (test->rt) {
+            test->pipeline->rendering_info.pColorAttachmentFormats =
+                &test->ahb_resolve_props.colorAttachmentFormat;
+        } else {
+            test->pipeline->external_format = (VkExternalFormatANDROID){
+                .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
+                .externalFormat = test->ahb_fmt_props.externalFormat,
+            };
+        }
     }
 
     vk_compile_pipeline(vk, test->pipeline);
