@@ -20,7 +20,7 @@ if idep_androidutil.found() or idep_gbmutil.found()
   tests += ['image']
 endif
 if idep_androidutil.found()
-  tests += ['ahb_image', 'ahb_ssbo']
+  tests += ['ahb_image', 'ahb_ssbo', 'ahb_yuv_target']
 endif
 if idep_gbmutil.found()
   tests += ['multithread']
@@ -50,7 +50,7 @@ foreach t : tests
   endforeach
 
   test_deps = [idep_eglutil]
-  if t == 'ahb_image' or t == 'ahb_ssbo'
+  if t == 'ahb_image' or t == 'ahb_ssbo' or t == 'ahb_yuv_target'
     test_deps += [idep_androidutil]
   elif t == 'image'
     test_deps += [idep_androidutil, idep_gbmutil]
