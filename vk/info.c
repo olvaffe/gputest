@@ -24,18 +24,86 @@ info_device_extensions(struct vk *vk)
 }
 
 static void
+info_device_queue_families(struct vk *vk)
+{
+    uint32_t qf_count;
+    vk->GetPhysicalDeviceQueueFamilyProperties2(vk->physical_dev, &qf_count, NULL);
+
+    VkQueueFamilyGlobalPriorityProperties *prio_props;
+    VkQueueFamilyProperties2 *qf_props =
+        calloc(qf_count, sizeof(*qf_props) + sizeof(*prio_props));
+    if (!qf_props)
+        vk_die("failed to alloc props");
+    prio_props = (VkQueueFamilyGlobalPriorityProperties *)(qf_props + qf_count);
+
+    for (uint32_t i = 0; i < qf_count; i++) {
+        VkQueueFamilyProperties2 *qf = &qf_props[i];
+        VkQueueFamilyGlobalPriorityProperties *prio = &prio_props[i];
+
+        qf->sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
+        qf->pNext = prio;
+
+        prio->sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES;
+    }
+    vk->GetPhysicalDeviceQueueFamilyProperties2(vk->physical_dev, &qf_count, qf_props);
+
+    vk_log("  queue families:");
+
+    for (uint32_t i = 0; i < qf_count; i++) {
+        const VkQueueFamilyProperties2 *qf = &qf_props[i];
+        const VkQueueFamilyGlobalPriorityProperties *prio = &prio_props[i];
+
+        enum {
+            lo_bit = 1 << 0,
+            md_bit = 1 << 1,
+            hi_bit = 1 << 2,
+            rt_bit = 1 << 3,
+        };
+        uint32_t prio_flags = 0;
+        for (uint32_t j = 0; j < prio->priorityCount; j++) {
+            switch (prio->priorities[j]) {
+            case VK_QUEUE_GLOBAL_PRIORITY_LOW:
+                prio_flags |= lo_bit;
+                break;
+            case VK_QUEUE_GLOBAL_PRIORITY_MEDIUM:
+                prio_flags |= md_bit;
+                break;
+            case VK_QUEUE_GLOBAL_PRIORITY_HIGH:
+                prio_flags |= hi_bit;
+                break;
+            case VK_QUEUE_GLOBAL_PRIORITY_REALTIME:
+                prio_flags |= rt_bit;
+                break;
+            default:
+                vk_die("unknown priority");
+                break;
+            }
+        }
+        vk_log("    %d: flags %s%s%s%s%s count %d ts bits %d priority %s%s%s%s", i,
+               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_GRAPHICS_BIT) ? "Gr" : "-",
+               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_COMPUTE_BIT) ? "Co" : "-",
+               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_TRANSFER_BIT) ? "Tr" : "-",
+               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) ? "Sp" : "-",
+               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_PROTECTED_BIT) ? "Pr" : "-",
+               qf->queueFamilyProperties.queueCount, qf->queueFamilyProperties.timestampValidBits,
+               (prio_flags & lo_bit) ? "Lo" : "-", (prio_flags & md_bit) ? "Md" : "-",
+               (prio_flags & hi_bit) ? "Hi" : "-", (prio_flags & rt_bit) ? "Rt" : "-");
+    }
+}
+
+static void
 info_device_memories(struct vk *vk)
 {
-    vk_log("  memories", vk->mem_props.memoryHeapCount);
+    vk_log("  memories:");
 
     for (uint32_t i = 0; i < vk->mem_props.memoryHeapCount; i++) {
         const VkMemoryHeap *heap = &vk->mem_props.memoryHeaps[i];
-        vk_log("    heap[%d]: size %zu flags 0x%x", i, heap->size, heap->flags);
+        vk_log("    heap %d: size %zu flags 0x%x", i, heap->size, heap->flags);
     }
 
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
         const VkMemoryType *mt = &vk->mem_props.memoryTypes[i];
-        vk_log("    mt[%d]: heap %d flags %s%s%s%s%s%s", i, mt->heapIndex,
+        vk_log("    mt %d: heap %d flags %s%s%s%s%s%s", i, mt->heapIndex,
                (mt->propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? "Lo" : "-",
                (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) ? "Vi" : "-",
                (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) ? "Co" : "-",
@@ -134,7 +202,7 @@ info_device(struct vk *vk)
     info_device_properties(vk);
     info_device_features(vk);
     info_device_memories(vk);
-
+    info_device_queue_families(vk);
     info_device_extensions(vk);
 }
 
@@ -187,6 +255,7 @@ main(void)
 
     const struct vk_init_params params = {
         .api_version = VK_API_VERSION_1_4,
+        .enable_all_features = true,
     };
     vk_init(&vk, &params);
 
