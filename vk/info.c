@@ -6,42 +6,33 @@
 #include "vkutil.h"
 
 static void
-info_physical_device(struct vk *vk)
+info_device_extensions(struct vk *vk)
 {
-    uint32_t phy_count;
-    vk->EnumeratePhysicalDevices(vk->instance, &phy_count, NULL);
-
-    VkExtensionProperties *exts;
     uint32_t ext_count;
     vk->EnumerateDeviceExtensionProperties(vk->physical_dev, NULL, &ext_count, NULL);
-    exts = malloc(sizeof(*exts) * ext_count);
+
+    VkExtensionProperties *exts = malloc(sizeof(*exts) * ext_count);
     if (!exts)
         vk_die("failed to alloc exts");
     vk->EnumerateDeviceExtensionProperties(vk->physical_dev, NULL, &ext_count, exts);
-
-    vk_log("Physical Device:");
-    vk_log("  count: %d", phy_count);
-    vk_log("  name: %s", vk->props.properties.deviceName);
-    vk_log("  version: %d.%d.%d", VK_API_VERSION_MAJOR(vk->props.properties.apiVersion),
-           VK_API_VERSION_MINOR(vk->props.properties.apiVersion),
-           VK_API_VERSION_PATCH(vk->props.properties.apiVersion));
-
-    vk_log("  features:");
-    vk_log("    geometryShader: %d", vk->features.features.geometryShader);
-    vk_log("    tessellationShader: %d", vk->features.features.tessellationShader);
-    vk_log("    pipelineStatisticsQuery: %d", vk->features.features.pipelineStatisticsQuery);
 
     vk_log("  extensions:");
     for (uint32_t i = 0; i < ext_count; i++)
         vk_log("    %d: %s", i, exts[i].extensionName);
 
-    vk_log("  %d memory heaps", vk->mem_props.memoryHeapCount);
+    free(exts);
+}
+
+static void
+info_device_memories(struct vk *vk)
+{
+    vk_log("  memories", vk->mem_props.memoryHeapCount);
+
     for (uint32_t i = 0; i < vk->mem_props.memoryHeapCount; i++) {
         const VkMemoryHeap *heap = &vk->mem_props.memoryHeaps[i];
         vk_log("    heap[%d]: size %zu flags 0x%x", i, heap->size, heap->flags);
     }
 
-    vk_log("  %d memory types", vk->mem_props.memoryTypeCount);
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
         const VkMemoryType *mt = &vk->mem_props.memoryTypes[i];
         vk_log("    mt[%d]: heap %d flags %s%s%s%s%s%s", i, mt->heapIndex,
@@ -52,46 +43,156 @@ info_physical_device(struct vk *vk)
                (mt->propertyFlags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT) ? "La" : "-",
                (mt->propertyFlags & VK_MEMORY_PROPERTY_PROTECTED_BIT) ? "Pr" : "-");
     }
-
-    free(exts);
 }
 
 static void
-info_instance(struct vk *vk)
+info_device_features(struct vk *vk)
 {
-    uint32_t api_version;
-    vk->EnumerateInstanceVersion(&api_version);
+    vk_log("  features:");
 
-    VkExtensionProperties *exts;
+    vk_log("    geometryShader: %d", vk->features.features.geometryShader);
+    vk_log("    tessellationShader: %d", vk->features.features.tessellationShader);
+    vk_log("    textureCompressionETC2: %d", vk->features.features.textureCompressionETC2);
+    vk_log("    textureCompressionASTC_LDR: %d",
+           vk->features.features.textureCompressionASTC_LDR);
+    vk_log("    textureCompressionBC: %d", vk->features.features.textureCompressionBC);
+    vk_log("    pipelineStatisticsQuery: %d", vk->features.features.pipelineStatisticsQuery);
+
+    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_1) {
+        vk_log("    protectedMemory: %d", vk->vulkan_11_features.protectedMemory);
+        vk_log("    samplerYcbcrConversion: %d", vk->vulkan_11_features.samplerYcbcrConversion);
+    } else {
+        vk_log("    protectedMemory: %d", vk->protected_memory_features.protectedMemory);
+        vk_log("    samplerYcbcrConversion: %d",
+               vk->sampler_ycbcr_conversion_features.samplerYcbcrConversion);
+    }
+
+    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_2) {
+        vk_log("    descriptorIndexing: %d", vk->vulkan_12_features.descriptorIndexing);
+        vk_log("    timelineSemaphore: %d", vk->vulkan_12_features.timelineSemaphore);
+    }
+
+    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_3) {
+        vk_log("    textureCompressionASTC_HDR: %d",
+               vk->vulkan_13_features.textureCompressionASTC_HDR);
+        vk_log("    dynamicRendering: %d", vk->vulkan_13_features.dynamicRendering);
+        vk_log("    maintenance4: %d", vk->vulkan_13_features.maintenance4);
+    }
+
+    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_4) {
+        vk_log("    globalPriorityQuery: %d", vk->vulkan_14_features.globalPriorityQuery);
+        vk_log("    maintenance5: %d", vk->vulkan_14_features.maintenance5);
+        vk_log("    maintenance6: %d", vk->vulkan_14_features.maintenance6);
+        vk_log("    pipelineProtectedAccess: %d", vk->vulkan_14_features.pipelineProtectedAccess);
+        vk_log("    hostImageCopy: %d", vk->vulkan_14_features.hostImageCopy);
+    } else {
+        vk_log("    globalPriorityQuery: %d",
+               vk->global_priority_query_features.globalPriorityQuery);
+    }
+
+    vk_log("    externalFormatResolve: %d",
+           vk->external_format_resolve_features.externalFormatResolve);
+}
+
+static void
+info_device_properties(struct vk *vk)
+{
+    vk_log("  properties:");
+
+    vk_log("    apiVersion: %d.%d.%d", VK_API_VERSION_MAJOR(vk->props.properties.apiVersion),
+           VK_API_VERSION_MINOR(vk->props.properties.apiVersion),
+           VK_API_VERSION_PATCH(vk->props.properties.apiVersion));
+    vk_log("    driverVersion: %d.%d.%d",
+           VK_API_VERSION_MAJOR(vk->props.properties.driverVersion),
+           VK_API_VERSION_MINOR(vk->props.properties.driverVersion),
+           VK_API_VERSION_PATCH(vk->props.properties.driverVersion));
+    vk_log("    deviceName: %s", vk->props.properties.deviceName);
+
+    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_1) {
+        vk_log("    protectedNoFault: %d", vk->vulkan_11_props.protectedNoFault);
+    } else {
+        vk_log("    protectedNoFault: %d", vk->protected_props.protectedNoFault);
+    }
+
+    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_2) {
+        vk_log("    driverName: %s", vk->vulkan_12_props.driverName);
+        vk_log("    driverInfo: %s", vk->vulkan_12_props.driverInfo);
+    }
+
+    vk_log("    nullColorAttachmentWithExternalFormatResolve: %d",
+           vk->external_format_resolve_props.nullColorAttachmentWithExternalFormatResolve);
+}
+
+static void
+info_device(struct vk *vk)
+{
+    uint32_t phy_count;
+    vk->EnumeratePhysicalDevices(vk->instance, &phy_count, NULL);
+
+    vk_log("device 0 (of %d):", phy_count);
+
+    info_device_properties(vk);
+    info_device_features(vk);
+    info_device_memories(vk);
+
+    info_device_extensions(vk);
+}
+
+static void
+info_instance_extensions(struct vk *vk)
+{
     uint32_t ext_count;
     vk->EnumerateInstanceExtensionProperties(NULL, &ext_count, NULL);
-    exts = malloc(sizeof(*exts) * ext_count);
+
+    VkExtensionProperties *exts = malloc(sizeof(*exts) * ext_count);
     if (!exts)
         vk_die("failed to alloc exts");
     vk->EnumerateInstanceExtensionProperties(NULL, &ext_count, exts);
-
-    vk_log("Instance:");
-    vk_log("  version: %d.%d.%d", VK_API_VERSION_MAJOR(api_version),
-           VK_API_VERSION_MINOR(api_version), VK_API_VERSION_PATCH(api_version));
 
     vk_log("  extensions:");
     for (uint32_t i = 0; i < ext_count; i++)
         vk_log("    %d: %s", i, exts[i].extensionName);
 
-    vk_log("  requested version: %d.%d.%d", VK_API_VERSION_MAJOR(VKUTIL_MIN_API_VERSION),
-           VK_API_VERSION_MINOR(VKUTIL_MIN_API_VERSION),
-           VK_API_VERSION_PATCH(VKUTIL_MIN_API_VERSION));
-
     free(exts);
+}
+
+static void
+info_instance_version(struct vk *vk)
+{
+    uint32_t api_version;
+    vk->EnumerateInstanceVersion(&api_version);
+
+    vk_log("  instanceVersion: %d.%d.%d", VK_API_VERSION_MAJOR(api_version),
+           VK_API_VERSION_MINOR(api_version), VK_API_VERSION_PATCH(api_version));
+}
+
+static void
+info_instance(struct vk *vk)
+{
+    vk_log("instance:");
+
+    info_instance_version(vk);
+
+    vk_log("  apiVersion: %d.%d.%d", VK_API_VERSION_MAJOR(vk->params.api_version),
+           VK_API_VERSION_MINOR(vk->params.api_version),
+           VK_API_VERSION_PATCH(vk->params.api_version));
+
+    info_instance_extensions(vk);
 }
 
 int
 main(void)
 {
     struct vk vk;
-    vk_init(&vk, NULL);
+
+    const struct vk_init_params params = {
+        .api_version = VK_API_VERSION_1_4,
+    };
+    vk_init(&vk, &params);
+
     info_instance(&vk);
-    info_physical_device(&vk);
+    info_device(&vk);
+
     vk_cleanup(&vk);
 
     return 0;
