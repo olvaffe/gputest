@@ -331,7 +331,9 @@ vk_init_physical_device_memory_properties(struct vk *vk)
         if ((mt->propertyFlags & mt_flags) == mt_flags) {
             vk->buf_mt_index = i;
             mt_found = true;
-            break;
+            /* prefer cached */
+            if (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT)
+                break;
         }
     }
     if (!mt_found)
