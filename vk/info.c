@@ -80,14 +80,14 @@ info_device_queue_families(struct vk *vk)
             }
         }
         vk_log("    %d: flags %s%s%s%s%s count %d ts bits %d priority %s%s%s%s", i,
-               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_GRAPHICS_BIT) ? "Gr" : "-",
-               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_COMPUTE_BIT) ? "Co" : "-",
-               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_TRANSFER_BIT) ? "Tr" : "-",
-               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) ? "Sp" : "-",
-               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_PROTECTED_BIT) ? "Pr" : "-",
+               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_GRAPHICS_BIT) ? "Gr" : "--",
+               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_COMPUTE_BIT) ? "Co" : "--",
+               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_TRANSFER_BIT) ? "Tr" : "--",
+               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) ? "Sp" : "--",
+               (qf->queueFamilyProperties.queueFlags & VK_QUEUE_PROTECTED_BIT) ? "Pr" : "--",
                qf->queueFamilyProperties.queueCount, qf->queueFamilyProperties.timestampValidBits,
-               (prio_flags & lo_bit) ? "Lo" : "-", (prio_flags & md_bit) ? "Md" : "-",
-               (prio_flags & hi_bit) ? "Hi" : "-", (prio_flags & rt_bit) ? "Rt" : "-");
+               (prio_flags & lo_bit) ? "Lo" : "--", (prio_flags & md_bit) ? "Md" : "--",
+               (prio_flags & hi_bit) ? "Hi" : "--", (prio_flags & rt_bit) ? "Rt" : "--");
     }
 }
 
@@ -104,12 +104,12 @@ info_device_memories(struct vk *vk)
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
         const VkMemoryType *mt = &vk->mem_props.memoryTypes[i];
         vk_log("    mt %d: heap %d flags %s%s%s%s%s%s", i, mt->heapIndex,
-               (mt->propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? "Lo" : "-",
-               (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) ? "Vi" : "-",
-               (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) ? "Co" : "-",
-               (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) ? "Ca" : "-",
-               (mt->propertyFlags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT) ? "La" : "-",
-               (mt->propertyFlags & VK_MEMORY_PROPERTY_PROTECTED_BIT) ? "Pr" : "-");
+               (mt->propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? "Lo" : "--",
+               (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) ? "Vi" : "--",
+               (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) ? "Co" : "--",
+               (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) ? "Ca" : "--",
+               (mt->propertyFlags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT) ? "La" : "--",
+               (mt->propertyFlags & VK_MEMORY_PROPERTY_PROTECTED_BIT) ? "Pr" : "--");
     }
 }
 
