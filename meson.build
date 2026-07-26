@@ -22,6 +22,7 @@ warning_args = cc.get_supported_arguments([
 ])
 add_project_arguments(['-D_GNU_SOURCE', warning_args], language: ['c', 'cpp'])
 
+prog_dxc = find_program('dxc', required: false)
 prog_glslang = find_program('glslangValidator')
 prog_python = import('python').find_installation('python3')
 
@@ -154,7 +155,7 @@ if idep_clutil.found()
   subdir('cl')
 endif
 
-if idep_d3d12util.found()
+if prog_dxc.found() and idep_d3d12util.found()
   subdir('d3d12')
 endif
 
