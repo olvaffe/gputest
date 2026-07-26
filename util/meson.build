@@ -26,6 +26,15 @@ idep_clutil = declare_dependency(
 )
 util_summary += {'clutil': idep_clutil}
 
+idep_d3d12util = dep_not_found
+if dep_vkd3d_proton.found()
+  idep_d3d12util = declare_dependency(
+    sources: ['d3d12util.h'],
+    dependencies: [idep_util, dep_dl, dep_vkd3d_proton],
+  )
+endif
+util_summary += {'d3d12util': idep_d3d12util}
+
 idep_drmutil = dep_not_found
 if dep_drm.found()
   idep_drmutil = declare_dependency(

@@ -1,0 +1,13 @@
+#ifndef PFN_D3D12
+#define PFN_D3D12(type, name)
+#endif
+
+PFN_D3D12(CREATE_DEVICE, CreateDevice)
+PFN_D3D12(CREATE_VERSIONED_ROOT_SIGNATURE_DESERIALIZER, CreateVersionedRootSignatureDeserializer)
+PFN_D3D12(ENABLE_EXPERIMENTAL_FEATURES, EnableExperimentalFeatures)
+PFN_D3D12(GET_DEBUG_INTERFACE, GetDebugInterface)
+PFN_D3D12(GET_INTERFACE, GetInterface)
+PFN_D3D12(SERIALIZE_ROOT_SIGNATURE, SerializeRootSignature)
+PFN_D3D12(SERIALIZE_VERSIONED_ROOT_SIGNATURE, SerializeVersionedRootSignature)
+
+#undef PFN_D3D12

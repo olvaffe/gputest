@@ -46,6 +46,9 @@ dep_nativewindow = cc.find_library(
   required: false
 )
 
+# for d3d12util
+dep_vkd3d_proton = dependency('libvkd3d-proton-d3d12', required: false)
+
 # for drmutil and vautil
 dep_drm = dependency('libdrm', required: false)
 
@@ -149,6 +152,10 @@ subdir('misc')
 
 if idep_clutil.found()
   subdir('cl')
+endif
+
+if idep_d3d12util.found()
+  subdir('d3d12')
 endif
 
 if idep_eglutil.found()
