@@ -6,11 +6,11 @@
 #include "d3d11util.h"
 
 static const uint8_t tex_test_vs[] = {
-#include "tex_test.vs.h"
+#include "tex_test.vs.inc"
 };
 
 static const uint8_t tex_test_ps[] = {
-#include "tex_test.ps.h"
+#include "tex_test.ps.inc"
 };
 
 static const unsigned char tex_test_ppm[] = {
@@ -22,20 +22,20 @@ static const struct {
     float uv[2];
 } tex_test_vertices[] = {
     [0] = {
-        .pos = { -1.0f, -1.0f },
-        .uv = { 0.0f, 0.0f },
+        .pos = { -1.0f, 1.0f, },
+        .uv = { 0.0f, 0.0f, },
     },
     [1] = {
-        .pos = { 1.0f, -1.0f },
-        .uv = { 1.0f, 0.0f },
+        .pos = { 1.0f, 1.0f, },
+        .uv = { 1.0f, 0.0f, },
     },
     [2] = {
-        .pos = { -1.0f, 1.0f },
-        .uv = { 0.0f, 1.0f },
+        .pos = { -1.0f, -1.0f, },
+        .uv = { 0.0f, 1.0f, },
     },
     [3] = {
-        .pos = { 1.0f, 1.0f },
-        .uv = { 1.0f, 1.0f },
+        .pos = { 1.0f, -1.0f, },
+        .uv = { 1.0f, 1.0f, },
     },
 };
 
@@ -58,8 +58,6 @@ struct tex_test {
     ID3D11VertexShader *vs;
     ID3D11PixelShader *ps;
     ID3D11InputLayout *input_layout;
-    ID3D11RasterizerState *rs;
-    ID3D11DepthStencilState *ds;
 };
 
 static void
@@ -93,21 +91,6 @@ tex_test_init_pipeline(struct tex_test *test)
         ID3D11Device_CreateInputLayout(d3d11->dev, input_elements, ARRAY_SIZE(input_elements),
                                        tex_test_vs, sizeof(tex_test_vs), &test->input_layout);
     d3d11_check(d3d11, "CreateInputLayout");
-
-    const D3D11_RASTERIZER_DESC rs_desc = {
-        .FillMode = D3D11_FILL_SOLID,
-        .CullMode = D3D11_CULL_NONE,
-        .DepthClipEnable = TRUE,
-    };
-    d3d11->result = ID3D11Device_CreateRasterizerState(d3d11->dev, &rs_desc, &test->rs);
-    d3d11_check(d3d11, "CreateRasterizerState");
-
-    const D3D11_DEPTH_STENCIL_DESC ds_desc = {
-        .DepthEnable = FALSE,
-        .StencilEnable = FALSE,
-    };
-    d3d11->result = ID3D11Device_CreateDepthStencilState(d3d11->dev, &ds_desc, &test->ds);
-    d3d11_check(d3d11, "CreateDepthStencilState");
 }
 
 static void
@@ -128,7 +111,6 @@ tex_test_init_rt(struct tex_test *test)
         .Usage = D3D11_USAGE_DEFAULT,
         .BindFlags = D3D11_BIND_RENDER_TARGET,
     };
-
     d3d11->result = ID3D11Device_CreateTexture2D(d3d11->dev, &desc, NULL, &test->rt);
     d3d11_check(d3d11, "CreateTexture2D (RT)");
 
@@ -195,18 +177,16 @@ tex_test_cleanup(struct tex_test *test)
 {
     struct d3d11 *d3d11 = &test->d3d11;
 
-    ID3D11DepthStencilState_Release(test->ds);
-    ID3D11RasterizerState_Release(test->rs);
     ID3D11InputLayout_Release(test->input_layout);
     ID3D11PixelShader_Release(test->ps);
     ID3D11VertexShader_Release(test->vs);
 
+    ID3D11RenderTargetView_Release(test->rtv);
+    ID3D11Texture2D_Release(test->rt);
+
     ID3D11SamplerState_Release(test->sampler);
     ID3D11ShaderResourceView_Release(test->srv);
     ID3D11Texture2D_Release(test->tex);
-
-    ID3D11RenderTargetView_Release(test->rtv);
-    ID3D11Texture2D_Release(test->rt);
 
     ID3D11Buffer_Release(test->vb);
 
@@ -218,15 +198,6 @@ tex_test_draw(struct tex_test *test)
 {
     struct d3d11 *d3d11 = &test->d3d11;
 
-    const D3D11_VIEWPORT vp = {
-        .TopLeftX = 0.0f,
-        .TopLeftY = 0.0f,
-        .Width = (float)test->width,
-        .Height = (float)test->height,
-        .MinDepth = 0.0f,
-        .MaxDepth = 1.0f,
-    };
-
     const UINT stride = sizeof(tex_test_vertices[0]);
     const UINT offset = 0;
     ID3D11DeviceContext_IASetVertexBuffers(d3d11->ctx, 0, 1, &test->vb, &stride, &offset);
@@ -236,7 +207,14 @@ tex_test_draw(struct tex_test *test)
 
     ID3D11DeviceContext_VSSetShader(d3d11->ctx, test->vs, NULL, 0);
 
-    ID3D11DeviceContext_RSSetState(d3d11->ctx, test->rs);
+    const D3D11_VIEWPORT vp = {
+        .TopLeftX = 0.0f,
+        .TopLeftY = 0.0f,
+        .Width = (float)test->width,
+        .Height = (float)test->height,
+        .MinDepth = 0.0f,
+        .MaxDepth = 1.0f,
+    };
     ID3D11DeviceContext_RSSetViewports(d3d11->ctx, 1, &vp);
 
     ID3D11DeviceContext_PSSetShader(d3d11->ctx, test->ps, NULL, 0);
@@ -244,7 +222,6 @@ tex_test_draw(struct tex_test *test)
     ID3D11DeviceContext_PSSetSamplers(d3d11->ctx, 0, 1, &test->sampler);
 
     ID3D11DeviceContext_OMSetRenderTargets(d3d11->ctx, 1, &test->rtv, NULL);
-    ID3D11DeviceContext_OMSetDepthStencilState(d3d11->ctx, test->ds, 0);
 
     ID3D11DeviceContext_Draw(d3d11->ctx, ARRAY_SIZE(tex_test_vertices), 0);
 

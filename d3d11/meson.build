@@ -30,9 +30,9 @@ foreach t : d3d11_tests
         ],
       )
       test_incs += custom_target(
-        t + '_test.' + stage + '.h',
+        t + '_test.' + stage + '.inc',
         input: [file_hexdump, hlsl_bc],
-        output: [t + '_test.' + stage + '.h'],
+        output: [t + '_test.' + stage + '.inc'],
         command: [prog_python, '@INPUT0@', 'binary', '@INPUT1@', '@OUTPUT@'],
       )
     endforeach

@@ -6,11 +6,11 @@
 #include "d3d11util.h"
 
 static const uint8_t tri_test_vs[] = {
-#include "tri_test.vs.h"
+#include "tri_test.vs.inc"
 };
 
 static const uint8_t tri_test_ps[] = {
-#include "tri_test.ps.h"
+#include "tri_test.ps.inc"
 };
 
 static const struct {
