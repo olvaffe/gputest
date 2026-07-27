@@ -57,7 +57,7 @@ tri_test_init_pipeline(struct tri_test *test)
 
     test->pipeline->input_elements[0] = (D3D12_INPUT_ELEMENT_DESC){
         .SemanticName = "POSITION",
-        .Format = DXGI_FORMAT_R32G32B32_FLOAT,
+        .Format = DXGI_FORMAT_R32G32_FLOAT,
         .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
     };
     test->pipeline->input_elements[1] = (D3D12_INPUT_ELEMENT_DESC){
