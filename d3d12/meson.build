@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: MIT
 
 d3d12_tests = [
+  'formats',
   'info',
-  'tri',
   'tex',
+  'tri',
 ]
 
 foreach t : d3d12_tests

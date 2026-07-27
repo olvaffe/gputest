@@ -21,8 +21,8 @@
 
 #define LIBVKD3D_PROTON_D3D12_NAME "libvkd3d-proton-d3d12.so"
 
-#define d3d12_log(format, ...) u_log("d3d12", format, ##__VA_ARGS__)
-#define d3d12_die(format, ...) u_die("d3d12", format, ##__VA_ARGS__)
+#define d3d12_log(format, ...) u_log("D3D12", format, ##__VA_ARGS__)
+#define d3d12_die(format, ...) u_die("D3D12", format, ##__VA_ARGS__)
 
 struct d3d12_init_params {
     D3D_FEATURE_LEVEL min_feature_level;
