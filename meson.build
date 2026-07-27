@@ -47,6 +47,10 @@ dep_nativewindow = cc.find_library(
   required: false
 )
 
+# for dxgiutil and d3d11util
+dep_dxvk_dxgi = dependency('dxvk-dxgi', required: false)
+dep_dxvk_d3d11 = dependency('dxvk-d3d11', required: false)
+
 # for d3d12util
 dep_vkd3d_proton = dependency('libvkd3d-proton-d3d12', required: false)
 
@@ -153,6 +157,10 @@ subdir('misc')
 
 if idep_clutil.found()
   subdir('cl')
+endif
+
+if idep_dxgiutil.found() and idep_d3d11util.found()
+  subdir('d3d11')
 endif
 
 if prog_dxc.found() and idep_d3d12util.found()

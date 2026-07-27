@@ -26,6 +26,24 @@ idep_clutil = declare_dependency(
 )
 util_summary += {'clutil': idep_clutil}
 
+idep_dxgiutil = dep_not_found
+if dep_dxvk_dxgi.found()
+  idep_dxgiutil = declare_dependency(
+    sources: ['dxgiutil.h'],
+    dependencies: [idep_util, dep_dl, dep_dxvk_dxgi],
+  )
+endif
+util_summary += {'dxgiutil': idep_dxgiutil}
+
+idep_d3d11util = dep_not_found
+if dep_dxvk_d3d11.found()
+  idep_d3d11util = declare_dependency(
+    sources: ['d3d11util.h'],
+    dependencies: [idep_util, dep_dl, dep_dxvk_d3d11],
+  )
+endif
+util_summary += {'d3d11util': idep_d3d11util}
+
 idep_d3d12util = dep_not_found
 if dep_vkd3d_proton.found()
   idep_d3d12util = declare_dependency(
