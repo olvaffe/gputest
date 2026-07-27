@@ -8,19 +8,19 @@
 #include "tri_vs.h"
 
 static const struct {
-    float pos[3];
+    float pos[2];
     float color[3];
 } tri_test_vertices[] = {
     [0] = {
-        .pos = { 0.0f, 1.0f, 0.0f, },
+        .pos = { 0.0f, 1.0f, },
         .color = { 1.0f, 0.0f, 0.0f, },
     },
     [1] = {
-        .pos = { 1.0f, -1.0f, 0.0f, },
+        .pos = { 1.0f, -1.0f, },
         .color = { 0.0f, 1.0f, 0.0f, },
     },
     [2] = {
-        .pos = { -1.0f, -1.0f, 0.0f, },
+        .pos = { -1.0f, -1.0f, },
         .color = { 0.0f, 0.0f, 1.0f, },
     },
 };
@@ -157,6 +157,15 @@ tri_test_draw(struct tri_test *test)
     struct d3d12 *d3d12 = &test->d3d12;
     ID3D12GraphicsCommandList *cmd = d3d12_begin_cmd(d3d12);
 
+    ID3D12GraphicsCommandList_ClearRenderTargetView(cmd, test->rtv_handle, test->clear_color, 0,
+                                                    NULL);
+
+    ID3D12GraphicsCommandList_SetPipelineState(cmd, test->pipeline->pipeline);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(cmd, test->pipeline->root_signature);
+
+    ID3D12GraphicsCommandList_IASetVertexBuffers(cmd, 0, 1, &test->vbv);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(cmd, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
     const D3D12_VIEWPORT vp = {
         .Width = (float)test->width,
         .Height = (float)test->height,
@@ -166,16 +175,9 @@ tri_test_draw(struct tri_test *test)
         .right = (LONG)test->width,
         .bottom = (LONG)test->height,
     };
-
-    ID3D12GraphicsCommandList_ClearRenderTargetView(cmd, test->rtv_handle, test->clear_color, 0,
-                                                    NULL);
-
-    ID3D12GraphicsCommandList_IASetVertexBuffers(cmd, 0, 1, &test->vbv);
-    ID3D12GraphicsCommandList_SetPipelineState(cmd, test->pipeline->pipeline);
-    ID3D12GraphicsCommandList_SetGraphicsRootSignature(cmd, test->pipeline->root_signature);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(cmd, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ID3D12GraphicsCommandList_RSSetViewports(cmd, 1, &vp);
     ID3D12GraphicsCommandList_RSSetScissorRects(cmd, 1, &scissor);
+
     ID3D12GraphicsCommandList_OMSetRenderTargets(cmd, 1, &test->rtv_handle, FALSE, NULL);
 
     ID3D12GraphicsCommandList_DrawInstanced(cmd, ARRAY_SIZE(tri_test_vertices), 1, 0, 0);
