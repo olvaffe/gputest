@@ -12,6 +12,17 @@ static void
 info_factory(struct dxgi *dxgi)
 {
     dxgi_log("IDXGIFactory%u:", dxgi->factory_version);
+
+    if (dxgi->factory_version >= 5) {
+        IDXGIFactory5 *factory5 = (IDXGIFactory5 *)dxgi->factory;
+
+        BOOL allow_tearing = FALSE;
+        dxgi->result = IDXGIFactory5_CheckFeatureSupport(
+            factory5, DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allow_tearing, sizeof(allow_tearing));
+        if (SUCCEEDED(dxgi->result)) {
+            dxgi_log("  PresentAllowTearing:   %d", allow_tearing);
+        }
+    }
 }
 
 static void
