@@ -124,6 +124,58 @@ d3d11_cleanup(struct d3d11 *d3d11)
     dlclose(d3d11->handle);
 }
 
+static inline ID3D11Texture2D *
+d3d11_create_tex_from_ppm(struct d3d11 *d3d11, const void *ppm_data, size_t ppm_size)
+{
+    uint32_t width;
+    uint32_t height;
+    const void *ppm_pixels = u_parse_ppm(ppm_data, ppm_size, &width, &height);
+
+    void *rgba_pixels = malloc(width * height * 4);
+    if (!rgba_pixels)
+        d3d11_die("failed to allocate rgba pixels");
+
+    const struct u_format_conversion conv = {
+        .width = width,
+        .height = height,
+        .src_format = DRM_FORMAT_BGR888,
+        .src_plane_count = 1,
+        .src_plane_ptrs = { ppm_pixels },
+        .src_plane_strides = { width * 3 },
+        .dst_format = DRM_FORMAT_ABGR8888,
+        .dst_plane_count = 1,
+        .dst_plane_ptrs = { rgba_pixels },
+        .dst_plane_strides = { width * 4 },
+    };
+    u_convert_format(&conv);
+
+    const D3D11_TEXTURE2D_DESC tex_desc = {
+        .Width = width,
+        .Height = height,
+        .MipLevels = 1,
+        .ArraySize = 1,
+        .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+        .SampleDesc = {
+            .Count = 1,
+            .Quality = 0,
+        },
+        .Usage = D3D11_USAGE_IMMUTABLE,
+        .BindFlags = D3D11_BIND_SHADER_RESOURCE,
+    };
+    const D3D11_SUBRESOURCE_DATA sub_data = {
+        .pSysMem = rgba_pixels,
+        .SysMemPitch = width * 4,
+    };
+
+    ID3D11Texture2D *tex = NULL;
+    d3d11->result = ID3D11Device_CreateTexture2D(d3d11->dev, &tex_desc, &sub_data, &tex);
+    d3d11_check(d3d11, "CreateTexture2D (Texture)");
+
+    free(rgba_pixels);
+
+    return tex;
+}
+
 static inline void
 d3d11_dump_image(struct d3d11 *d3d11, ID3D11Texture2D *rt, const char *filename)
 {

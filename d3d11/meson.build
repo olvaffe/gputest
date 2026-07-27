@@ -3,6 +3,7 @@
 
 d3d11_tests = [
   'info',
+  'tex',
   'tri',
 ]
 
