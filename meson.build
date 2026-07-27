@@ -184,4 +184,10 @@ if idep_vkutil.found()
   subdir('vk')
 endif
 
+compiler_summary = {}
+compiler_summary += {'dxc': prog_dxc}
+compiler_summary += {'glslangValidator': prog_glslang}
+compiler_summary += {'vkd3d-compiler': prog_vkd3d_compiler}
+summary(compiler_summary, section: 'Available compiles')
+
 summary(util_summary, section: 'Enabled utils')
