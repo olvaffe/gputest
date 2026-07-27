@@ -28,8 +28,7 @@
 struct d3d11_init_params {
     IDXGIAdapter *adapter;
     UINT flags;
-    const D3D_FEATURE_LEVEL *feature_levels;
-    UINT feature_level_count;
+    D3D_FEATURE_LEVEL feature_level;
 };
 
 struct d3d11 {
@@ -74,11 +73,17 @@ d3d11_init_dev(struct d3d11 *d3d11)
     D3D_DRIVER_TYPE driver_type =
         d3d11->params.adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE;
 
+    const D3D_FEATURE_LEVEL *feature_levels = NULL;
+    UINT feature_level_count = 0;
+    if (d3d11->params.feature_level) {
+        feature_levels = &d3d11->params.feature_level;
+        feature_level_count = 1;
+    }
+
     ID3D11Device *dev = NULL;
-    d3d11->result =
-        d3d11->CreateDevice(d3d11->params.adapter, driver_type, NULL, d3d11->params.flags,
-                            d3d11->params.feature_levels, d3d11->params.feature_level_count,
-                            D3D11_SDK_VERSION, &dev, &d3d11->feature_level, &d3d11->ctx);
+    d3d11->result = d3d11->CreateDevice(
+        d3d11->params.adapter, driver_type, NULL, d3d11->params.flags, feature_levels,
+        feature_level_count, D3D11_SDK_VERSION, &dev, &d3d11->feature_level, &d3d11->ctx);
     d3d11_check(d3d11, "D3D11CreateDevice");
 
     const struct {
