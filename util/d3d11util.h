@@ -82,9 +82,9 @@ d3d11_init_dev(struct d3d11 *d3d11)
     }
 
     ID3D11Device *dev = NULL;
-    d3d11->result = d3d11->CreateDevice(
-        d3d11->params.adapter, driver_type, NULL, d3d11->params.flags, feature_levels,
-        feature_level_count, D3D11_SDK_VERSION, &dev, &d3d11->feature_level, NULL);
+    d3d11->result = d3d11->CreateDevice(d3d11->params.adapter, driver_type, NULL,
+                                        d3d11->params.flags, feature_levels, feature_level_count,
+                                        D3D11_SDK_VERSION, &dev, &d3d11->feature_level, NULL);
     d3d11_check(d3d11, "D3D11CreateDevice");
 
     const struct {
@@ -128,8 +128,8 @@ d3d11_init_ctx(struct d3d11 *d3d11)
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
-        if (SUCCEEDED(ID3D11DeviceContext_QueryInterface(ctx, versions[i].iid,
-                                                         (void **)&d3d11->ctx))) {
+        if (SUCCEEDED(
+                ID3D11DeviceContext_QueryInterface(ctx, versions[i].iid, (void **)&d3d11->ctx))) {
             d3d11->ctx_version = versions[i].version;
             break;
         }
