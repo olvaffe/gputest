@@ -48,7 +48,8 @@ ahb_get_usage_str(uint64_t bits, char *str, size_t size)
         snprintf(str + len, size - len, "none");
 }
 
-static bool ahb_is_supported(enum AHardwareBuffer_Format fmt, uint64_t usage)
+static bool
+ahb_is_supported(enum AHardwareBuffer_Format fmt, uint64_t usage)
 {
     const AHardwareBuffer_Desc desc = {
         .width = 64,

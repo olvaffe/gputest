@@ -5,8 +5,8 @@
 
 #include "vkutil.h"
 
-#include <linux/prctl.h>
 #include <errno.h>
+#include <linux/prctl.h>
 #include <sched.h>
 #include <stdatomic.h>
 #include <sys/prctl.h>

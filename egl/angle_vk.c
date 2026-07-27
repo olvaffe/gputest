@@ -125,7 +125,8 @@ angle_test_dump_features(struct angle_test *test)
 {
     egl_log("selected features:");
 
-    for (const VkBaseInStructure *pnext = (const VkBaseInStructure *)test->features; pnext; pnext = pnext->pNext) {
+    for (const VkBaseInStructure *pnext = (const VkBaseInStructure *)test->features; pnext;
+         pnext = pnext->pNext) {
         switch (pnext->sType) {
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_FEATURES_EXT: {
             const VkPhysicalDeviceTransformFeedbackFeaturesEXT *feats = (const void *)pnext;
@@ -156,8 +157,7 @@ angle_test_dump_features(struct angle_test *test)
         }
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES: {
             const VkPhysicalDeviceSamplerYcbcrConversionFeatures *feats = (const void *)pnext;
-            egl_log("  samplerYcbcrConversion: %d",
-                    feats->samplerYcbcrConversion);
+            egl_log("  samplerYcbcrConversion: %d", feats->samplerYcbcrConversion);
             break;
         }
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES: {
@@ -201,7 +201,8 @@ angle_test_dump_features(struct angle_test *test)
             break;
         }
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_FEATURES_EXT: {
-            const VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT *feats = (const void *)pnext;
+            const VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT *feats =
+                (const void *)pnext;
             egl_log("  multisampledRenderToSingleSampled: %d",
                     feats->multisampledRenderToSingleSampled);
             break;
@@ -212,7 +213,8 @@ angle_test_dump_features(struct angle_test *test)
             break;
         }
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT: {
-            const VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT *feats = (const void *)pnext;
+            const VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT *feats =
+                (const void *)pnext;
             egl_log("  primitivesGeneratedQuery: %d", feats->primitivesGeneratedQuery);
             break;
         }
@@ -227,7 +229,8 @@ angle_test_dump_features(struct angle_test *test)
             break;
         }
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FORMAT_RESOLVE_FEATURES_ANDROID: {
-            const VkPhysicalDeviceExternalFormatResolveFeaturesANDROID *feats = (const void *)pnext;
+            const VkPhysicalDeviceExternalFormatResolveFeaturesANDROID *feats =
+                (const void *)pnext;
             egl_log("  externalFormatResolve: %d", feats->externalFormatResolve);
             break;
         }
