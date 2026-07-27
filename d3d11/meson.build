@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 d3d11_tests = [
+  'formats',
   'info',
   'tex',
   'tri',
