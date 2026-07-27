@@ -25,7 +25,8 @@
 #define d3d12_die(format, ...) u_die("D3D12", format, ##__VA_ARGS__)
 
 struct d3d12_init_params {
-    D3D_FEATURE_LEVEL min_feature_level;
+    IDXGIAdapter *adapter;
+    D3D_FEATURE_LEVEL feature_level;
 };
 
 struct d3d12 {
@@ -41,6 +42,7 @@ struct d3d12 {
     HRESULT result;
 
     ID3D12Device *dev;
+    UINT dev_version;
 
     ID3D12CommandQueue *queue;
     ID3D12Fence *fence;
@@ -106,9 +108,28 @@ d3d12_init_library(struct d3d12 *d3d12)
 static inline void
 d3d12_init_dev(struct d3d12 *d3d12)
 {
-    d3d12->result = d3d12->CreateDevice(NULL, d3d12->params.min_feature_level, &IID_ID3D12Device,
-                                        (void **)&d3d12->dev);
-    d3d12_check(d3d12, "CreateDevice");
+    const struct {
+        const GUID *iid;
+        UINT version;
+    } versions[] = {
+        { &IID_ID3D12Device14, 14 }, { &IID_ID3D12Device13, 13 }, { &IID_ID3D12Device12, 12 },
+        { &IID_ID3D12Device11, 11 }, { &IID_ID3D12Device10, 10 }, { &IID_ID3D12Device9, 9 },
+        { &IID_ID3D12Device8, 8 },   { &IID_ID3D12Device7, 7 },   { &IID_ID3D12Device6, 6 },
+        { &IID_ID3D12Device5, 5 },   { &IID_ID3D12Device4, 4 },   { &IID_ID3D12Device3, 3 },
+        { &IID_ID3D12Device2, 2 },   { &IID_ID3D12Device1, 1 },   { &IID_ID3D12Device, 0 },
+    };
+
+    for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
+        if (SUCCEEDED(d3d12->CreateDevice((IUnknown *)d3d12->params.adapter,
+                                          d3d12->params.feature_level, versions[i].iid,
+                                          (void **)&d3d12->dev))) {
+            d3d12->dev_version = versions[i].version;
+            break;
+        }
+    }
+
+    if (!d3d12->dev)
+        d3d12_die("CreateDevice failed");
 }
 
 static inline void
@@ -122,11 +143,10 @@ d3d12_init_queue(struct d3d12 *d3d12)
         d3d12->dev, &queue_desc, &IID_ID3D12CommandQueue, (void **)&d3d12->queue);
     d3d12_check(d3d12, "CreateCommandQueue");
 
-    d3d12->result = ID3D12Device_CreateFence(d3d12->dev, 0, D3D12_FENCE_FLAG_NONE,
+    d3d12->result = ID3D12Device_CreateFence(d3d12->dev, d3d12->fence_val, D3D12_FENCE_FLAG_NONE,
                                              &IID_ID3D12Fence, (void **)&d3d12->fence);
     d3d12_check(d3d12, "CreateFence");
 
-    d3d12->fence_val = 1;
     d3d12->fence_event = eventfd(0, EFD_CLOEXEC);
     if (d3d12->fence_event < 0)
         d3d12_die("eventfd failed");
@@ -145,13 +165,12 @@ static inline void
 d3d12_init(struct d3d12 *d3d12, const struct d3d12_init_params *params)
 {
     memset(d3d12, 0, sizeof(*d3d12));
-
     d3d12->fence_event = -1;
 
     if (params)
         d3d12->params = *params;
-    if (!d3d12->params.min_feature_level)
-        d3d12->params.min_feature_level = D3D_FEATURE_LEVEL_11_0;
+    if (!d3d12->params.feature_level)
+        d3d12->params.feature_level = D3D_FEATURE_LEVEL_11_0;
 
     d3d12_init_library(d3d12);
     d3d12_init_dev(d3d12);
@@ -162,7 +181,7 @@ d3d12_init(struct d3d12 *d3d12, const struct d3d12_init_params *params)
 static inline void
 d3d12_wait(struct d3d12 *d3d12)
 {
-    const UINT64 v = d3d12->fence_val++;
+    const UINT64 v = ++d3d12->fence_val;
     d3d12->result = ID3D12CommandQueue_Signal(d3d12->queue, d3d12->fence, v);
     d3d12_check(d3d12, "Signal");
 
@@ -170,6 +189,7 @@ d3d12_wait(struct d3d12 *d3d12)
         d3d12->result = ID3D12Fence_SetEventOnCompletion(d3d12->fence, v,
                                                          (HANDLE)(intptr_t)d3d12->fence_event);
         d3d12_check(d3d12, "SetEventOnCompletion");
+
         uint64_t ev_val;
         if (read(d3d12->fence_event, &ev_val, sizeof(ev_val)) < 0)
             d3d12_die("read eventfd failed");

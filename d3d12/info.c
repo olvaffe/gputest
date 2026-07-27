@@ -6,27 +6,24 @@
 #include "d3d12util.h"
 
 static void
-info_impl(struct d3d12 *d3d12)
-{
-    void *ext = NULL;
-    d3d12->result = ID3D12Device_QueryInterface(d3d12->dev, &IID_ID3D12DeviceExt, &ext);
-    if (SUCCEEDED(d3d12->result) && ext) {
-        d3d12_log("Implementation: VKD3D-Proton (ID3D12DeviceExt supported)");
-        IUnknown_Release((IUnknown *)ext);
-    } else {
-        d3d12_log("Implementation: Unknown / Native D3D12");
-    }
-}
-
-static void
 info_general(struct d3d12 *d3d12)
 {
+    d3d12_log("ID3D12Device%u:", d3d12->dev_version);
+
     const UINT node_count = ID3D12Device_GetNodeCount(d3d12->dev);
     const LUID luid = ID3D12Device_GetAdapterLuid(d3d12->dev);
 
-    d3d12_log("Device General:");
     d3d12_log("  Node Count: %u", node_count);
     d3d12_log("  Adapter LUID: %08x:%08x", (unsigned)luid.HighPart, (unsigned)luid.LowPart);
+
+    void *ext = NULL;
+    d3d12->result = ID3D12Device_QueryInterface(d3d12->dev, &IID_ID3D12DeviceExt, &ext);
+    if (SUCCEEDED(d3d12->result)) {
+        d3d12_log("  Implementation: VKD3D-Proton (ID3D12DeviceExt supported)");
+        IUnknown_Release((IUnknown *)ext);
+    } else {
+        d3d12_log("  Implementation: Unknown / Native D3D12");
+    }
 }
 
 static void
@@ -625,7 +622,6 @@ main(void)
 
     d3d12_init(&d3d12, NULL);
 
-    info_impl(&d3d12);
     info_general(&d3d12);
 
     info_heap_properties(&d3d12);
