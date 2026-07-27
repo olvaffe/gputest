@@ -27,6 +27,7 @@
 
 struct dxgi_init_params {
     UINT flags;
+    UINT adapter_index;
 };
 
 struct dxgi {
@@ -100,7 +101,8 @@ static inline void
 dxgi_init_adapter(struct dxgi *dxgi)
 {
     IDXGIAdapter1 *adapter1 = NULL;
-    dxgi->result = IDXGIFactory1_EnumAdapters1(dxgi->factory, 0, &adapter1);
+    dxgi->result =
+        IDXGIFactory1_EnumAdapters1(dxgi->factory, dxgi->params.adapter_index, &adapter1);
     dxgi_check(dxgi, "EnumAdapters1");
 
     const struct {
