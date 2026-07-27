@@ -15,15 +15,15 @@ foreach t : d3d12_tests
   hlsl_src = t + '.hlsl'
   if fs.exists(hlsl_src)
     test_incs += custom_target(
-      t + '_vs.h',
+      t + '_test.vs.h',
       input: [hlsl_src],
-      output: [t + '_vs.h'],
+      output: [t + '_test.vs.h'],
       command: [prog_dxc, '-T', 'vs_6_0', '-E', 'vs_main', '-Vn', t + '_test_vs', '-Fh', '@OUTPUT@', '@INPUT@'],
     )
     test_incs += custom_target(
-      t + '_ps.h',
+      t + '_test.ps.h',
       input: [hlsl_src],
-      output: [t + '_ps.h'],
+      output: [t + '_test.ps.h'],
       command: [prog_dxc, '-T', 'ps_6_0', '-E', 'ps_main', '-Vn', t + '_test_ps', '-Fh', '@OUTPUT@', '@INPUT@'],
     )
   endif

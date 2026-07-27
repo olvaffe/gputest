@@ -4,8 +4,8 @@
  */
 
 #include "d3d12util.h"
-#include "tex_ps.h"
-#include "tex_vs.h"
+#include "tex_test.ps.h"
+#include "tex_test.vs.h"
 
 static const unsigned char tex_test_ppm[] = {
 #include "tex_test.ppm.inc"
@@ -16,20 +16,20 @@ static const struct {
     float uv[2];
 } tex_test_vertices[] = {
     [0] = {
-        .pos = { -1.0f, -1.0f },
-        .uv = { 0.0f, 0.0f },
+        .pos = { -1.0f, 1.0f, },
+        .uv = { 0.0f, 0.0f, },
     },
     [1] = {
-        .pos = { 1.0f, -1.0f },
-        .uv = { 1.0f, 0.0f },
+        .pos = { 1.0f, 1.0f, },
+        .uv = { 1.0f, 0.0f, },
     },
     [2] = {
-        .pos = { -1.0f, 1.0f },
-        .uv = { 0.0f, 1.0f },
+        .pos = { -1.0f, -1.0f, },
+        .uv = { 0.0f, 1.0f, },
     },
     [3] = {
-        .pos = { 1.0f, 1.0f },
-        .uv = { 1.0f, 1.0f },
+        .pos = { 1.0f, -1.0f, },
+        .uv = { 1.0f, 1.0f, },
     },
 };
 
@@ -45,7 +45,7 @@ struct tex_test {
 
     struct d3d12_image *tex;
     ID3D12DescriptorHeap *srv_heap;
-    D3D12_CPU_DESCRIPTOR_HANDLE srv_handle;
+    D3D12_GPU_DESCRIPTOR_HANDLE srv_handle;
 
     struct d3d12_image *rt;
     ID3D12DescriptorHeap *rtv_heap;
@@ -169,7 +169,8 @@ tex_test_init_tex(struct tex_test *test)
         d3d12->dev, &srv_heap_desc, &IID_ID3D12DescriptorHeap, (void **)&test->srv_heap);
     d3d12_check(d3d12, "CreateDescriptorHeap (SRV)");
 
-    test->srv_handle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(test->srv_heap);
+    const D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle =
+        ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(test->srv_heap);
 
     const D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {
         .Format = test->tex->format,
@@ -182,8 +183,9 @@ tex_test_init_tex(struct tex_test *test)
             .ResourceMinLODClamp = 0.0f,
         },
     };
-    ID3D12Device_CreateShaderResourceView(d3d12->dev, test->tex->img, &srv_desc,
-                                          test->srv_handle);
+    ID3D12Device_CreateShaderResourceView(d3d12->dev, test->tex->img, &srv_desc, cpu_handle);
+
+    test->srv_handle = ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(test->srv_heap);
 }
 
 static void
@@ -238,6 +240,14 @@ tex_test_draw(struct tex_test *test)
     struct d3d12 *d3d12 = &test->d3d12;
     ID3D12GraphicsCommandList *cmd = d3d12_begin_cmd(d3d12);
 
+    ID3D12GraphicsCommandList_SetPipelineState(cmd, test->pipeline->pipeline);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(cmd, test->pipeline->root_signature);
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(cmd, 1, &test->srv_heap);
+    ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(cmd, 0, test->srv_handle);
+
+    ID3D12GraphicsCommandList_IASetVertexBuffers(cmd, 0, 1, &test->vbv);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(cmd, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
     const D3D12_VIEWPORT vp = {
         .Width = (float)test->width,
         .Height = (float)test->height,
@@ -247,19 +257,9 @@ tex_test_draw(struct tex_test *test)
         .right = (LONG)test->width,
         .bottom = (LONG)test->height,
     };
-
-    ID3D12GraphicsCommandList_IASetVertexBuffers(cmd, 0, 1, &test->vbv);
-    ID3D12GraphicsCommandList_SetPipelineState(cmd, test->pipeline->pipeline);
-    ID3D12GraphicsCommandList_SetGraphicsRootSignature(cmd, test->pipeline->root_signature);
-
-    ID3D12GraphicsCommandList_SetDescriptorHeaps(cmd, 1, &test->srv_heap);
-    const D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle =
-        ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(test->srv_heap);
-    ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(cmd, 0, gpu_handle);
-
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(cmd, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     ID3D12GraphicsCommandList_RSSetViewports(cmd, 1, &vp);
     ID3D12GraphicsCommandList_RSSetScissorRects(cmd, 1, &scissor);
+
     ID3D12GraphicsCommandList_OMSetRenderTargets(cmd, 1, &test->rtv_handle, FALSE, NULL);
 
     ID3D12GraphicsCommandList_DrawInstanced(cmd, ARRAY_SIZE(tex_test_vertices), 1, 0, 0);

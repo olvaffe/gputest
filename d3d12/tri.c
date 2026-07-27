@@ -4,8 +4,8 @@
  */
 
 #include "d3d12util.h"
-#include "tri_ps.h"
-#include "tri_vs.h"
+#include "tri_test.ps.h"
+#include "tri_test.vs.h"
 
 static const struct {
     float pos[2];
