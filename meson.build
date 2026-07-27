@@ -25,6 +25,7 @@ add_project_arguments(['-D_GNU_SOURCE', warning_args], language: ['c', 'cpp'])
 prog_dxc = find_program('dxc', required: false)
 prog_glslang = find_program('glslangValidator')
 prog_python = import('python').find_installation('python3')
+prog_vkd3d_compiler = find_program('vkd3d-compiler', required: false)
 
 dep_not_found = disabler()
 
@@ -159,7 +160,7 @@ if idep_clutil.found()
   subdir('cl')
 endif
 
-if idep_dxgiutil.found() and idep_d3d11util.found()
+if prog_vkd3d_compiler.found() and idep_dxgiutil.found() and idep_d3d11util.found()
   subdir('d3d11')
 endif
 

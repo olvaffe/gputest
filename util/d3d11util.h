@@ -124,4 +124,32 @@ d3d11_cleanup(struct d3d11 *d3d11)
     dlclose(d3d11->handle);
 }
 
+static inline void
+d3d11_dump_image(struct d3d11 *d3d11, ID3D11Texture2D *rt, const char *filename)
+{
+    D3D11_TEXTURE2D_DESC desc;
+    ID3D11Texture2D_GetDesc(rt, &desc);
+
+    desc.Usage = D3D11_USAGE_STAGING;
+    desc.BindFlags = 0;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    desc.MiscFlags = 0;
+
+    ID3D11Texture2D *staging = NULL;
+    d3d11->result = ID3D11Device_CreateTexture2D(d3d11->dev, &desc, NULL, &staging);
+    d3d11_check(d3d11, "CreateTexture2D (Staging)");
+
+    ID3D11DeviceContext_CopyResource(d3d11->ctx, (ID3D11Resource *)staging, (ID3D11Resource *)rt);
+
+    D3D11_MAPPED_SUBRESOURCE mapped;
+    d3d11->result = ID3D11DeviceContext_Map(d3d11->ctx, (ID3D11Resource *)staging, 0,
+                                            D3D11_MAP_READ, 0, &mapped);
+    d3d11_check(d3d11, "Map Staging Texture");
+
+    u_write_ppm(filename, mapped.pData, desc.Width, desc.Height, mapped.RowPitch);
+
+    ID3D11DeviceContext_Unmap(d3d11->ctx, (ID3D11Resource *)staging, 0);
+    ID3D11Texture2D_Release(staging);
+}
+
 #endif /* D3D11UTIL_H */
