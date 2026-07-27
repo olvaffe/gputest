@@ -217,10 +217,10 @@ d3d11_create_tex_from_ppm(struct d3d11 *d3d11, const void *ppm_data, size_t ppm_
 }
 
 static inline void
-d3d11_dump_image(struct d3d11 *d3d11, ID3D11Texture2D *rt, const char *filename)
+d3d11_dump_image(struct d3d11 *d3d11, ID3D11Texture2D *tex, const char *filename)
 {
     D3D11_TEXTURE2D_DESC desc;
-    ID3D11Texture2D_GetDesc(rt, &desc);
+    ID3D11Texture2D_GetDesc(tex, &desc);
 
     desc.Usage = D3D11_USAGE_STAGING;
     desc.BindFlags = 0;
@@ -231,7 +231,8 @@ d3d11_dump_image(struct d3d11 *d3d11, ID3D11Texture2D *rt, const char *filename)
     d3d11->result = ID3D11Device_CreateTexture2D(d3d11->dev, &desc, NULL, &staging);
     d3d11_check(d3d11, "CreateTexture2D (Staging)");
 
-    ID3D11DeviceContext_CopyResource(d3d11->ctx, (ID3D11Resource *)staging, (ID3D11Resource *)rt);
+    ID3D11DeviceContext_CopyResource(d3d11->ctx, (ID3D11Resource *)staging,
+                                     (ID3D11Resource *)tex);
 
     D3D11_MAPPED_SUBRESOURCE mapped;
     d3d11->result = ID3D11DeviceContext_Map(d3d11->ctx, (ID3D11Resource *)staging, 0,
