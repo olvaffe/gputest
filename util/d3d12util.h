@@ -329,23 +329,66 @@ d3d12_destroy_image(struct d3d12_image *img)
     free(img);
 }
 
-static inline void
-d3d12_init_pipeline_root_signature(struct d3d12 *d3d12,
-                                   struct d3d12_pipeline *pipeline,
-                                   const D3D12_ROOT_SIGNATURE_DESC *desc)
+static inline struct d3d12_image *
+d3d12_create_image_from_ppm(struct d3d12 *d3d12, const void *ppm_data, size_t ppm_size)
 {
-    ID3DBlob *blob;
+    uint32_t width;
+    uint32_t height;
+    ppm_data = u_parse_ppm(ppm_data, ppm_size, &width, &height);
 
-    d3d12->result =
-        d3d12->SerializeRootSignature(desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, NULL);
-    d3d12_check(d3d12, "SerializeRootSignature");
+    struct d3d12_image *img = d3d12_create_image(
+        d3d12, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, D3D12_HEAP_TYPE_DEFAULT,
+        D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_FLAG_NONE, NULL);
 
-    d3d12->result = ID3D12Device_CreateRootSignature(
-        d3d12->dev, 0, ID3D10Blob_GetBufferPointer(blob), ID3D10Blob_GetBufferSize(blob),
-        &IID_ID3D12RootSignature, (void **)&pipeline->root_signature);
-    d3d12_check(d3d12, "CreateRootSignature");
+    struct d3d12_buffer *upload_buf =
+        d3d12_create_buffer(d3d12, img->total_bytes, D3D12_HEAP_TYPE_UPLOAD,
+                            D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_NONE);
 
-    ID3D10Blob_Release(blob);
+    const struct u_format_conversion conv = {
+        .width = width,
+        .height = height,
+        .src_format = DRM_FORMAT_BGR888,
+        .src_plane_count = 1,
+        .src_plane_ptrs = { ppm_data, },
+        .src_plane_strides = { width * 3, },
+        .dst_format = DRM_FORMAT_ABGR8888,
+        .dst_plane_count = 1,
+        .dst_plane_ptrs = { (uint8_t *)upload_buf->map + img->footprint.Offset, },
+        .dst_plane_strides = { img->footprint.Footprint.RowPitch, },
+    };
+    u_convert_format(&conv);
+
+    ID3D12GraphicsCommandList *cmd = d3d12_begin_cmd(d3d12);
+
+    const D3D12_TEXTURE_COPY_LOCATION dst_loc = {
+        .pResource = img->img,
+        .Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+        .SubresourceIndex = 0,
+    };
+    const D3D12_TEXTURE_COPY_LOCATION src_loc = {
+        .pResource = upload_buf->buf,
+        .Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
+        .PlacedFootprint = img->footprint,
+    };
+    ID3D12GraphicsCommandList_CopyTextureRegion(cmd, &dst_loc, 0, 0, 0, &src_loc, NULL);
+
+    const D3D12_RESOURCE_BARRIER barrier = {
+        .Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+        .Transition = {
+            .pResource = img->img,
+            .Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+            .StateBefore = D3D12_RESOURCE_STATE_COPY_DEST,
+            .StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+        },
+    };
+    ID3D12GraphicsCommandList_ResourceBarrier(cmd, 1, &barrier);
+
+    d3d12_end_cmd(d3d12, cmd);
+    d3d12_wait(d3d12);
+
+    d3d12_destroy_buffer(upload_buf);
+
+    return img;
 }
 
 static inline struct d3d12_pipeline *
@@ -355,13 +398,7 @@ d3d12_create_pipeline(struct d3d12 *d3d12)
     if (!pipeline)
         d3d12_die("failed to allocate pipeline");
 
-    const D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {
-        .Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
-    };
-    d3d12_init_pipeline_root_signature(d3d12, pipeline, &root_signature_desc);
-
     pipeline->desc = (D3D12_GRAPHICS_PIPELINE_STATE_DESC){
-        .pRootSignature = pipeline->root_signature,
         .BlendState = {
             .RenderTarget = {
                 [0] = {
@@ -404,6 +441,27 @@ d3d12_create_pipeline(struct d3d12 *d3d12)
     };
 
     return pipeline;
+}
+
+static inline void
+d3d12_add_pipeline_root_signature(struct d3d12 *d3d12,
+                                  struct d3d12_pipeline *pipeline,
+                                  const D3D12_ROOT_SIGNATURE_DESC *desc)
+{
+    ID3DBlob *blob;
+
+    d3d12->result =
+        d3d12->SerializeRootSignature(desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, NULL);
+    d3d12_check(d3d12, "SerializeRootSignature");
+
+    d3d12->result = ID3D12Device_CreateRootSignature(
+        d3d12->dev, 0, ID3D10Blob_GetBufferPointer(blob), ID3D10Blob_GetBufferSize(blob),
+        &IID_ID3D12RootSignature, (void **)&pipeline->root_signature);
+    d3d12_check(d3d12, "CreateRootSignature");
+
+    ID3D10Blob_Release(blob);
+
+    pipeline->desc.pRootSignature = pipeline->root_signature;
 }
 
 static inline void

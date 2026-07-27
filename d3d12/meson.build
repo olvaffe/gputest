@@ -4,6 +4,7 @@
 d3d12_tests = [
   'info',
   'tri',
+  'tex',
 ]
 
 foreach t : d3d12_tests
@@ -23,6 +24,17 @@ foreach t : d3d12_tests
       input: [hlsl_src],
       output: [t + '_ps.h'],
       command: [prog_dxc, '-T', 'ps_6_0', '-E', 'ps_main', '-Vn', t + '_test_ps', '-Fh', '@OUTPUT@', '@INPUT@'],
+    )
+  endif
+
+  ppm_src = t + '.ppm'
+  if fs.exists(ppm_src)
+    dst = t + '_test.ppm.inc'
+    test_incs += custom_target(
+      dst,
+      input: [file_hexdump, ppm_src],
+      output: [dst],
+      command: [prog_python, '@INPUT0@', 'binary', '@INPUT1@', '@OUTPUT@'],
     )
   endif
 

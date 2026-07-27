@@ -50,6 +50,11 @@ tri_test_init_pipeline(struct tri_test *test)
 
     test->pipeline = d3d12_create_pipeline(d3d12);
 
+    const D3D12_ROOT_SIGNATURE_DESC root_sig_desc = {
+        .Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+    };
+    d3d12_add_pipeline_root_signature(d3d12, test->pipeline, &root_sig_desc);
+
     test->pipeline->input_elements[0] = (D3D12_INPUT_ELEMENT_DESC){
         .SemanticName = "POSITION",
         .Format = DXGI_FORMAT_R32G32B32_FLOAT,
