@@ -46,6 +46,7 @@ struct d3d11 {
     D3D_FEATURE_LEVEL feature_level;
 
     ID3D11DeviceContext *ctx;
+    UINT ctx_version;
 };
 
 static inline void
@@ -83,7 +84,7 @@ d3d11_init_dev(struct d3d11 *d3d11)
     ID3D11Device *dev = NULL;
     d3d11->result = d3d11->CreateDevice(
         d3d11->params.adapter, driver_type, NULL, d3d11->params.flags, feature_levels,
-        feature_level_count, D3D11_SDK_VERSION, &dev, &d3d11->feature_level, &d3d11->ctx);
+        feature_level_count, D3D11_SDK_VERSION, &dev, &d3d11->feature_level, NULL);
     d3d11_check(d3d11, "D3D11CreateDevice");
 
     const struct {
@@ -109,6 +110,39 @@ d3d11_init_dev(struct d3d11 *d3d11)
 }
 
 static inline void
+d3d11_init_ctx(struct d3d11 *d3d11)
+{
+    ID3D11DeviceContext *ctx = NULL;
+    ID3D11Device_GetImmediateContext(d3d11->dev, &ctx);
+    if (!ctx)
+        d3d11_die("GetImmediateContext failed");
+
+    const struct {
+        const GUID *iid;
+        UINT version;
+    } versions[] = {
+        { &IID_ID3D11DeviceContext4, 4 },
+        { &IID_ID3D11DeviceContext3, 3 },
+        { &IID_ID3D11DeviceContext2, 2 },
+        { &IID_ID3D11DeviceContext1, 1 },
+    };
+
+    for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
+        if (SUCCEEDED(ID3D11DeviceContext_QueryInterface(ctx, versions[i].iid,
+                                                         (void **)&d3d11->ctx))) {
+            d3d11->ctx_version = versions[i].version;
+            break;
+        }
+    }
+
+    if (d3d11->ctx) {
+        ID3D11DeviceContext_Release(ctx);
+    } else {
+        d3d11->ctx = ctx;
+    }
+}
+
+static inline void
 d3d11_init(struct d3d11 *d3d11, const struct d3d11_init_params *params)
 {
     memset(d3d11, 0, sizeof(*d3d11));
@@ -118,6 +152,7 @@ d3d11_init(struct d3d11 *d3d11, const struct d3d11_init_params *params)
 
     d3d11_init_library(d3d11);
     d3d11_init_dev(d3d11);
+    d3d11_init_ctx(d3d11);
 }
 
 static inline void

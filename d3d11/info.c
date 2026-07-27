@@ -111,6 +111,7 @@ static void
 info_device(struct d3d11 *d3d11)
 {
     d3d11_log("ID3D11Device%d:", d3d11->dev_version);
+    d3d11_log("ID3D11DeviceContext%d:", d3d11->ctx_version);
 
     const D3D_FEATURE_LEVEL level = ID3D11Device_GetFeatureLevel(d3d11->dev);
     const char *str;
