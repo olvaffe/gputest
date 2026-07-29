@@ -96,10 +96,13 @@ d3d11_init_dev(struct d3d11 *d3d11)
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
-        if (SUCCEEDED(ID3D11Device_QueryInterface(dev, versions[i].iid, (void **)&d3d11->dev))) {
+        HRESULT hr = ID3D11Device_QueryInterface(dev, versions[i].iid, (void **)&d3d11->dev);
+        if (SUCCEEDED(hr)) {
             d3d11->dev_version = versions[i].version;
             break;
         }
+        if (hr != E_NOINTERFACE)
+            d3d11_die("ID3D11Device_QueryInterface failed: 0x%08x", (unsigned)hr);
     }
 
     if (d3d11->dev) {
@@ -128,11 +131,14 @@ d3d11_init_ctx(struct d3d11 *d3d11)
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
-        if (SUCCEEDED(
-                ID3D11DeviceContext_QueryInterface(ctx, versions[i].iid, (void **)&d3d11->ctx))) {
+        HRESULT hr =
+            ID3D11DeviceContext_QueryInterface(ctx, versions[i].iid, (void **)&d3d11->ctx);
+        if (SUCCEEDED(hr)) {
             d3d11->ctx_version = versions[i].version;
             break;
         }
+        if (hr != E_NOINTERFACE)
+            d3d11_die("ID3D11DeviceContext_QueryInterface failed: 0x%08x", (unsigned)hr);
     }
 
     if (d3d11->ctx) {

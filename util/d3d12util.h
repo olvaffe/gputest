@@ -120,12 +120,15 @@ d3d12_init_dev(struct d3d12 *d3d12)
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
-        if (SUCCEEDED(d3d12->CreateDevice((IUnknown *)d3d12->params.adapter,
-                                          d3d12->params.feature_level, versions[i].iid,
-                                          (void **)&d3d12->dev))) {
+        HRESULT hr =
+            d3d12->CreateDevice((IUnknown *)d3d12->params.adapter, d3d12->params.feature_level,
+                                versions[i].iid, (void **)&d3d12->dev);
+        if (SUCCEEDED(hr)) {
             d3d12->dev_version = versions[i].version;
             break;
         }
+        if (hr != E_NOINTERFACE)
+            d3d12_die("D3D12CreateDevice failed: 0x%08x", (unsigned)hr);
     }
 
     if (!d3d12->dev)

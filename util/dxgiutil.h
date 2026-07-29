@@ -86,11 +86,14 @@ dxgi_init_factory(struct dxgi *dxgi)
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
-        if (SUCCEEDED(dxgi->CreateDXGIFactory2(dxgi->params.flags, versions[i].iid,
-                                               (void **)&dxgi->factory))) {
+        HRESULT hr = dxgi->CreateDXGIFactory2(dxgi->params.flags, versions[i].iid,
+                                              (void **)&dxgi->factory);
+        if (SUCCEEDED(hr)) {
             dxgi->factory_version = versions[i].version;
             break;
         }
+        if (hr != E_NOINTERFACE)
+            dxgi_die("CreateDXGIFactory2 failed: 0x%08x", (unsigned)hr);
     }
 
     if (!dxgi->factory)
@@ -115,11 +118,14 @@ dxgi_init_adapter(struct dxgi *dxgi)
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
-        if (SUCCEEDED(IDXGIAdapter1_QueryInterface(adapter1, versions[i].iid,
-                                                   (void **)&dxgi->adapter))) {
+        HRESULT hr =
+            IDXGIAdapter1_QueryInterface(adapter1, versions[i].iid, (void **)&dxgi->adapter);
+        if (SUCCEEDED(hr)) {
             dxgi->adapter_version = versions[i].version;
             break;
         }
+        if (hr != E_NOINTERFACE)
+            dxgi_die("IDXGIAdapter1_QueryInterface failed: 0x%08x", (unsigned)hr);
     }
 
     if (dxgi->adapter) {
