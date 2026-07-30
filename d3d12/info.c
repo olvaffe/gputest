@@ -10,14 +10,14 @@ info_general(struct d3d12 *d3d12)
 {
     d3d12_log("ID3D12Device%u:", d3d12->dev_version);
 
-    const UINT node_count = ID3D12Device_GetNodeCount(d3d12->dev);
-    const LUID luid = ID3D12Device_GetAdapterLuid(d3d12->dev);
+    const UINT node_count = ID3D12Device14_GetNodeCount(d3d12->dev);
+    const LUID luid = ID3D12Device14_GetAdapterLuid(d3d12->dev);
 
     d3d12_log("  Node Count: %u", node_count);
     d3d12_log("  Adapter LUID: %08x:%08x", (unsigned)luid.HighPart, (unsigned)luid.LowPart);
 
     void *ext = NULL;
-    d3d12->result = ID3D12Device_QueryInterface(d3d12->dev, &IID_ID3D12DeviceExt, &ext);
+    d3d12->result = ID3D12Device14_QueryInterface(d3d12->dev, &IID_ID3D12DeviceExt, &ext);
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("  Implementation: VKD3D-Proton (ID3D12DeviceExt supported)");
         IUnknown_Release((IUnknown *)ext);
@@ -42,7 +42,7 @@ info_heap_properties(struct d3d12 *d3d12)
     d3d12_log("Custom Heap Properties:");
     for (size_t i = 0; i < ARRAY_SIZE(heap_types); i++) {
         const D3D12_HEAP_PROPERTIES props =
-            ID3D12Device_GetCustomHeapProperties(d3d12->dev, 0, heap_types[i].type);
+            ID3D12Device14_GetCustomHeapProperties(d3d12->dev, 0, heap_types[i].type);
 
         const char *cpu_page;
         switch (props.CPUPageProperty) {
@@ -81,14 +81,14 @@ info_heap_properties(struct d3d12 *d3d12)
 static void
 info_descriptor_sizes(struct d3d12 *d3d12)
 {
-    const UINT cbv_srv_uav = ID3D12Device_GetDescriptorHandleIncrementSize(
+    const UINT cbv_srv_uav = ID3D12Device14_GetDescriptorHandleIncrementSize(
         d3d12->dev, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    const UINT sampler = ID3D12Device_GetDescriptorHandleIncrementSize(
+    const UINT sampler = ID3D12Device14_GetDescriptorHandleIncrementSize(
         d3d12->dev, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
-    const UINT rtv =
-        ID3D12Device_GetDescriptorHandleIncrementSize(d3d12->dev, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-    const UINT dsv =
-        ID3D12Device_GetDescriptorHandleIncrementSize(d3d12->dev, D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+    const UINT rtv = ID3D12Device14_GetDescriptorHandleIncrementSize(
+        d3d12->dev, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    const UINT dsv = ID3D12Device14_GetDescriptorHandleIncrementSize(
+        d3d12->dev, D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
     d3d12_log("Descriptor Handle Increment Sizes:");
     d3d12_log("  CBV_SRV_UAV: %u bytes", cbv_srv_uav);
@@ -101,12 +101,12 @@ static void
 info_feat_architecture(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_ARCHITECTURE1 arch = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_ARCHITECTURE1,
-                                                     &arch, sizeof(arch));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_ARCHITECTURE1,
+                                                       &arch, sizeof(arch));
     if (FAILED(d3d12->result)) {
         D3D12_FEATURE_DATA_ARCHITECTURE arch0 = { 0 };
-        d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_ARCHITECTURE,
-                                                         &arch0, sizeof(arch0));
+        d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_ARCHITECTURE,
+                                                           &arch0, sizeof(arch0));
         if (SUCCEEDED(d3d12->result)) {
             arch.TileBasedRenderer = arch0.TileBasedRenderer;
             arch.UMA = arch0.UMA;
@@ -134,8 +134,8 @@ info_feat_feature_levels(struct d3d12 *d3d12)
         .NumFeatureLevels = ARRAY_SIZE(levels),
         .pFeatureLevelsRequested = levels,
     };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_FEATURE_LEVELS,
-                                                     &data, sizeof(data));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_FEATURE_LEVELS,
+                                                       &data, sizeof(data));
     d3d12_check(d3d12, "CheckFeatureSupport FEATURE_LEVELS");
 
     const char *str;
@@ -167,7 +167,7 @@ static void
 info_feat_gpu_virtual_address_support(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_GPU_VIRTUAL_ADDRESS_SUPPORT data = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_GPU_VIRTUAL_ADDRESS_SUPPORT, &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("GPU Virtual Address Support:");
@@ -188,8 +188,8 @@ info_feat_shader_model(struct d3d12 *d3d12)
     };
     for (size_t i = 0; i < ARRAY_SIZE(models); i++) {
         D3D12_FEATURE_DATA_SHADER_MODEL data = { .HighestShaderModel = models[i] };
-        d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_SHADER_MODEL,
-                                                         &data, sizeof(data));
+        d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_SHADER_MODEL,
+                                                           &data, sizeof(data));
         if (SUCCEEDED(d3d12->result)) {
             d3d12_log("Highest Shader Model: 0x%x", data.HighestShaderModel);
             break;
@@ -201,8 +201,8 @@ static void
 info_feat_root_signature(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_ROOT_SIGNATURE data = { .HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_ROOT_SIGNATURE,
-                                                     &data, sizeof(data));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_ROOT_SIGNATURE,
+                                                       &data, sizeof(data));
     if (FAILED(d3d12->result)) {
         data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
     }
@@ -215,8 +215,8 @@ static void
 info_feat_shader_cache(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_SHADER_CACHE data = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_SHADER_CACHE,
-                                                     &data, sizeof(data));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_SHADER_CACHE,
+                                                       &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("Shader Cache Support Flags: 0x%x", data.SupportFlags);
     }
@@ -226,8 +226,8 @@ static void
 info_feat_existing_heaps(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_EXISTING_HEAPS data = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_EXISTING_HEAPS,
-                                                     &data, sizeof(data));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_EXISTING_HEAPS,
+                                                       &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("Existing Heaps Supported: %d", data.Supported);
     }
@@ -237,8 +237,8 @@ static void
 info_feat_serialization(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_SERIALIZATION data = { .NodeIndex = 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_SERIALIZATION,
-                                                     &data, sizeof(data));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_SERIALIZATION,
+                                                       &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("Heap Serialization Tier: %d", data.HeapSerializationTier);
     }
@@ -248,8 +248,8 @@ static void
 info_feat_cross_node(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_CROSS_NODE data = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_CROSS_NODE, &data,
-                                                     sizeof(data));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_CROSS_NODE,
+                                                       &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("Cross Node:");
         d3d12_log("  SharingTier:               %d", data.SharingTier);
@@ -261,8 +261,8 @@ static void
 info_feat_predication(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_PREDICATION data = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_PREDICATION, &data,
-                                                     sizeof(data));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_PREDICATION,
+                                                       &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("Predication Supported: %d", data.Supported);
     }
@@ -272,8 +272,8 @@ static void
 info_feat_hardware_copy(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_HARDWARE_COPY data = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_HARDWARE_COPY,
-                                                     &data, sizeof(data));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_HARDWARE_COPY,
+                                                       &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("Hardware Copy Supported: %d", data.Supported);
     }
@@ -283,7 +283,7 @@ static void
 info_feat_tight_alignment(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_TIGHT_ALIGNMENT data = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_D3D12_TIGHT_ALIGNMENT, &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("Tight Alignment Tier: %d", data.SupportTier);
@@ -294,7 +294,7 @@ static void
 info_feat_application_specific_driver_state(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_APPLICATION_SPECIFIC_DRIVER_STATE data = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_APPLICATION_SPECIFIC_DRIVER_STATE, &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("Application Specific Driver State Supported: %d", data.Supported);
@@ -305,7 +305,7 @@ static void
 info_feat_bytecode_bypass_hash(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_BYTECODE_BYPASS_HASH_SUPPORTED data = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_BYTECODE_BYPASS_HASH_SUPPORTED, &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("Bytecode Bypass Hash Supported: %d", data.Supported);
@@ -316,7 +316,7 @@ static void
 info_feat_protected_resource_session_support(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_SUPPORT data = { .NodeIndex = 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_PROTECTED_RESOURCE_SESSION_SUPPORT, &data, sizeof(data));
     if (SUCCEEDED(d3d12->result)) {
         d3d12_log("Protected Resource Session Support: 0x%x", data.Support);
@@ -327,109 +327,109 @@ static void
 info_feat_options(struct d3d12 *d3d12)
 {
     D3D12_FEATURE_DATA_D3D12_OPTIONS opts = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS,
-                                                     &opts, sizeof(opts));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS,
+                                                       &opts, sizeof(opts));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS1 opts1 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS1,
-                                                     &opts1, sizeof(opts1));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS1,
+                                                       &opts1, sizeof(opts1));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS1");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS2 opts2 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS2,
-                                                     &opts2, sizeof(opts2));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS2,
+                                                       &opts2, sizeof(opts2));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS2");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS3 opts3 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS3,
-                                                     &opts3, sizeof(opts3));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS3,
+                                                       &opts3, sizeof(opts3));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS3");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS4 opts4 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS4,
-                                                     &opts4, sizeof(opts4));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS4,
+                                                       &opts4, sizeof(opts4));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS4");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS5 opts5 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS5,
-                                                     &opts5, sizeof(opts5));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS5,
+                                                       &opts5, sizeof(opts5));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS5");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS6 opts6 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS6,
-                                                     &opts6, sizeof(opts6));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS6,
+                                                       &opts6, sizeof(opts6));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS6");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS7 opts7 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS7,
-                                                     &opts7, sizeof(opts7));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS7,
+                                                       &opts7, sizeof(opts7));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS7");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS8 opts8 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS8,
-                                                     &opts8, sizeof(opts8));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS8,
+                                                       &opts8, sizeof(opts8));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS8");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS9 opts9 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS9,
-                                                     &opts9, sizeof(opts9));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS9,
+                                                       &opts9, sizeof(opts9));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS9");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS10 opts10 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS10,
-                                                     &opts10, sizeof(opts10));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS10,
+                                                       &opts10, sizeof(opts10));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS10");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS11 opts11 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS11,
-                                                     &opts11, sizeof(opts11));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS11,
+                                                       &opts11, sizeof(opts11));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS11");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS12 opts12 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS12,
-                                                     &opts12, sizeof(opts12));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS12,
+                                                       &opts12, sizeof(opts12));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS12");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS13 opts13 = { 0 };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS13,
-                                                     &opts13, sizeof(opts13));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS13,
+                                                       &opts13, sizeof(opts13));
     d3d12_check(d3d12, "CheckFeatureSupport D3D12_OPTIONS13");
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS14 opts14 = { 0 };
-    const bool has_opts14 = SUCCEEDED(ID3D12Device_CheckFeatureSupport(
+    const bool has_opts14 = SUCCEEDED(ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS14, &opts14, sizeof(opts14)));
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS15 opts15 = { 0 };
-    const bool has_opts15 = SUCCEEDED(ID3D12Device_CheckFeatureSupport(
+    const bool has_opts15 = SUCCEEDED(ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS15, &opts15, sizeof(opts15)));
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS16 opts16 = { 0 };
-    const bool has_opts16 = SUCCEEDED(ID3D12Device_CheckFeatureSupport(
+    const bool has_opts16 = SUCCEEDED(ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS16, &opts16, sizeof(opts16)));
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS17 opts17 = { 0 };
-    const bool has_opts17 = SUCCEEDED(ID3D12Device_CheckFeatureSupport(
+    const bool has_opts17 = SUCCEEDED(ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS17, &opts17, sizeof(opts17)));
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS18 opts18 = { 0 };
-    const bool has_opts18 = SUCCEEDED(ID3D12Device_CheckFeatureSupport(
+    const bool has_opts18 = SUCCEEDED(ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS18, &opts18, sizeof(opts18)));
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS19 opts19 = { 0 };
-    const bool has_opts19 = SUCCEEDED(ID3D12Device_CheckFeatureSupport(
+    const bool has_opts19 = SUCCEEDED(ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS19, &opts19, sizeof(opts19)));
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS20 opts20 = { 0 };
-    const bool has_opts20 = SUCCEEDED(ID3D12Device_CheckFeatureSupport(
+    const bool has_opts20 = SUCCEEDED(ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS20, &opts20, sizeof(opts20)));
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS21 opts21 = { 0 };
-    const bool has_opts21 = SUCCEEDED(ID3D12Device_CheckFeatureSupport(
+    const bool has_opts21 = SUCCEEDED(ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS21, &opts21, sizeof(opts21)));
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS22 opts22 = { 0 };
-    const bool has_opts22 = SUCCEEDED(ID3D12Device_CheckFeatureSupport(
+    const bool has_opts22 = SUCCEEDED(ID3D12Device14_CheckFeatureSupport(
         d3d12->dev, D3D12_FEATURE_D3D12_OPTIONS22, &opts22, sizeof(opts22)));
 
     d3d12_log("D3D12 Options:");

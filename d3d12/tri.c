@@ -50,7 +50,7 @@ tri_test_init_pipeline(struct tri_test *test)
 
     test->pipeline = d3d12_create_pipeline(d3d12);
 
-    const D3D12_ROOT_SIGNATURE_DESC root_sig_desc = {
+    const D3D12_ROOT_SIGNATURE_DESC2 root_sig_desc = {
         .Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
     };
     d3d12_add_pipeline_root_signature(d3d12, test->pipeline, &root_sig_desc);
@@ -66,18 +66,18 @@ tri_test_init_pipeline(struct tri_test *test)
         .AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
         .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
     };
-    test->pipeline->desc.InputLayout.NumElements = 2;
+    test->pipeline->stream.input_layout.NumElements = 2;
 
-    test->pipeline->desc.VS = (D3D12_SHADER_BYTECODE){
+    test->pipeline->stream.vs = (D3D12_SHADER_BYTECODE){
         .pShaderBytecode = tri_test_vs,
         .BytecodeLength = sizeof(tri_test_vs),
     };
-    test->pipeline->desc.PS = (D3D12_SHADER_BYTECODE){
+    test->pipeline->stream.ps = (D3D12_SHADER_BYTECODE){
         .pShaderBytecode = tri_test_ps,
         .BytecodeLength = sizeof(tri_test_ps),
     };
 
-    test->pipeline->desc.RTVFormats[0] = test->format;
+    test->pipeline->stream.rt_formats.RTFormats[0] = test->format;
 
     d3d12_compile_pipeline(d3d12, test->pipeline);
 }
@@ -101,12 +101,12 @@ tri_test_init_rt(struct tri_test *test)
         .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
         .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
     };
-    d3d12->result = ID3D12Device_CreateDescriptorHeap(
+    d3d12->result = ID3D12Device14_CreateDescriptorHeap(
         d3d12->dev, &rtv_heap_desc, &IID_ID3D12DescriptorHeap, (void **)&test->rtv_heap);
     d3d12_check(d3d12, "CreateDescriptorHeap");
 
     test->rtv_handle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(test->rtv_heap);
-    ID3D12Device_CreateRenderTargetView(d3d12->dev, test->rt->img, NULL, test->rtv_handle);
+    ID3D12Device14_CreateRenderTargetView(d3d12->dev, test->rt->img, NULL, test->rtv_handle);
 }
 
 static void
@@ -155,16 +155,16 @@ static void
 tri_test_draw(struct tri_test *test)
 {
     struct d3d12 *d3d12 = &test->d3d12;
-    ID3D12GraphicsCommandList *cmd = d3d12_begin_cmd(d3d12);
+    ID3D12GraphicsCommandList10 *cmd = d3d12_begin_cmd(d3d12);
 
-    ID3D12GraphicsCommandList_ClearRenderTargetView(cmd, test->rtv_handle, test->clear_color, 0,
-                                                    NULL);
+    ID3D12GraphicsCommandList10_ClearRenderTargetView(cmd, test->rtv_handle, test->clear_color, 0,
+                                                      NULL);
 
-    ID3D12GraphicsCommandList_SetPipelineState(cmd, test->pipeline->pipeline);
-    ID3D12GraphicsCommandList_SetGraphicsRootSignature(cmd, test->pipeline->root_signature);
+    ID3D12GraphicsCommandList10_SetPipelineState(cmd, test->pipeline->pipeline);
+    ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmd, test->pipeline->root_signature);
 
-    ID3D12GraphicsCommandList_IASetVertexBuffers(cmd, 0, 1, &test->vbv);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(cmd, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D12GraphicsCommandList10_IASetVertexBuffers(cmd, 0, 1, &test->vbv);
+    ID3D12GraphicsCommandList10_IASetPrimitiveTopology(cmd, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     const D3D12_VIEWPORT vp = {
         .Width = (float)test->width,
@@ -175,12 +175,12 @@ tri_test_draw(struct tri_test *test)
         .right = (LONG)test->width,
         .bottom = (LONG)test->height,
     };
-    ID3D12GraphicsCommandList_RSSetViewports(cmd, 1, &vp);
-    ID3D12GraphicsCommandList_RSSetScissorRects(cmd, 1, &scissor);
+    ID3D12GraphicsCommandList10_RSSetViewports(cmd, 1, &vp);
+    ID3D12GraphicsCommandList10_RSSetScissorRects(cmd, 1, &scissor);
 
-    ID3D12GraphicsCommandList_OMSetRenderTargets(cmd, 1, &test->rtv_handle, FALSE, NULL);
+    ID3D12GraphicsCommandList10_OMSetRenderTargets(cmd, 1, &test->rtv_handle, FALSE, NULL);
 
-    ID3D12GraphicsCommandList_DrawInstanced(cmd, ARRAY_SIZE(tri_test_vertices), 1, 0, 0);
+    ID3D12GraphicsCommandList10_DrawInstanced(cmd, ARRAY_SIZE(tri_test_vertices), 1, 0, 0);
 
     d3d12_end_cmd(d3d12, cmd);
     d3d12_wait(d3d12);

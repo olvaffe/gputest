@@ -61,15 +61,16 @@ tex_test_init_pipeline(struct tex_test *test)
 
     test->pipeline = d3d12_create_pipeline(d3d12);
 
-    const D3D12_DESCRIPTOR_RANGE srv_range = {
+    const D3D12_DESCRIPTOR_RANGE1 srv_range = {
         .RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
         .NumDescriptors = 1,
         .BaseShaderRegister = 0,
         .RegisterSpace = 0,
+        .Flags = D3D12_DESCRIPTOR_RANGE_FLAG_NONE,
         .OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND,
     };
 
-    const D3D12_ROOT_PARAMETER root_param = {
+    const D3D12_ROOT_PARAMETER1 root_param = {
         .ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
         .DescriptorTable = {
             .NumDescriptorRanges = 1,
@@ -78,7 +79,7 @@ tex_test_init_pipeline(struct tex_test *test)
         .ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL,
     };
 
-    const D3D12_STATIC_SAMPLER_DESC static_sampler = {
+    const D3D12_STATIC_SAMPLER_DESC1 static_sampler = {
         .Filter = D3D12_FILTER_MIN_MAG_MIP_POINT,
         .AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
         .AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
@@ -92,9 +93,10 @@ tex_test_init_pipeline(struct tex_test *test)
         .ShaderRegister = 0,
         .RegisterSpace = 0,
         .ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL,
+        .Flags = D3D12_SAMPLER_FLAG_NONE,
     };
 
-    const D3D12_ROOT_SIGNATURE_DESC root_sig_desc = {
+    const D3D12_ROOT_SIGNATURE_DESC2 root_sig_desc = {
         .NumParameters = 1,
         .pParameters = &root_param,
         .NumStaticSamplers = 1,
@@ -115,18 +117,18 @@ tex_test_init_pipeline(struct tex_test *test)
         .AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
         .InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
     };
-    test->pipeline->desc.InputLayout.NumElements = 2;
+    test->pipeline->stream.input_layout.NumElements = 2;
 
-    test->pipeline->desc.VS = (D3D12_SHADER_BYTECODE){
+    test->pipeline->stream.vs = (D3D12_SHADER_BYTECODE){
         .pShaderBytecode = tex_test_vs,
         .BytecodeLength = sizeof(tex_test_vs),
     };
-    test->pipeline->desc.PS = (D3D12_SHADER_BYTECODE){
+    test->pipeline->stream.ps = (D3D12_SHADER_BYTECODE){
         .pShaderBytecode = tex_test_ps,
         .BytecodeLength = sizeof(tex_test_ps),
     };
 
-    test->pipeline->desc.RTVFormats[0] = test->format;
+    test->pipeline->stream.rt_formats.RTFormats[0] = test->format;
 
     d3d12_compile_pipeline(d3d12, test->pipeline);
 }
@@ -145,12 +147,12 @@ tex_test_init_rt(struct tex_test *test)
         .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
         .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
     };
-    d3d12->result = ID3D12Device_CreateDescriptorHeap(
+    d3d12->result = ID3D12Device14_CreateDescriptorHeap(
         d3d12->dev, &rtv_heap_desc, &IID_ID3D12DescriptorHeap, (void **)&test->rtv_heap);
     d3d12_check(d3d12, "CreateDescriptorHeap (RTV)");
 
     test->rtv_handle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(test->rtv_heap);
-    ID3D12Device_CreateRenderTargetView(d3d12->dev, test->rt->img, NULL, test->rtv_handle);
+    ID3D12Device14_CreateRenderTargetView(d3d12->dev, test->rt->img, NULL, test->rtv_handle);
 }
 
 static void
@@ -165,7 +167,7 @@ tex_test_init_tex(struct tex_test *test)
         .Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
         .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
     };
-    d3d12->result = ID3D12Device_CreateDescriptorHeap(
+    d3d12->result = ID3D12Device14_CreateDescriptorHeap(
         d3d12->dev, &srv_heap_desc, &IID_ID3D12DescriptorHeap, (void **)&test->srv_heap);
     d3d12_check(d3d12, "CreateDescriptorHeap (SRV)");
 
@@ -183,7 +185,7 @@ tex_test_init_tex(struct tex_test *test)
             .ResourceMinLODClamp = 0.0f,
         },
     };
-    ID3D12Device_CreateShaderResourceView(d3d12->dev, test->tex->img, &srv_desc, cpu_handle);
+    ID3D12Device14_CreateShaderResourceView(d3d12->dev, test->tex->img, &srv_desc, cpu_handle);
 
     test->srv_handle = ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(test->srv_heap);
 }
@@ -238,15 +240,15 @@ static void
 tex_test_draw(struct tex_test *test)
 {
     struct d3d12 *d3d12 = &test->d3d12;
-    ID3D12GraphicsCommandList *cmd = d3d12_begin_cmd(d3d12);
+    ID3D12GraphicsCommandList10 *cmd = d3d12_begin_cmd(d3d12);
 
-    ID3D12GraphicsCommandList_SetPipelineState(cmd, test->pipeline->pipeline);
-    ID3D12GraphicsCommandList_SetGraphicsRootSignature(cmd, test->pipeline->root_signature);
-    ID3D12GraphicsCommandList_SetDescriptorHeaps(cmd, 1, &test->srv_heap);
-    ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(cmd, 0, test->srv_handle);
+    ID3D12GraphicsCommandList10_SetPipelineState(cmd, test->pipeline->pipeline);
+    ID3D12GraphicsCommandList10_SetGraphicsRootSignature(cmd, test->pipeline->root_signature);
+    ID3D12GraphicsCommandList10_SetDescriptorHeaps(cmd, 1, &test->srv_heap);
+    ID3D12GraphicsCommandList10_SetGraphicsRootDescriptorTable(cmd, 0, test->srv_handle);
 
-    ID3D12GraphicsCommandList_IASetVertexBuffers(cmd, 0, 1, &test->vbv);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(cmd, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList10_IASetVertexBuffers(cmd, 0, 1, &test->vbv);
+    ID3D12GraphicsCommandList10_IASetPrimitiveTopology(cmd, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
     const D3D12_VIEWPORT vp = {
         .Width = (float)test->width,
@@ -257,12 +259,12 @@ tex_test_draw(struct tex_test *test)
         .right = (LONG)test->width,
         .bottom = (LONG)test->height,
     };
-    ID3D12GraphicsCommandList_RSSetViewports(cmd, 1, &vp);
-    ID3D12GraphicsCommandList_RSSetScissorRects(cmd, 1, &scissor);
+    ID3D12GraphicsCommandList10_RSSetViewports(cmd, 1, &vp);
+    ID3D12GraphicsCommandList10_RSSetScissorRects(cmd, 1, &scissor);
 
-    ID3D12GraphicsCommandList_OMSetRenderTargets(cmd, 1, &test->rtv_handle, FALSE, NULL);
+    ID3D12GraphicsCommandList10_OMSetRenderTargets(cmd, 1, &test->rtv_handle, FALSE, NULL);
 
-    ID3D12GraphicsCommandList_DrawInstanced(cmd, ARRAY_SIZE(tex_test_vertices), 1, 0, 0);
+    ID3D12GraphicsCommandList10_DrawInstanced(cmd, ARRAY_SIZE(tex_test_vertices), 1, 0, 0);
 
     d3d12_end_cmd(d3d12, cmd);
     d3d12_wait(d3d12);

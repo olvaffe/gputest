@@ -213,8 +213,8 @@ static void
 formats_test_dump_format(struct d3d12 *d3d12, const struct formats_test_format *fmt)
 {
     D3D12_FEATURE_DATA_FORMAT_SUPPORT support = { .Format = fmt->format };
-    d3d12->result = ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_FORMAT_SUPPORT,
-                                                     &support, sizeof(support));
+    d3d12->result = ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_FORMAT_SUPPORT,
+                                                       &support, sizeof(support));
     if (FAILED(d3d12->result) || (support.Support1 == D3D12_FORMAT_SUPPORT1_NONE &&
                                   support.Support2 == D3D12_FORMAT_SUPPORT2_NONE)) {
         d3d12_log("%s is not supported", fmt->name);
@@ -234,8 +234,8 @@ formats_test_dump_format(struct d3d12 *d3d12, const struct formats_test_format *
     d3d12_log("  Support2: %s", str2);
 
     D3D12_FEATURE_DATA_FORMAT_INFO info = { .Format = fmt->format };
-    if (SUCCEEDED(ID3D12Device_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_FORMAT_INFO, &info,
-                                                   sizeof(info)))) {
+    if (SUCCEEDED(ID3D12Device14_CheckFeatureSupport(d3d12->dev, D3D12_FEATURE_FORMAT_INFO, &info,
+                                                     sizeof(info)))) {
         d3d12_log("  PlaneCount: %u", info.PlaneCount);
     }
 }
