@@ -220,9 +220,9 @@ formats_test_dump_format(struct d3d11 *d3d11, const struct formats_test_format *
     D3D11_FEATURE_DATA_FORMAT_SUPPORT supp1 = { .InFormat = fmt->format };
     D3D11_FEATURE_DATA_FORMAT_SUPPORT2 supp2 = { .InFormat = fmt->format };
 
-    const HRESULT hr1 = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_FORMAT_SUPPORT,
-                                                         &supp1, sizeof(supp1));
-    const HRESULT hr2 = ID3D11Device_CheckFeatureSupport(
+    const HRESULT hr1 = ID3D11Device5_CheckFeatureSupport(
+        d3d11->dev, D3D11_FEATURE_FORMAT_SUPPORT, &supp1, sizeof(supp1));
+    const HRESULT hr2 = ID3D11Device5_CheckFeatureSupport(
         d3d11->dev, D3D11_FEATURE_FORMAT_SUPPORT2, &supp2, sizeof(supp2));
 
     const UINT support1 = SUCCEEDED(hr1) ? supp1.OutFormatSupport : 0;

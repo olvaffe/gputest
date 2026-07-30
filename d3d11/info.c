@@ -112,7 +112,7 @@ info_device(struct d3d11 *d3d11)
 {
     d3d11_log("ID3D11Device%d:", d3d11->dev_version);
 
-    const D3D_FEATURE_LEVEL level = ID3D11Device_GetFeatureLevel(d3d11->dev);
+    const D3D_FEATURE_LEVEL level = ID3D11Device5_GetFeatureLevel(d3d11->dev);
     const char *str;
     switch (level) {
     case D3D_FEATURE_LEVEL_9_1:
@@ -160,8 +160,8 @@ static void
 info_feat_threading(struct d3d11 *d3d11)
 {
     D3D11_FEATURE_DATA_THREADING data = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_THREADING, &data,
-                                                     sizeof(data));
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_THREADING, &data,
+                                                      sizeof(data));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("Threading Support:");
         d3d11_log("  DriverConcurrentCreates: %d", data.DriverConcurrentCreates);
@@ -174,7 +174,7 @@ info_feat_doubles(struct d3d11 *d3d11)
 {
     D3D11_FEATURE_DATA_DOUBLES data = { 0 };
     d3d11->result =
-        ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_DOUBLES, &data, sizeof(data));
+        ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_DOUBLES, &data, sizeof(data));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("Double Precision Ops: %d", data.DoublePrecisionFloatShaderOps);
     }
@@ -184,8 +184,8 @@ static void
 info_feat_architecture(struct d3d11 *d3d11)
 {
     D3D11_FEATURE_DATA_ARCHITECTURE_INFO data = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_ARCHITECTURE_INFO,
-                                                     &data, sizeof(data));
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_ARCHITECTURE_INFO,
+                                                      &data, sizeof(data));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("Architecture:");
         d3d11_log("  TileBasedDeferredRenderer: %d", data.TileBasedDeferredRenderer);
@@ -196,7 +196,7 @@ static void
 info_feat_shader_min_precision(struct d3d11 *d3d11)
 {
     D3D11_FEATURE_DATA_SHADER_MIN_PRECISION_SUPPORT data = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(
         d3d11->dev, D3D11_FEATURE_SHADER_MIN_PRECISION_SUPPORT, &data, sizeof(data));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("Shader Min Precision:");
@@ -210,8 +210,8 @@ static void
 info_feat_marker_support(struct d3d11 *d3d11)
 {
     D3D11_FEATURE_DATA_MARKER_SUPPORT data = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_MARKER_SUPPORT,
-                                                     &data, sizeof(data));
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_MARKER_SUPPORT,
+                                                      &data, sizeof(data));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("Marker Support:        %d", data.Profile);
     }
@@ -221,7 +221,7 @@ static void
 info_feat_gpu_virtual_address_support(struct d3d11 *d3d11)
 {
     D3D11_FEATURE_DATA_GPU_VIRTUAL_ADDRESS_SUPPORT data = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(
         d3d11->dev, D3D11_FEATURE_GPU_VIRTUAL_ADDRESS_SUPPORT, &data, sizeof(data));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("GPU Virtual Address Support:");
@@ -236,8 +236,8 @@ static void
 info_feat_shader_cache(struct d3d11 *d3d11)
 {
     D3D11_FEATURE_DATA_SHADER_CACHE data = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_SHADER_CACHE,
-                                                     &data, sizeof(data));
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_SHADER_CACHE,
+                                                      &data, sizeof(data));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("Shader Cache Support Flags: 0x%x", data.SupportFlags);
     }
@@ -247,8 +247,8 @@ static void
 info_feat_options(struct d3d11 *d3d11)
 {
     D3D11_FEATURE_DATA_D3D11_OPTIONS opts = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS,
-                                                     &opts, sizeof(opts));
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS,
+                                                      &opts, sizeof(opts));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("D3D11 Options:");
         d3d11_log("  OutputMergerLogicOp:                   %d", opts.OutputMergerLogicOp);
@@ -275,8 +275,8 @@ info_feat_options(struct d3d11 *d3d11)
     }
 
     D3D11_FEATURE_DATA_D3D11_OPTIONS1 opts1 = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS1,
-                                                     &opts1, sizeof(opts1));
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS1,
+                                                      &opts1, sizeof(opts1));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("D3D11 Options1:");
         d3d11_log("  TiledResourcesTier:                    %d", opts1.TiledResourcesTier);
@@ -287,8 +287,8 @@ info_feat_options(struct d3d11 *d3d11)
     }
 
     D3D11_FEATURE_DATA_D3D11_OPTIONS2 opts2 = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS2,
-                                                     &opts2, sizeof(opts2));
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS2,
+                                                      &opts2, sizeof(opts2));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("D3D11 Options2:");
         d3d11_log("  PSSpecifiedStencilRefSupported:        %d",
@@ -305,8 +305,8 @@ info_feat_options(struct d3d11 *d3d11)
     }
 
     D3D11_FEATURE_DATA_D3D11_OPTIONS3 opts3 = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS3,
-                                                     &opts3, sizeof(opts3));
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS3,
+                                                      &opts3, sizeof(opts3));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("D3D11 Options3:");
         d3d11_log("  VPAndRTArrayIndexFromAnyShaderFeedingRasterizer: %d",
@@ -314,8 +314,8 @@ info_feat_options(struct d3d11 *d3d11)
     }
 
     D3D11_FEATURE_DATA_D3D11_OPTIONS4 opts4 = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS4,
-                                                     &opts4, sizeof(opts4));
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS4,
+                                                      &opts4, sizeof(opts4));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("D3D11 Options4:");
         d3d11_log("  ExtendedNV12SharedTextureSupported:    %d",
@@ -323,8 +323,8 @@ info_feat_options(struct d3d11 *d3d11)
     }
 
     D3D11_FEATURE_DATA_D3D11_OPTIONS5 opts5 = { 0 };
-    d3d11->result = ID3D11Device_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS5,
-                                                     &opts5, sizeof(opts5));
+    d3d11->result = ID3D11Device5_CheckFeatureSupport(d3d11->dev, D3D11_FEATURE_D3D11_OPTIONS5,
+                                                      &opts5, sizeof(opts5));
     if (SUCCEEDED(d3d11->result)) {
         d3d11_log("D3D11 Options5:");
         d3d11_log("  SharedResourceTier:                    %d", opts5.SharedResourceTier);

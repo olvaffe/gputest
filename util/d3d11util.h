@@ -41,11 +41,11 @@ struct d3d11 {
 
     HRESULT result;
 
-    ID3D11Device *dev;
+    ID3D11Device5 *dev;
     UINT dev_version;
     D3D_FEATURE_LEVEL feature_level;
 
-    ID3D11DeviceContext *ctx;
+    ID3D11DeviceContext4 *ctx;
     UINT ctx_version;
 };
 
@@ -88,8 +88,7 @@ d3d11_init_dev(struct d3d11 *d3d11)
         const GUID *iid;
         UINT version;
     } versions[] = {
-        { &IID_ID3D11Device5, 5 }, { &IID_ID3D11Device4, 4 }, { &IID_ID3D11Device3, 3 },
-        { &IID_ID3D11Device2, 2 }, { &IID_ID3D11Device1, 1 },
+        { &IID_ID3D11Device5, 5 },
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
@@ -101,19 +100,17 @@ d3d11_init_dev(struct d3d11 *d3d11)
         if (hr != E_NOINTERFACE)
             d3d11_die("ID3D11Device_QueryInterface failed: 0x%08x", (unsigned)hr);
     }
+    if (!d3d11->dev)
+        d3d11_die("ID3D11Device5 required");
 
-    if (d3d11->dev) {
-        ID3D11Device_Release(dev);
-    } else {
-        d3d11->dev = dev;
-    }
+    ID3D11Device_Release(dev);
 }
 
 static inline void
 d3d11_init_ctx(struct d3d11 *d3d11)
 {
     ID3D11DeviceContext *ctx = NULL;
-    ID3D11Device_GetImmediateContext(d3d11->dev, &ctx);
+    ID3D11Device5_GetImmediateContext(d3d11->dev, &ctx);
     if (!ctx)
         d3d11_die("GetImmediateContext failed");
 
@@ -122,9 +119,6 @@ d3d11_init_ctx(struct d3d11 *d3d11)
         UINT version;
     } versions[] = {
         { &IID_ID3D11DeviceContext4, 4 },
-        { &IID_ID3D11DeviceContext3, 3 },
-        { &IID_ID3D11DeviceContext2, 2 },
-        { &IID_ID3D11DeviceContext1, 1 },
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
@@ -137,12 +131,10 @@ d3d11_init_ctx(struct d3d11 *d3d11)
         if (hr != E_NOINTERFACE)
             d3d11_die("ID3D11DeviceContext_QueryInterface failed: 0x%08x", (unsigned)hr);
     }
+    if (!d3d11->ctx)
+        d3d11_die("ID3D11DeviceContext4 required");
 
-    if (d3d11->ctx) {
-        ID3D11DeviceContext_Release(ctx);
-    } else {
-        d3d11->ctx = ctx;
-    }
+    ID3D11DeviceContext_Release(ctx);
 }
 
 static inline void
@@ -161,8 +153,8 @@ d3d11_init(struct d3d11 *d3d11, const struct d3d11_init_params *params)
 static inline void
 d3d11_cleanup(struct d3d11 *d3d11)
 {
-    ID3D11DeviceContext_Release(d3d11->ctx);
-    ID3D11Device_Release(d3d11->dev);
+    ID3D11DeviceContext4_Release(d3d11->ctx);
+    ID3D11Device5_Release(d3d11->dev);
 
     dlclose(d3d11->handle);
 }
@@ -211,7 +203,7 @@ d3d11_create_tex_from_ppm(struct d3d11 *d3d11, const void *ppm_data, size_t ppm_
     };
 
     ID3D11Texture2D *tex = NULL;
-    d3d11->result = ID3D11Device_CreateTexture2D(d3d11->dev, &tex_desc, &sub_data, &tex);
+    d3d11->result = ID3D11Device5_CreateTexture2D(d3d11->dev, &tex_desc, &sub_data, &tex);
     d3d11_check(d3d11, "CreateTexture2D (Texture)");
 
     free(rgba_pixels);
@@ -231,20 +223,20 @@ d3d11_dump_image(struct d3d11 *d3d11, ID3D11Texture2D *tex, const char *filename
     desc.MiscFlags = 0;
 
     ID3D11Texture2D *staging = NULL;
-    d3d11->result = ID3D11Device_CreateTexture2D(d3d11->dev, &desc, NULL, &staging);
+    d3d11->result = ID3D11Device5_CreateTexture2D(d3d11->dev, &desc, NULL, &staging);
     d3d11_check(d3d11, "CreateTexture2D (Staging)");
 
-    ID3D11DeviceContext_CopyResource(d3d11->ctx, (ID3D11Resource *)staging,
-                                     (ID3D11Resource *)tex);
+    ID3D11DeviceContext4_CopyResource(d3d11->ctx, (ID3D11Resource *)staging,
+                                      (ID3D11Resource *)tex);
 
     D3D11_MAPPED_SUBRESOURCE mapped;
-    d3d11->result = ID3D11DeviceContext_Map(d3d11->ctx, (ID3D11Resource *)staging, 0,
-                                            D3D11_MAP_READ, 0, &mapped);
+    d3d11->result = ID3D11DeviceContext4_Map(d3d11->ctx, (ID3D11Resource *)staging, 0,
+                                             D3D11_MAP_READ, 0, &mapped);
     d3d11_check(d3d11, "Map Staging Texture");
 
     u_write_ppm(filename, mapped.pData, desc.Width, desc.Height, mapped.RowPitch);
 
-    ID3D11DeviceContext_Unmap(d3d11->ctx, (ID3D11Resource *)staging, 0);
+    ID3D11DeviceContext4_Unmap(d3d11->ctx, (ID3D11Resource *)staging, 0);
     ID3D11Texture2D_Release(staging);
 }
 

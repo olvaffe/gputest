@@ -54,12 +54,12 @@ tri_test_init_pipeline(struct tri_test *test)
 {
     struct d3d11 *d3d11 = &test->d3d11;
 
-    d3d11->result = ID3D11Device_CreateVertexShader(d3d11->dev, tri_test_vs, sizeof(tri_test_vs),
-                                                    NULL, &test->vs);
+    d3d11->result = ID3D11Device5_CreateVertexShader(d3d11->dev, tri_test_vs, sizeof(tri_test_vs),
+                                                     NULL, &test->vs);
     d3d11_check(d3d11, "CreateVertexShader");
 
-    d3d11->result = ID3D11Device_CreatePixelShader(d3d11->dev, tri_test_ps, sizeof(tri_test_ps),
-                                                   NULL, &test->ps);
+    d3d11->result = ID3D11Device5_CreatePixelShader(d3d11->dev, tri_test_ps, sizeof(tri_test_ps),
+                                                    NULL, &test->ps);
     d3d11_check(d3d11, "CreatePixelShader");
 
     const D3D11_INPUT_ELEMENT_DESC input_elements[] = {
@@ -76,8 +76,8 @@ tri_test_init_pipeline(struct tri_test *test)
         },
     };
     d3d11->result =
-        ID3D11Device_CreateInputLayout(d3d11->dev, input_elements, ARRAY_SIZE(input_elements),
-                                       tri_test_vs, sizeof(tri_test_vs), &test->input_layout);
+        ID3D11Device5_CreateInputLayout(d3d11->dev, input_elements, ARRAY_SIZE(input_elements),
+                                        tri_test_vs, sizeof(tri_test_vs), &test->input_layout);
     d3d11_check(d3d11, "CreateInputLayout");
 }
 
@@ -99,11 +99,11 @@ tri_test_init_rt(struct tri_test *test)
         .Usage = D3D11_USAGE_DEFAULT,
         .BindFlags = D3D11_BIND_RENDER_TARGET,
     };
-    d3d11->result = ID3D11Device_CreateTexture2D(d3d11->dev, &desc, NULL, &test->rt);
+    d3d11->result = ID3D11Device5_CreateTexture2D(d3d11->dev, &desc, NULL, &test->rt);
     d3d11_check(d3d11, "CreateTexture2D (RT)");
 
-    d3d11->result = ID3D11Device_CreateRenderTargetView(d3d11->dev, (ID3D11Resource *)test->rt,
-                                                        NULL, &test->rtv);
+    d3d11->result = ID3D11Device5_CreateRenderTargetView(d3d11->dev, (ID3D11Resource *)test->rt,
+                                                         NULL, &test->rtv);
     d3d11_check(d3d11, "CreateRenderTargetView");
 }
 
@@ -121,7 +121,7 @@ tri_test_init_vb(struct tri_test *test)
         .pSysMem = tri_test_vertices,
     };
 
-    d3d11->result = ID3D11Device_CreateBuffer(d3d11->dev, &desc, &sub_data, &test->vb);
+    d3d11->result = ID3D11Device5_CreateBuffer(d3d11->dev, &desc, &sub_data, &test->vb);
     d3d11_check(d3d11, "CreateBuffer (VB)");
 }
 
@@ -157,15 +157,16 @@ tri_test_draw(struct tri_test *test)
 {
     struct d3d11 *d3d11 = &test->d3d11;
 
-    ID3D11DeviceContext_ClearRenderTargetView(d3d11->ctx, test->rtv, test->clear_color);
+    ID3D11DeviceContext4_ClearRenderTargetView(d3d11->ctx, test->rtv, test->clear_color);
 
     const UINT stride = sizeof(tri_test_vertices[0]);
     const UINT offset = 0;
-    ID3D11DeviceContext_IASetVertexBuffers(d3d11->ctx, 0, 1, &test->vb, &stride, &offset);
-    ID3D11DeviceContext_IASetInputLayout(d3d11->ctx, test->input_layout);
-    ID3D11DeviceContext_IASetPrimitiveTopology(d3d11->ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D11DeviceContext4_IASetVertexBuffers(d3d11->ctx, 0, 1, &test->vb, &stride, &offset);
+    ID3D11DeviceContext4_IASetInputLayout(d3d11->ctx, test->input_layout);
+    ID3D11DeviceContext4_IASetPrimitiveTopology(d3d11->ctx,
+                                                D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    ID3D11DeviceContext_VSSetShader(d3d11->ctx, test->vs, NULL, 0);
+    ID3D11DeviceContext4_VSSetShader(d3d11->ctx, test->vs, NULL, 0);
 
     const D3D11_VIEWPORT vp = {
         .TopLeftX = 0.0f,
@@ -175,13 +176,13 @@ tri_test_draw(struct tri_test *test)
         .MinDepth = 0.0f,
         .MaxDepth = 1.0f,
     };
-    ID3D11DeviceContext_RSSetViewports(d3d11->ctx, 1, &vp);
+    ID3D11DeviceContext4_RSSetViewports(d3d11->ctx, 1, &vp);
 
-    ID3D11DeviceContext_PSSetShader(d3d11->ctx, test->ps, NULL, 0);
+    ID3D11DeviceContext4_PSSetShader(d3d11->ctx, test->ps, NULL, 0);
 
-    ID3D11DeviceContext_OMSetRenderTargets(d3d11->ctx, 1, &test->rtv, NULL);
+    ID3D11DeviceContext4_OMSetRenderTargets(d3d11->ctx, 1, &test->rtv, NULL);
 
-    ID3D11DeviceContext_Draw(d3d11->ctx, ARRAY_SIZE(tri_test_vertices), 0);
+    ID3D11DeviceContext4_Draw(d3d11->ctx, ARRAY_SIZE(tri_test_vertices), 0);
 
     d3d11_dump_image(d3d11, test->rt, "rt.ppm");
 }
