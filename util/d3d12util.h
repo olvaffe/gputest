@@ -49,7 +49,14 @@ struct d3d12 {
     UINT64 fence_val;
     int fence_event;
 
-    ID3D12CommandAllocator *cmd_alloc;
+    struct {
+        ID3D12CommandAllocator *cmd_allocs[4];
+        UINT64 fence_vals[4];
+        uint32_t count;
+        uint32_t next;
+
+        ID3D12GraphicsCommandList *cmd;
+    } submit;
 };
 
 struct d3d12_buffer {
@@ -155,10 +162,15 @@ d3d12_init_queue(struct d3d12 *d3d12)
 static inline void
 d3d12_init_cmd(struct d3d12 *d3d12)
 {
-    d3d12->result = ID3D12Device_CreateCommandAllocator(
-        d3d12->dev, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator,
-        (void **)&d3d12->cmd_alloc);
-    d3d12_check(d3d12, "CreateCommandAllocator");
+    d3d12->submit.count = ARRAY_SIZE(d3d12->submit.cmd_allocs);
+    for (size_t i = 0; i < d3d12->submit.count; i++) {
+        d3d12->result = ID3D12Device_CreateCommandAllocator(
+            d3d12->dev, D3D12_COMMAND_LIST_TYPE_DIRECT, &IID_ID3D12CommandAllocator,
+            (void **)&d3d12->submit.cmd_allocs[i]);
+        d3d12_check(d3d12, "CreateCommandAllocator");
+
+        d3d12->submit.fence_vals[i] = d3d12->fence_val;
+    }
 }
 
 static inline void
@@ -178,15 +190,20 @@ d3d12_init(struct d3d12 *d3d12, const struct d3d12_init_params *params)
     d3d12_init_cmd(d3d12);
 }
 
-static inline void
-d3d12_wait(struct d3d12 *d3d12)
+static inline UINT64
+d3d12_signal_fence(struct d3d12 *d3d12)
 {
     const UINT64 v = ++d3d12->fence_val;
     d3d12->result = ID3D12CommandQueue_Signal(d3d12->queue, d3d12->fence, v);
     d3d12_check(d3d12, "Signal");
+    return v;
+}
 
-    if (ID3D12Fence_GetCompletedValue(d3d12->fence) < v) {
-        d3d12->result = ID3D12Fence_SetEventOnCompletion(d3d12->fence, v,
+static inline void
+d3d12_wait_fence_val(struct d3d12 *d3d12, UINT64 val)
+{
+    if (ID3D12Fence_GetCompletedValue(d3d12->fence) < val) {
+        d3d12->result = ID3D12Fence_SetEventOnCompletion(d3d12->fence, val,
                                                          (HANDLE)(intptr_t)d3d12->fence_event);
         d3d12_check(d3d12, "SetEventOnCompletion");
 
@@ -197,11 +214,21 @@ d3d12_wait(struct d3d12 *d3d12)
 }
 
 static inline void
+d3d12_wait(struct d3d12 *d3d12)
+{
+    d3d12_wait_fence_val(d3d12, d3d12->fence_val);
+}
+
+static inline void
 d3d12_cleanup(struct d3d12 *d3d12)
 {
     d3d12_wait(d3d12);
 
-    ID3D12CommandAllocator_Release(d3d12->cmd_alloc);
+    if (d3d12->submit.cmd)
+        ID3D12GraphicsCommandList_Release(d3d12->submit.cmd);
+
+    for (size_t i = 0; i < d3d12->submit.count; i++)
+        ID3D12CommandAllocator_Release(d3d12->submit.cmd_allocs[i]);
 
     close(d3d12->fence_event);
     ID3D12Fence_Release(d3d12->fence);
@@ -215,14 +242,25 @@ d3d12_cleanup(struct d3d12 *d3d12)
 static inline ID3D12GraphicsCommandList *
 d3d12_begin_cmd(struct d3d12 *d3d12)
 {
-    ID3D12GraphicsCommandList *cmd;
+    const uint32_t next = d3d12->submit.next;
 
-    d3d12->result = ID3D12Device_CreateCommandList(d3d12->dev, 0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                                   d3d12->cmd_alloc, NULL,
-                                                   &IID_ID3D12GraphicsCommandList, (void **)&cmd);
-    d3d12_check(d3d12, "CreateCommandList");
+    if (!d3d12->submit.cmd) {
+        d3d12->result = ID3D12Device_CreateCommandList(
+            d3d12->dev, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, d3d12->submit.cmd_allocs[next], NULL,
+            &IID_ID3D12GraphicsCommandList, (void **)&d3d12->submit.cmd);
+        d3d12_check(d3d12, "CreateCommandList");
+    } else {
+        d3d12_wait_fence_val(d3d12, d3d12->submit.fence_vals[next]);
 
-    return cmd;
+        d3d12->result = ID3D12CommandAllocator_Reset(d3d12->submit.cmd_allocs[next]);
+        d3d12_check(d3d12, "Reset CommandAllocator");
+
+        d3d12->result = ID3D12GraphicsCommandList_Reset(d3d12->submit.cmd,
+                                                        d3d12->submit.cmd_allocs[next], NULL);
+        d3d12_check(d3d12, "Reset CommandList");
+    }
+
+    return d3d12->submit.cmd;
 }
 
 static inline void
@@ -232,7 +270,10 @@ d3d12_end_cmd(struct d3d12 *d3d12, ID3D12GraphicsCommandList *cmd)
     d3d12_check(d3d12, "Close");
 
     ID3D12CommandQueue_ExecuteCommandLists(d3d12->queue, 1, (ID3D12CommandList **)&cmd);
-    ID3D12GraphicsCommandList_Release(cmd);
+
+    const uint32_t next = d3d12->submit.next;
+    d3d12->submit.fence_vals[next] = d3d12_signal_fence(d3d12);
+    d3d12->submit.next = (next + 1) % d3d12->submit.count;
 }
 
 static inline struct d3d12_buffer *
