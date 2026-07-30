@@ -139,16 +139,8 @@ struct drm_dumb {
 #define drm_log(format, ...) u_log("DRM", format __VA_OPT__(, ) __VA_ARGS__)
 #define drm_die(format, ...) u_die("DRM", format __VA_OPT__(, ) __VA_ARGS__)
 
-static inline void PRINTFLIKE(2, 3) drm_check(const struct drm *drm, const char *format, ...)
-{
-    if (drm->ret >= 0)
-        return;
-
-    va_list ap;
-    va_start(ap, format);
-    u_diev("DRM", format, ap);
-    va_end(ap);
-}
+#define drm_check(drm, format, ...)                                                              \
+    u_check("DRM", (drm)->ret >= 0, format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 drm_init_devices(struct drm *drm)

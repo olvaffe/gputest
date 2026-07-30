@@ -49,12 +49,9 @@ struct d3d11 {
     UINT ctx_version;
 };
 
-static inline void
-d3d11_check(const struct d3d11 *d3d11, const char *msg)
-{
-    if (FAILED(d3d11->result))
-        d3d11_die("%s failed: 0x%08x", msg, (unsigned)d3d11->result);
-}
+#define d3d11_check(d3d11, msg)                                                                  \
+    u_check("D3D11", SUCCEEDED((d3d11)->result), "%s failed: 0x%08x", msg,                       \
+            (unsigned)(d3d11)->result)
 
 static inline void
 d3d11_init_library(struct d3d11 *d3d11)

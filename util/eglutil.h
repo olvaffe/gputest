@@ -128,13 +128,11 @@ static inline void
 egl_check(struct egl *egl, const char *where)
 {
     const EGLint egl_err = egl->GetError();
-    if (egl_err != EGL_SUCCESS)
-        egl_die("%s: egl has error 0x%04x", where, egl_err);
+    u_check("EGL", egl_err == EGL_SUCCESS, "%s: egl has error 0x%04x", where, egl_err);
 
     if (egl->ctx) {
         const GLenum gl_err = egl->gl.GetError();
-        if (gl_err != GL_NO_ERROR)
-            egl_die("%s: gl has error 0x%04x", where, gl_err);
+        u_check("EGL", gl_err == GL_NO_ERROR, "%s: gl has error 0x%04x", where, gl_err);
     }
 }
 

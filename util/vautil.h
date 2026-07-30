@@ -52,16 +52,8 @@ struct va {
 #define va_log(format, ...) u_log("VA", format __VA_OPT__(, ) __VA_ARGS__)
 #define va_die(format, ...) u_die("VA", format __VA_OPT__(, ) __VA_ARGS__)
 
-static inline void PRINTFLIKE(2, 3) va_check(const struct va *va, const char *format, ...)
-{
-    if (va->status == VA_STATUS_SUCCESS)
-        return;
-
-    va_list ap;
-    va_start(ap, format);
-    u_diev("VA", format, ap);
-    va_end(ap);
-}
+#define va_check(va, format, ...)                                                                \
+    u_check("VA", (va)->status == VA_STATUS_SUCCESS, format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 va_init_display(struct va *va)

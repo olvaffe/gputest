@@ -84,12 +84,9 @@ struct d3d12_pipeline {
     ID3D12PipelineState *pipeline;
 };
 
-static inline void
-d3d12_check(const struct d3d12 *d3d12, const char *msg)
-{
-    if (FAILED(d3d12->result))
-        d3d12_die("%s failed: 0x%08x", msg, (unsigned)d3d12->result);
-}
+#define d3d12_check(d3d12, msg)                                                                  \
+    u_check("D3D12", SUCCEEDED((d3d12)->result), "%s failed: 0x%08x", msg,                       \
+            (unsigned)(d3d12)->result)
 
 static inline void
 d3d12_init_library(struct d3d12 *d3d12)

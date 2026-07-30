@@ -48,12 +48,8 @@ struct dxgi {
     UINT adapter_version;
 };
 
-static inline void
-dxgi_check(const struct dxgi *dxgi, const char *msg)
-{
-    if (FAILED(dxgi->result))
-        dxgi_die("%s failed: 0x%08x", msg, (unsigned)dxgi->result);
-}
+#define dxgi_check(dxgi, msg)                                                                    \
+    u_check("DXGI", SUCCEEDED((dxgi)->result), "%s failed: 0x%08x", msg, (unsigned)(dxgi)->result)
 
 static inline void
 dxgi_init_library(struct dxgi *dxgi)

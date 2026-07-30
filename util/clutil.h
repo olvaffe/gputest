@@ -196,16 +196,8 @@ struct cl_pipeline {
 #define cl_log(format, ...) u_log("CL", format __VA_OPT__(, ) __VA_ARGS__)
 #define cl_die(format, ...) u_die("CL", format __VA_OPT__(, ) __VA_ARGS__)
 
-static inline void PRINTFLIKE(2, 3) cl_check(struct cl *cl, const char *format, ...)
-{
-    if (cl->err == CL_SUCCESS)
-        return;
-
-    va_list ap;
-    va_start(ap, format);
-    u_diev("CL", format, ap);
-    va_end(ap);
-}
+#define cl_check(cl, format, ...)                                                                \
+    u_check("CL", (cl)->err == CL_SUCCESS, format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline const char *
 cl_device_type_to_str(cl_device_type val, char *str, size_t size)

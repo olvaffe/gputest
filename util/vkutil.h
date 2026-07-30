@@ -218,19 +218,13 @@ struct vk_swapchain {
 #define vk_log(format, ...) u_log("VK", format __VA_OPT__(, ) __VA_ARGS__)
 #define vk_die(format, ...) u_die("VK", format __VA_OPT__(, ) __VA_ARGS__)
 
-static inline void PRINTFLIKE(2, 3) vk_check(const struct vk *vk, const char *format, ...)
-{
-    if (vk->result == VK_SUCCESS)
-        return;
-
-    va_list ap;
-    va_start(ap, format);
-    if (vk->result > VK_SUCCESS)
-        u_logv("VK", format, ap);
-    else
-        u_diev("VK", format, ap);
-    va_end(ap);
-}
+#define vk_check(vk, format, ...)                                                                \
+    do {                                                                                         \
+        if ((vk)->result > VK_SUCCESS)                                                           \
+            vk_log(format __VA_OPT__(, ) __VA_ARGS__);                                           \
+        else if ((vk)->result < VK_SUCCESS)                                                      \
+            vk_die(format __VA_OPT__(, ) __VA_ARGS__);                                           \
+    } while (0)
 
 static inline void
 vk_init_params(struct vk *vk, const struct vk_init_params *params)

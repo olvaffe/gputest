@@ -39,6 +39,12 @@
 #define ALIGN(v, a) (((v) + (a) - 1) & ~((a) - 1))
 #define DIV_ROUND_UP(v, d) (((v) + (d) - 1) / (d))
 
+#define u_check(tag, cond, format, ...)                                                          \
+    do {                                                                                         \
+        if (!(cond))                                                                             \
+            u_die(tag, format __VA_OPT__(, ) __VA_ARGS__);                                       \
+    } while (0)
+
 static inline bool
 u_isatty(void)
 {
