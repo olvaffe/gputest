@@ -22,8 +22,8 @@
 
 #define LIBDXVK_D3D11_NAME "libdxvk_d3d11.so"
 
-#define d3d11_log(format, ...) u_log("D3D11", format, ##__VA_ARGS__)
-#define d3d11_die(format, ...) u_die("D3D11", format, ##__VA_ARGS__)
+#define d3d11_log(format, ...) u_log("D3D11", format __VA_OPT__(, ) __VA_ARGS__)
+#define d3d11_die(format, ...) u_die("D3D11", format __VA_OPT__(, ) __VA_ARGS__)
 
 struct d3d11_init_params {
     IDXGIAdapter *adapter;

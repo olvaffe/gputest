@@ -121,21 +121,8 @@ struct egl_stopwatch {
     GLint64 *ts;
 };
 
-static inline void PRINTFLIKE(1, 2) egl_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("EGL", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN egl_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("EGL", format, ap);
-    va_end(ap);
-}
+#define egl_log(format, ...) u_log("EGL", format __VA_OPT__(, ) __VA_ARGS__)
+#define egl_die(format, ...) u_die("EGL", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 egl_check(struct egl *egl, const char *where)

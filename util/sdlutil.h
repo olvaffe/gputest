@@ -26,21 +26,8 @@ struct sdl {
     SDL_GLContext ctx;
 };
 
-static inline void PRINTFLIKE(1, 2) sdl_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("SDL", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN sdl_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("SDL", format, ap);
-    va_end(ap);
-}
+#define sdl_log(format, ...) u_log("SDL", format __VA_OPT__(, ) __VA_ARGS__)
+#define sdl_die(format, ...) u_die("SDL", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 sdl_init_video(struct sdl *sdl)

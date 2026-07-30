@@ -29,21 +29,8 @@ struct dma_heap {
     int fd;
 };
 
-static inline void PRINTFLIKE(1, 2) dma_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("DMA", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN dma_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("DMA", format, ap);
-    va_end(ap);
-}
+#define dma_log(format, ...) u_log("DMA", format __VA_OPT__(, ) __VA_ARGS__)
+#define dma_die(format, ...) u_die("DMA", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 dma_buf_sync(int fd, uint64_t flags)

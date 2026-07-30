@@ -75,21 +75,8 @@ struct wl_swapchain {
     } *images;
 };
 
-static inline void PRINTFLIKE(1, 2) wl_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("WL", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN wl_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("WL", format, ap);
-    va_end(ap);
-}
+#define wl_log(format, ...) u_log("WL", format __VA_OPT__(, ) __VA_ARGS__)
+#define wl_die(format, ...) u_die("WL", format __VA_OPT__(, ) __VA_ARGS__)
 
 static void
 zwp_linux_dmabuf_feedback_v1_event_format_table(void *data,

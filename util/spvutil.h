@@ -48,21 +48,8 @@ struct spv_program {
     struct spv_program_reflection reflection;
 };
 
-static inline void PRINTFLIKE(1, 2) spv_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("SPV", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN spv_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("SPV", format, ap);
-    va_end(ap);
-}
+#define spv_log(format, ...) u_log("SPV", format __VA_OPT__(, ) __VA_ARGS__)
+#define spv_die(format, ...) u_die("SPV", format __VA_OPT__(, ) __VA_ARGS__)
 
 void
 spv_init(struct spv *spv, const struct spv_init_params *params);

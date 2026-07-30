@@ -23,21 +23,8 @@ struct android_ahb {
     AHardwareBuffer_Desc desc;
 };
 
-static inline void PRINTFLIKE(1, 2) android_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("ANDROID", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN android_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("ANDROID", format, ap);
-    va_end(ap);
-}
+#define android_log(format, ...) u_log("ANDROID", format __VA_OPT__(, ) __VA_ARGS__)
+#define android_die(format, ...) u_die("ANDROID", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 android_init(struct android *android, const struct android_init_params *params)

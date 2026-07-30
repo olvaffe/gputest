@@ -27,21 +27,8 @@ struct v4l2 {
     struct v4l2_capability cap;
 };
 
-static inline void PRINTFLIKE(1, 2) v4l2_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("V4L2", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN v4l2_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("V4L2", format, ap);
-    va_end(ap);
-}
+#define v4l2_log(format, ...) u_log("V4L2", format __VA_OPT__(, ) __VA_ARGS__)
+#define v4l2_die(format, ...) u_die("V4L2", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void PRINTFLIKE(2, 3) v4l2_check(struct v4l2 *v4l2, const char *format, ...)
 {

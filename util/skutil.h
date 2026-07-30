@@ -30,21 +30,8 @@ struct sk {
     struct sk_init_params params;
 };
 
-static inline void PRINTFLIKE(1, 2) sk_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("SK", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN sk_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("SK", format, ap);
-    va_end(ap);
-}
+#define sk_log(format, ...) u_log("SK", format __VA_OPT__(, ) __VA_ARGS__)
+#define sk_die(format, ...) u_die("SK", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 sk_init(struct sk *sk, const struct sk_init_params *params)

@@ -50,21 +50,8 @@ struct gbm_bo_info {
     void *map_data;
 };
 
-static inline void PRINTFLIKE(1, 2) gbm_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("GBM", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN gbm_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("GBM", format, ap);
-    va_end(ap);
-}
+#define gbm_log(format, ...) u_log("GBM", format __VA_OPT__(, ) __VA_ARGS__)
+#define gbm_die(format, ...) u_die("GBM", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline const char *
 gbm_flags_to_str(uint32_t val, char *str, size_t size)

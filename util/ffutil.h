@@ -24,21 +24,8 @@ struct ff {
     AVFrame *frame;
 };
 
-static inline void PRINTFLIKE(1, 2) ff_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("FF", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN ff_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("FF", format, ap);
-    va_end(ap);
-}
+#define ff_log(format, ...) u_log("FF", format __VA_OPT__(, ) __VA_ARGS__)
+#define ff_die(format, ...) u_die("FF", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 ff_init_input(struct ff *ff, const char *filename)

@@ -193,21 +193,8 @@ struct cl_pipeline {
     cl_kernel kern;
 };
 
-static inline void PRINTFLIKE(1, 2) cl_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("CL", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN cl_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("CL", format, ap);
-    va_end(ap);
-}
+#define cl_log(format, ...) u_log("CL", format __VA_OPT__(, ) __VA_ARGS__)
+#define cl_die(format, ...) u_die("CL", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void PRINTFLIKE(2, 3) cl_check(struct cl *cl, const char *format, ...)
 {

@@ -215,21 +215,8 @@ struct vk_swapchain {
     uint32_t img_cur;
 };
 
-static inline void PRINTFLIKE(1, 2) vk_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("VK", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN vk_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("VK", format, ap);
-    va_end(ap);
-}
+#define vk_log(format, ...) u_log("VK", format __VA_OPT__(, ) __VA_ARGS__)
+#define vk_die(format, ...) u_die("VK", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void PRINTFLIKE(2, 3) vk_check(const struct vk *vk, const char *format, ...)
 {

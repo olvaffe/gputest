@@ -22,8 +22,8 @@
 
 #define LIBDXVK_DXGI_NAME "libdxvk_dxgi.so"
 
-#define dxgi_log(format, ...) u_log("DXGI", format, ##__VA_ARGS__)
-#define dxgi_die(format, ...) u_die("DXGI", format, ##__VA_ARGS__)
+#define dxgi_log(format, ...) u_log("DXGI", format __VA_OPT__(, ) __VA_ARGS__)
+#define dxgi_die(format, ...) u_die("DXGI", format __VA_OPT__(, ) __VA_ARGS__)
 
 struct dxgi_init_params {
     UINT flags;

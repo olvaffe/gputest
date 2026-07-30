@@ -49,21 +49,8 @@ struct va {
     unsigned int subpic_count;
 };
 
-static inline void PRINTFLIKE(1, 2) va_log(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_logv("VA", format, ap);
-    va_end(ap);
-}
-
-static inline void PRINTFLIKE(1, 2) NORETURN va_die(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    u_diev("VA", format, ap);
-    va_end(ap);
-}
+#define va_log(format, ...) u_log("VA", format __VA_OPT__(, ) __VA_ARGS__)
+#define va_die(format, ...) u_die("VA", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void PRINTFLIKE(2, 3) va_check(const struct va *va, const char *format, ...)
 {
