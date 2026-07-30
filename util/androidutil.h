@@ -10,6 +10,13 @@
 
 #include <android/hardware_buffer.h>
 
+/* Assumes
+ *
+ *   - AHardwareBuffer_lockPlanes (API 29)
+ *   - AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420 (API 29)
+ *   - AHARDWAREBUFFER_FORMAT_YCbCr_P010 (API 29)
+ */
+
 struct android_init_params {
     int unused;
 };
@@ -123,7 +130,6 @@ static const struct {
         .drm_format = 0,
         .is_ycbcr = false,
     },
-#if __ANDROID_API__ >= 29
     /* AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420 is flexible and is not 1:1 */
     {
         .name = "AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420",
@@ -150,7 +156,6 @@ static const struct {
         .drm_format = DRM_FORMAT_P210,
         .is_ycbcr = true,
     },
-#endif
 #endif
     {
         .name = "AHARDWAREBUFFER_FORMAT_R8_UNORM",
@@ -306,25 +311,8 @@ android_map_ahb(struct android *android, struct android_ahb *ahb, AHardwareBuffe
         AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY;
     const ARect rect = { .right = ahb->desc.width, .bottom = ahb->desc.height };
 
-#if __ANDROID_API__ >= 29
     if (AHardwareBuffer_lockPlanes(ahb->ahb, usage, -1, &rect, planes))
         android_die("failed to lock ahb");
-#else
-    void *ptr;
-    if (AHardwareBuffer_lock(ahb->ahb, usage, -1, &rect, &ptr))
-        android_die("failed to lock ahb");
-
-    const uint32_t drm_format = android_ahb_format_to_drm_format(ahb->desc.format);
-    const uint32_t plane_count = u_drm_format_to_plane_count(drm_format);
-    if (plane_count != 1)
-        android_die("failed to lock planar ahb");
-    const uint32_t cpp = u_drm_format_to_cpp(drm_format);
-
-    planes->planeCount = 1;
-    planes->planes[0].data = ptr;
-    planes->planes[0].pixelStride = cpp;
-    planes->planes[0].rowStride = ahb->desc.stride * cpp;
-#endif
 }
 
 static inline void
