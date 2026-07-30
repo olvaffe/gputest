@@ -16,7 +16,11 @@
 #include <CL/cl_ext.h>
 #include <CL/cl_function_types.h>
 
+#ifdef __ANDROID__
+#define LIBOPENCL_NAME "libOpenCL.so"
+#else
 #define LIBOPENCL_NAME "libOpenCL.so.1"
+#endif
 
 struct cl_device {
     cl_device_id id;
