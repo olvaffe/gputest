@@ -14,7 +14,7 @@
 #define LIBRENDERDOC_NAME "librenderdoc.so"
 
 struct rdoc {
-    RENDERDOC_API_1_0_0 *api;
+    RENDERDOC_API_1_7_0 *api;
 };
 
 static inline void
@@ -35,7 +35,7 @@ rdoc_init(struct rdoc *rdoc)
     if (!get_api)
         return;
 
-    if (!get_api(eRENDERDOC_API_Version_1_0_0, (void **)&rdoc->api))
+    if (!get_api(eRENDERDOC_API_Version_1_7_0, (void **)&rdoc->api))
         rdoc->api = NULL;
 }
 
