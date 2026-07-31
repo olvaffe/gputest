@@ -151,6 +151,9 @@ bench_arith_init(struct bench_arith *test)
     cl_init(cl, &params);
     cl_log("device: %s", cl->dev->name);
 
+    if (!strncmp(test->type_name, "half", 4) && !cl->dev->half_fp_config)
+        cl_die("fp16 is not supported");
+
     bench_arith_init_global_work_size(test);
     bench_arith_init_buffer(test);
     bench_arith_init_pipeline(test);

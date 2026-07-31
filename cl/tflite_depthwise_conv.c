@@ -113,6 +113,9 @@ tflite_depthwise_conv_test_init(struct tflite_depthwise_conv_test *test)
     cl_init(cl, &params);
     cl_log("device: %s", cl->dev->name);
 
+    if (!cl->dev->half_fp_config)
+        cl_die("fp16 is not supported");
+
     test->buf = cl_create_buffer(cl, CL_MEM_READ_WRITE, test->buf_size, NULL);
 
     const size_t src_count = test->src_width * test->src_height * test->slice_count;

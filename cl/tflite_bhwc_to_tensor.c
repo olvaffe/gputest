@@ -64,6 +64,9 @@ tflite_bhwc_to_tensor_test_init(struct tflite_bhwc_to_tensor_test *test)
     cl_init(cl, &params);
     cl_log("device: %s", cl->dev->name);
 
+    if (!cl->dev->half_fp_config)
+        cl_die("fp16 is not supported");
+
     const size_t item_count = test->width * test->height * test->slices * test->batches;
     const size_t src_size = item_count * 4 * sizeof(cl_float);
     const size_t dst_size = item_count * 4 * sizeof(cl_half);

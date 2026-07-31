@@ -26,6 +26,9 @@ loop_test_init(struct loop_test *test)
 
     cl_init(cl, NULL);
 
+    if (!cl->dev->half_fp_config)
+        cl_die("fp16 is not supported");
+
     const size_t buf_size = test->buf_width * test->type_size;
     test->dst = cl_create_buffer(cl, CL_MEM_WRITE_ONLY, buf_size, NULL);
     test->pipeline = cl_create_pipeline(cl, loop_test_cs, "loop");
