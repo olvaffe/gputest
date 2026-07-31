@@ -7,7 +7,7 @@
 
 #define VP_DEBUG_MESSAGE_CALLBACK profile_test_log
 #define VP_USE_OBJECT
-#include <vulkan/vulkan_profiles.hpp>
+#include "vkutil_profiles.hpp"
 
 struct profile_test {
     VpProfileProperties profile;
@@ -35,6 +35,7 @@ profile_test_init(struct profile_test *test)
 
     const VpVulkanFunctions funcs = {
         .GetInstanceProcAddr = vk->GetInstanceProcAddr,
+        .GetDeviceProcAddr = vk->GetDeviceProcAddr,
         .EnumerateInstanceVersion = vk->EnumerateInstanceVersion,
         .EnumerateInstanceExtensionProperties = vk->EnumerateInstanceExtensionProperties,
         .EnumerateDeviceExtensionProperties = vk->EnumerateDeviceExtensionProperties,
@@ -50,7 +51,8 @@ profile_test_init(struct profile_test *test)
         .pVulkanFunctions = &funcs,
 
     };
-    vpCreateCapabilities(&info, NULL, &test->caps);
+    vk->result = vpCreateCapabilities(&info, NULL, &test->caps);
+    vk_check(vk, "failed to create caps");
 }
 
 static void
@@ -117,25 +119,49 @@ static void
 profile_test_parse_args(struct profile_test *test, int argc, char **argv)
 {
     const char *name = argc == 2 ? argv[1] : NULL;
-    const detail::VpProfileDesc *desc = name ? detail::vpGetProfileDesc(name) : NULL;
-    if (!desc) {
+
+    uint32_t count = 0;
+    if (vpGetProfiles(VK_NULL_HANDLE, &count, NULL) != VK_SUCCESS)
+        vk_die("failed to get profile count");
+
+    VpProfileProperties *profiles = (VpProfileProperties *)malloc(sizeof(*profiles) * count);
+    if (!profiles)
+        vk_die("failed to alloc profiles");
+
+    if (vpGetProfiles(VK_NULL_HANDLE, &count, profiles) != VK_SUCCESS)
+        vk_die("failed to get profiles");
+
+    bool found = false;
+    if (name) {
+        for (uint32_t i = 0; i < count; i++) {
+            const VpProfileProperties *profile = &profiles[i];
+            if (!strcmp(profile->profileName, name)) {
+                test->profile = *profile;
+                found = true;
+                break;
+            }
+        }
+    }
+    if (!found) {
         if (name) {
-            vk_log("unsupported profile %s", name);
+            vk_log("unrecognized profile %s", name);
             vk_log(NULL);
         }
+
         vk_log("usage: %s <profile>", argv[0]);
         vk_log(NULL);
-        vk_log("supported profiles:");
-        for (uint32_t i = 0; i < detail::profileCount; i++) {
-            const detail::VpProfileDesc *desc = &detail::profiles[i];
-            vk_log("  %s", desc->props.profileName);
+        vk_log("recognized profiles:");
+        for (uint32_t i = 0; i < count; i++) {
+            const VpProfileProperties *profile = &profiles[i];
+            vk_log("  %s", profile->profileName);
         }
 
         exit(name ? -1 : 0);
     }
 
-    test->profile = desc->props;
-    test->api_version = desc->minApiVersion;
+    free(profiles);
+
+    test->api_version = vpGetProfileAPIVersion(VK_NULL_HANDLE, &test->profile);
 }
 
 int
