@@ -107,7 +107,15 @@ jpegdec_test_dump(struct jpegdec_test *test, const char *filename)
     struct va *va = &test->va;
     VAImage img;
 
-    va_create_image(va, file->sof0.X, file->sof0.Y, VA_FOURCC_NV12, &img);
+    unsigned int pix_format = VA_FOURCC_NV12;
+    if (file->sof0.Nf == 3 &&
+        file->sof0.Hi[0] == 1 && file->sof0.Vi[0] == 1 &&
+        file->sof0.Hi[1] == 1 && file->sof0.Vi[1] == 1 &&
+        file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
+        pix_format = VA_FOURCC_444P;
+    }
+
+    va_create_image(va, file->sof0.X, file->sof0.Y, pix_format, &img);
     va_get_image(va, test->surface, file->sof0.X, file->sof0.Y, img.image_id);
     va_save_image(va, &img, filename);
     va_destroy_image(va, img.image_id);
@@ -132,10 +140,37 @@ jpegdec_test_decode(struct jpegdec_test *test)
 static void
 jpegdec_test_prepare(struct jpegdec_test *test)
 {
-    const unsigned int rt_format = VA_RT_FORMAT_YUV420;
-    const unsigned int pix_format = VA_FOURCC_NV12;
     const struct jpegdec_test_file *file = &test->file;
     struct va *va = &test->va;
+
+    unsigned int rt_format = VA_RT_FORMAT_YUV420;
+    unsigned int pix_format = VA_FOURCC_NV12;
+
+    if (file->sof0.Nf == 1) {
+        rt_format = VA_RT_FORMAT_YUV400;
+        pix_format = VA_FOURCC_NV12;
+    } else if (file->sof0.Nf == 3) {
+        if (file->sof0.Hi[0] == 1 && file->sof0.Vi[0] == 1 &&
+            file->sof0.Hi[1] == 1 && file->sof0.Vi[1] == 1 &&
+            file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
+            rt_format = VA_RT_FORMAT_YUV444;
+            pix_format = VA_FOURCC_444P;
+        } else if (file->sof0.Hi[0] == 2 && file->sof0.Vi[0] == 1 &&
+                   file->sof0.Hi[1] == 1 && file->sof0.Vi[1] == 1 &&
+                   file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
+            rt_format = VA_RT_FORMAT_YUV422;
+            pix_format = VA_FOURCC_NV12;
+        } else if (file->sof0.Hi[0] == 2 && file->sof0.Vi[0] == 2 &&
+                   file->sof0.Hi[1] == 1 && file->sof0.Vi[1] == 1 &&
+                   file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
+            rt_format = VA_RT_FORMAT_YUV420;
+            pix_format = VA_FOURCC_NV12;
+        } else {
+            va_die("unsupported subsampling");
+        }
+    } else {
+        va_die("unsupported component count");
+    }
 
     VAPictureParameterBufferJPEGBaseline pic_param = {
         .picture_width = file->sof0.X,
@@ -192,8 +227,17 @@ jpegdec_test_prepare(struct jpegdec_test *test)
     }
     slice_param.restart_interval = file->dri.Ri;
 
-    const int mcu_cols = (file->sof0.X + file->sof0.Hi[0] * 8 - 1) / (file->sof0.Hi[0] * 8);
-    const int mcu_rows = (file->sof0.Y + file->sof0.Vi[0] * 8 - 1) / (file->sof0.Vi[0] * 8);
+    int max_h = file->sof0.Hi[0];
+    int max_v = file->sof0.Vi[0];
+    for (int i = 1; i < file->sof0.Nf; i++) {
+        if (file->sof0.Hi[i] > max_h)
+            max_h = file->sof0.Hi[i];
+        if (file->sof0.Vi[i] > max_v)
+            max_v = file->sof0.Vi[i];
+    }
+
+    const int mcu_cols = (file->sof0.X + max_h * 8 - 1) / (max_h * 8);
+    const int mcu_rows = (file->sof0.Y + max_v * 8 - 1) / (max_v * 8);
     slice_param.num_mcus = mcu_cols * mcu_rows;
 
     test->config = va_create_config(va, test->profile, test->entrypoint, rt_format);

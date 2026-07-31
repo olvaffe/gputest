@@ -369,27 +369,51 @@ va_get_image(
 static inline void
 va_save_image(struct va *va, const VAImage *img, const char *filename)
 {
-    if (img->format.fourcc != VA_FOURCC_NV12)
-        va_die("only VA_FOURCC_NV12 is supported");
+    if (img->format.fourcc != VA_FOURCC_NV12 &&
+        img->format.fourcc != VA_FOURCC_444P &&
+        img->format.fourcc != VA_FOURCC_AYUV)
+        va_die("unsupported fourcc 0x%08x", img->format.fourcc);
 
     void *ptr = va_map_buffer(va, img->buf);
 
-    FILE *fp = fopen(filename, "w");
+    FILE *fp = fopen(filename, "wb");
     if (!fp)
         va_die("failed to open %s", filename);
 
-    fprintf(fp, "P6 %u %u %u\n", img->width, img->height, 255);
+    fprintf(fp, "P6 %u %u 255\n", img->width, img->height);
     for (uint32_t y = 0; y < img->height; y++) {
         for (uint32_t x = 0; x < img->width; x++) {
-            const uint8_t *yy = ptr + img->offsets[0] + img->pitches[0] * y + x;
-            const uint8_t *uv = ptr + img->offsets[1] + img->pitches[1] * (y / 2) + (x & ~1);
+            int yuv[3];
 
-            const int yuv[3] = { (int)*yy, (int)uv[0] - 128, (int)uv[1] - 128 };
-            const int rgb[3] = { yuv[0] + 1.402000f * yuv[2],
-                                 yuv[0] - 0.344136f * yuv[1] - 0.714136f * yuv[2],
-                                 yuv[0] + 1.772000f * yuv[1] };
-#define CLAMP(v) v > 255 ? 255 : v < 0 ? 0 : v
-            const char bytes[3] = { CLAMP(rgb[0]), CLAMP(rgb[1]), CLAMP(rgb[2]) };
+            if (img->format.fourcc == VA_FOURCC_NV12) {
+                const uint8_t *yy = (const uint8_t *)ptr + img->offsets[0] + img->pitches[0] * y + x;
+                const uint8_t *uv = (const uint8_t *)ptr + img->offsets[1] + img->pitches[1] * (y / 2) + (x & ~1);
+
+                yuv[0] = (int)*yy;
+                yuv[1] = (int)uv[0] - 128;
+                yuv[2] = (int)uv[1] - 128;
+            } else if (img->format.fourcc == VA_FOURCC_444P) {
+                const uint8_t *yy = (const uint8_t *)ptr + img->offsets[0] + img->pitches[0] * y + x;
+                const uint8_t *uu = (const uint8_t *)ptr + img->offsets[1] + img->pitches[1] * y + x;
+                const uint8_t *vv = (const uint8_t *)ptr + img->offsets[2] + img->pitches[2] * y + x;
+
+                yuv[0] = (int)*yy;
+                yuv[1] = (int)*uu - 128;
+                yuv[2] = (int)*vv - 128;
+            } else { /* VA_FOURCC_AYUV */
+                const uint8_t *px = (const uint8_t *)ptr + img->offsets[0] + img->pitches[0] * y + 4 * x;
+
+                yuv[0] = (int)px[2]; /* Y */
+                yuv[1] = (int)px[1] - 128; /* U */
+                yuv[2] = (int)px[0] - 128; /* V */
+            }
+
+            const float r = (float)yuv[0] + 1.402000f * (float)yuv[2];
+            const float g = (float)yuv[0] - 0.344136f * (float)yuv[1] - 0.714136f * (float)yuv[2];
+            const float b = (float)yuv[0] + 1.772000f * (float)yuv[1];
+
+#define CLAMP(v) ((v) > 255.0f ? 255 : ((v) < 0.0f ? 0 : (uint8_t)(v)))
+            const uint8_t bytes[3] = { CLAMP(r), CLAMP(g), CLAMP(b) };
 #undef CLAMP
             if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
                 va_die("failed to write pixel (%u, %u)", x, y);
