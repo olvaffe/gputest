@@ -232,10 +232,18 @@ jpegdec_test_parse_file_sos(struct jpegdec_test *test)
     const unsigned char *stream = file->sos.segment + 4;
 
     file->sos.Ns = stream[0];
+    if (file->sos.Ns > (int)ARRAY_SIZE(file->sos.Csj))
+        va_die("too many sos components");
+
     for (int i = 0; i < file->sos.Ns; i++) {
         file->sos.Csj[i] = stream[1 + 2 * i];
         file->sos.Tdj[i] = stream[1 + 2 * i + 1] >> 4;
         file->sos.Taj[i] = stream[1 + 2 * i + 1] & 0xf;
+
+        if (file->sos.Tdj[i] >= 2)
+            va_die("invalid Tdj");
+        if (file->sos.Taj[i] >= 2)
+            va_die("invalid Taj");
     }
 }
 
@@ -261,6 +269,10 @@ jpegdec_test_parse_file_dht(struct jpegdec_test *test)
             file->dht.Tc[count] = stream[0] >> 4;
             file->dht.Th[count] = stream[0] & 0xf;
             file->dht.Li[count] = &stream[1];
+            if (file->dht.Tc[count] > 1)
+                va_die("invalid dht Tc");
+            if (file->dht.Th[count] >= 2)
+                va_die("invalid dht Th");
 
             if (stream + 1 + 16 > end)
                 va_die("invalid dht");
@@ -271,6 +283,10 @@ jpegdec_test_parse_file_dht(struct jpegdec_test *test)
 
             file->dht.Vij[count] = &stream[0];
             file->dht.Vij_sizes[count] = sum;
+            if (file->dht.Tc[count] == 0 && sum > 12)
+                va_die("too many dc huffman values");
+            if (file->dht.Tc[count] == 1 && sum > 162)
+                va_die("too many ac huffman values");
 
             stream += sum;
             if (stream > end)
@@ -291,11 +307,19 @@ jpegdec_test_parse_file_sof0(struct jpegdec_test *test)
     file->sof0.Y = segment_param_be16(&stream[1]);
     file->sof0.X = segment_param_be16(&stream[3]);
     file->sof0.Nf = stream[5];
+    if (file->sof0.Nf > (int)ARRAY_SIZE(file->sof0.Ci))
+        va_die("too many sof components");
+
     for (int i = 0; i < file->sof0.Nf; i++) {
         file->sof0.Ci[i] = stream[6 + 3 * i];
         file->sof0.Hi[i] = stream[6 + 3 * i + 1] >> 4;
         file->sof0.Vi[i] = stream[6 + 3 * i + 1] & 0xf;
         file->sof0.Tqi[i] = stream[6 + 3 * i + 2];
+
+        if (file->sof0.Hi[i] == 0 || file->sof0.Vi[i] == 0)
+            va_die("invalid sampling factor");
+        if (file->sof0.Tqi[i] >= 4)
+            va_die("invalid Tqi");
     }
 }
 
@@ -321,6 +345,10 @@ jpegdec_test_parse_file_dqt(struct jpegdec_test *test)
             file->dqt.Pq[count] = stream[0] >> 4;
             file->dqt.Tq[count] = stream[0] & 0xf;
             file->dqt.Qk[count] = &stream[1];
+            if (file->dqt.Pq[count] > 1)
+                va_die("invalid dqt Pq");
+            if (file->dqt.Tq[count] >= 4)
+                va_die("invalid dqt Tq");
 
             stream += 1 + 64 * (1 + file->dqt.Pq[count]);
             if (stream > end)
@@ -384,6 +412,8 @@ jpegdec_test_parse_file_segments(struct jpegdec_test *test)
             /* duplicated segments */
             if (*dst) {
                 if (dst == &file->dqt.segments[0] || dst == &file->dht.segments[0]) {
+                    static_assert(
+                        ARRAY_SIZE(file->dqt.segments) == ARRAY_SIZE(file->dht.segments), "");
                     for (size_t i = 1; i < ARRAY_SIZE(file->dqt.segments); i++) {
                         if (!dst[i]) {
                             dst = &dst[i];
