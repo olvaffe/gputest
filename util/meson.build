@@ -87,10 +87,10 @@ endif
 util_summary += {'gbmutil': idep_gbmutil}
 
 idep_sdlutil = dep_not_found
-if dep_sdl2.found()
+if dep_sdl3.found()
   idep_sdlutil = declare_dependency(
     sources: ['sdlutil.h'],
-    dependencies: [idep_util, dep_sdl2],
+    dependencies: [idep_util, dep_sdl3],
   )
 endif
 util_summary += {'sdlutil': idep_sdlutil}

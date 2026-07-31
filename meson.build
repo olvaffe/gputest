@@ -67,7 +67,7 @@ dep_libavutil = dependency('libavutil', required: false)
 dep_gbm = dependency('gbm', required: false)
 
 # for sdlutil
-dep_sdl2 = dependency('sdl2', required: false)
+dep_sdl3 = dependency('sdl3', required: false)
 
 # for skutil
 dep_skia = dep_not_found

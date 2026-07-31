@@ -3,10 +3,13 @@
  * SPDX-License-Identifier: MIT
  */
 
+#ifndef SDLUTIL_H
+#define SDLUTIL_H
+
 #include "util.h"
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_vulkan.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
 
 struct sdl_init_params {
     bool gl;
@@ -15,7 +18,7 @@ struct sdl_init_params {
 
     int width;
     int height;
-    uint32_t flags;
+    SDL_WindowFlags flags;
 };
 
 struct sdl {
@@ -34,7 +37,7 @@ sdl_init_video(struct sdl *sdl)
 {
     SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "1");
 
-    if (SDL_Init(SDL_INIT_VIDEO))
+    if (!SDL_Init(SDL_INIT_VIDEO))
         sdl_die("failed to init sdl video: %s", SDL_GetError());
 
     if (sdl->params.gl) {
@@ -47,25 +50,28 @@ sdl_init_video(struct sdl *sdl)
     }
 
     if (sdl->params.vk && sdl->params.libvulkan_path) {
-        if (SDL_Vulkan_LoadLibrary(sdl->params.libvulkan_path))
-            sdl_die("failed to load vulkan into sdl");
+        if (!SDL_Vulkan_LoadLibrary(sdl->params.libvulkan_path))
+            sdl_die("failed to load vulkan into sdl: %s", SDL_GetError());
     }
 }
 
 static inline void
 sdl_init_window(struct sdl *sdl)
 {
-    sdl->win = SDL_CreateWindow("sdlutil", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                sdl->params.width, sdl->params.height, sdl->params.flags);
+    sdl->win =
+        SDL_CreateWindow("sdlutil", sdl->params.width, sdl->params.height, sdl->params.flags);
     if (!sdl->win)
-        sdl_die("failed to create win");
+        sdl_die("failed to create win: %s", SDL_GetError());
 }
 
 static inline void
 sdl_init_context(struct sdl *sdl)
 {
-    if (sdl->params.gl)
+    if (sdl->params.gl) {
         sdl->ctx = SDL_GL_CreateContext(sdl->win);
+        if (!sdl->ctx)
+            sdl_die("failed to create gl context: %s", SDL_GetError());
+    }
 }
 
 static inline void
@@ -82,7 +88,7 @@ static inline void
 sdl_cleanup(struct sdl *sdl)
 {
     if (sdl->params.gl)
-        SDL_GL_DeleteContext(sdl->ctx);
+        SDL_GL_DestroyContext(sdl->ctx);
 
     SDL_DestroyWindow(sdl->win);
 
@@ -93,48 +99,6 @@ sdl_cleanup(struct sdl *sdl)
 }
 
 static inline void
-sdl_log_event_windowevent(const SDL_Event *ev)
-{
-    switch (ev->window.event) {
-#define CASE(ty)                                                                                 \
-    case ty:                                                                                     \
-        sdl_log("  " #ty);                                                                       \
-        break
-        CASE(SDL_WINDOWEVENT_SHOWN);
-        CASE(SDL_WINDOWEVENT_HIDDEN);
-        CASE(SDL_WINDOWEVENT_EXPOSED);
-        CASE(SDL_WINDOWEVENT_MOVED);
-        CASE(SDL_WINDOWEVENT_RESIZED);
-        CASE(SDL_WINDOWEVENT_SIZE_CHANGED);
-        CASE(SDL_WINDOWEVENT_MINIMIZED);
-        CASE(SDL_WINDOWEVENT_MAXIMIZED);
-        CASE(SDL_WINDOWEVENT_RESTORED);
-        CASE(SDL_WINDOWEVENT_ENTER);
-        CASE(SDL_WINDOWEVENT_LEAVE);
-        CASE(SDL_WINDOWEVENT_FOCUS_GAINED);
-        CASE(SDL_WINDOWEVENT_FOCUS_LOST);
-        CASE(SDL_WINDOWEVENT_CLOSE);
-        CASE(SDL_WINDOWEVENT_TAKE_FOCUS);
-        CASE(SDL_WINDOWEVENT_HIT_TEST);
-        CASE(SDL_WINDOWEVENT_ICCPROF_CHANGED);
-        CASE(SDL_WINDOWEVENT_DISPLAY_CHANGED);
-#undef CASE
-    default:
-        sdl_log("unknown windowe vent 0x%x", ev->window.event);
-        break;
-    }
-
-    switch (ev->window.event) {
-    case SDL_WINDOWEVENT_RESIZED:
-    case SDL_WINDOWEVENT_SIZE_CHANGED:
-        sdl_log("  data1 %d data2 %d", ev->window.data1, ev->window.data2);
-        break;
-    default:
-        break;
-    }
-}
-
-static inline void
 sdl_log_event(const SDL_Event *ev)
 {
     switch (ev->type) {
@@ -142,74 +106,58 @@ sdl_log_event(const SDL_Event *ev)
     case ty:                                                                                     \
         sdl_log(#ty);                                                                            \
         break
-        CASE(SDL_QUIT);
-        CASE(SDL_APP_TERMINATING);
-        CASE(SDL_APP_LOWMEMORY);
-        CASE(SDL_APP_WILLENTERBACKGROUND);
-        CASE(SDL_APP_DIDENTERBACKGROUND);
-        CASE(SDL_APP_WILLENTERFOREGROUND);
-        CASE(SDL_APP_DIDENTERFOREGROUND);
-        CASE(SDL_LOCALECHANGED);
-        CASE(SDL_DISPLAYEVENT);
-        CASE(SDL_WINDOWEVENT);
-        CASE(SDL_SYSWMEVENT);
-        CASE(SDL_KEYDOWN);
-        CASE(SDL_KEYUP);
-        CASE(SDL_TEXTEDITING);
-        CASE(SDL_TEXTINPUT);
-        CASE(SDL_KEYMAPCHANGED);
-        CASE(SDL_TEXTEDITING_EXT);
-        CASE(SDL_MOUSEMOTION);
-        CASE(SDL_MOUSEBUTTONDOWN);
-        CASE(SDL_MOUSEBUTTONUP);
-        CASE(SDL_MOUSEWHEEL);
-        CASE(SDL_JOYAXISMOTION);
-        CASE(SDL_JOYBALLMOTION);
-        CASE(SDL_JOYHATMOTION);
-        CASE(SDL_JOYBUTTONDOWN);
-        CASE(SDL_JOYBUTTONUP);
-        CASE(SDL_JOYDEVICEADDED);
-        CASE(SDL_JOYDEVICEREMOVED);
-        CASE(SDL_JOYBATTERYUPDATED);
-        CASE(SDL_CONTROLLERAXISMOTION);
-        CASE(SDL_CONTROLLERBUTTONDOWN);
-        CASE(SDL_CONTROLLERBUTTONUP);
-        CASE(SDL_CONTROLLERDEVICEADDED);
-        CASE(SDL_CONTROLLERDEVICEREMOVED);
-        CASE(SDL_CONTROLLERDEVICEREMAPPED);
-        CASE(SDL_CONTROLLERTOUCHPADDOWN);
-        CASE(SDL_CONTROLLERTOUCHPADMOTION);
-        CASE(SDL_CONTROLLERTOUCHPADUP);
-        CASE(SDL_CONTROLLERSENSORUPDATE);
-        CASE(SDL_FINGERDOWN);
-        CASE(SDL_FINGERUP);
-        CASE(SDL_FINGERMOTION);
-        CASE(SDL_DOLLARGESTURE);
-        CASE(SDL_DOLLARRECORD);
-        CASE(SDL_MULTIGESTURE);
-        CASE(SDL_CLIPBOARDUPDATE);
-        CASE(SDL_DROPFILE);
-        CASE(SDL_DROPTEXT);
-        CASE(SDL_DROPBEGIN);
-        CASE(SDL_DROPCOMPLETE);
-        CASE(SDL_AUDIODEVICEADDED);
-        CASE(SDL_AUDIODEVICEREMOVED);
-        CASE(SDL_SENSORUPDATE);
-        CASE(SDL_RENDER_TARGETS_RESET);
-        CASE(SDL_RENDER_DEVICE_RESET);
-        CASE(SDL_POLLSENTINEL);
-        CASE(SDL_USEREVENT);
+        /* application events */
+        CASE(SDL_EVENT_QUIT);
+        CASE(SDL_EVENT_TERMINATING);
+        /* window events */
+        CASE(SDL_EVENT_WINDOW_SHOWN);
+        CASE(SDL_EVENT_WINDOW_HIDDEN);
+        CASE(SDL_EVENT_WINDOW_EXPOSED);
+        CASE(SDL_EVENT_WINDOW_MOVED);
+        CASE(SDL_EVENT_WINDOW_RESIZED);
+        CASE(SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED);
+        CASE(SDL_EVENT_WINDOW_METAL_VIEW_RESIZED);
+        CASE(SDL_EVENT_WINDOW_MINIMIZED);
+        CASE(SDL_EVENT_WINDOW_MAXIMIZED);
+        CASE(SDL_EVENT_WINDOW_RESTORED);
+        CASE(SDL_EVENT_WINDOW_MOUSE_ENTER);
+        CASE(SDL_EVENT_WINDOW_MOUSE_LEAVE);
+        CASE(SDL_EVENT_WINDOW_FOCUS_GAINED);
+        CASE(SDL_EVENT_WINDOW_FOCUS_LOST);
+        CASE(SDL_EVENT_WINDOW_CLOSE_REQUESTED);
+        CASE(SDL_EVENT_WINDOW_HIT_TEST);
+        CASE(SDL_EVENT_WINDOW_ICCPROF_CHANGED);
+        CASE(SDL_EVENT_WINDOW_DISPLAY_CHANGED);
+        CASE(SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED);
+        CASE(SDL_EVENT_WINDOW_SAFE_AREA_CHANGED);
+        CASE(SDL_EVENT_WINDOW_OCCLUDED);
+        CASE(SDL_EVENT_WINDOW_ENTER_FULLSCREEN);
+        CASE(SDL_EVENT_WINDOW_LEAVE_FULLSCREEN);
+        CASE(SDL_EVENT_WINDOW_DESTROYED);
+        CASE(SDL_EVENT_WINDOW_HDR_STATE_CHANGED);
+        /* keyboard events */
+        CASE(SDL_EVENT_KEY_DOWN);
+        CASE(SDL_EVENT_KEY_UP);
+        /* mouse events */
+        CASE(SDL_EVENT_MOUSE_MOTION);
+        CASE(SDL_EVENT_MOUSE_BUTTON_DOWN);
+        CASE(SDL_EVENT_MOUSE_BUTTON_UP);
+        CASE(SDL_EVENT_MOUSE_WHEEL);
 #undef CASE
     default:
-        sdl_log("unknown event 0x%x", ev->type);
+        sdl_log("unknown event 0x%" PRIx32, ev->type);
         break;
     }
 
     switch (ev->type) {
-    case SDL_WINDOWEVENT:
-        sdl_log_event_windowevent(ev);
+    case SDL_EVENT_WINDOW_MOVED:
+    case SDL_EVENT_WINDOW_RESIZED:
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        sdl_log("  data1 %" PRId32 " data2 %" PRId32, ev->window.data1, ev->window.data2);
         break;
     default:
         break;
     }
 }
+
+#endif /* SDLUTIL_H */

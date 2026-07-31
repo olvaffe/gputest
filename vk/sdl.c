@@ -16,7 +16,7 @@ enum win_op {
 struct sdl_test {
     uint32_t win_width;
     uint32_t win_height;
-    uint32_t win_flags;
+    SDL_WindowFlags win_flags;
 
     struct sdl sdl;
     struct vk vk;
@@ -44,9 +44,9 @@ sdl_test_init(struct sdl_test *test)
     };
     sdl_init(sdl, &sdl_params);
 
-    const char *wsi_exts[8];
-    uint32_t wsi_ext_count = ARRAY_SIZE(wsi_exts);
-    if (!SDL_Vulkan_GetInstanceExtensions(sdl->win, &wsi_ext_count, wsi_exts))
+    uint32_t wsi_ext_count = 0;
+    const char *const *wsi_exts = SDL_Vulkan_GetInstanceExtensions(&wsi_ext_count);
+    if (!wsi_exts)
         vk_die("failed to get wsi exts");
 
     const char *dev_exts[] = {
@@ -61,7 +61,7 @@ sdl_test_init(struct sdl_test *test)
     };
     vk_init(vk, &params);
 
-    if (!SDL_Vulkan_CreateSurface(sdl->win, vk->instance, &test->surf))
+    if (!SDL_Vulkan_CreateSurface(sdl->win, vk->instance, NULL, &test->surf))
         vk_die("failed to create surface");
 }
 
@@ -133,37 +133,31 @@ sdl_test_wait_events(struct sdl_test *test)
 {
     struct sdl *sdl = &test->sdl;
     SDL_Event ev;
-    int timeout = -1;
+    int32_t timeout = -1;
     while (SDL_WaitEventTimeout(&ev, timeout)) {
         timeout = 0;
 
         switch (ev.type) {
-        case SDL_QUIT:
+        case SDL_EVENT_QUIT:
             test->quit = true;
             break;
-        case SDL_WINDOWEVENT:
+        case SDL_EVENT_WINDOW_SHOWN:
+        case SDL_EVENT_WINDOW_EXPOSED:
             sdl_log_event(&ev);
-            switch (ev.window.event) {
-            case SDL_WINDOWEVENT_SHOWN:
-            case SDL_WINDOWEVENT_EXPOSED:
-                test->redraw = true;
-                break;
-            default:
-                break;
-            }
+            test->redraw = true;
             break;
-        case SDL_KEYUP:
-            switch (ev.key.keysym.sym) {
-            case SDLK_f:
+        case SDL_EVENT_KEY_UP:
+            switch (ev.key.key) {
+            case SDLK_F:
                 test->win_op = WIN_OP_TOGGLE_FULLSCREEN;
                 break;
-            case SDLK_m:
-                if (ev.key.keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT))
+            case SDLK_M:
+                if (ev.key.mod & SDL_KMOD_SHIFT)
                     test->win_op = WIN_OP_TOGGLE_MAXIMIZED;
                 else
                     test->win_op = WIN_OP_TOGGLE_MINIMIZED;
                 break;
-            case SDLK_q:
+            case SDLK_Q:
             case SDLK_ESCAPE:
                 test->quit = true;
                 break;
@@ -213,8 +207,9 @@ sdl_test_redraw_window(struct sdl_test *test)
     if (!surf)
         vk_die("no window surface");
 
-    const uint32_t color = SDL_MapRGB(surf->format, 0xff, 0x80, 0x80);
-    SDL_FillRect(surf, NULL, color);
+    const SDL_PixelFormatDetails *details = SDL_GetPixelFormatDetails(surf->format);
+    const uint32_t color = SDL_MapRGB(details, NULL, 0xff, 0x80, 0x80);
+    SDL_FillSurfaceRect(surf, NULL, color);
     SDL_UpdateWindowSurface(sdl->win);
 #else
     struct vk_image *img;
@@ -260,9 +255,7 @@ sdl_test_configure_window(struct sdl_test *test)
             SDL_MaximizeWindow(sdl->win);
         break;
     case WIN_OP_TOGGLE_FULLSCREEN:
-        SDL_SetWindowFullscreen(sdl->win, test->win_flags & SDL_WINDOW_FULLSCREEN
-                                              ? 0
-                                              : SDL_WINDOW_FULLSCREEN_DESKTOP);
+        SDL_SetWindowFullscreen(sdl->win, !(test->win_flags & SDL_WINDOW_FULLSCREEN));
         break;
     default:
         break;

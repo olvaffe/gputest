@@ -9,7 +9,7 @@
 struct sdl_test {
     uint32_t width;
     uint32_t height;
-    uint32_t win_flags;
+    SDL_WindowFlags win_flags;
 
     struct sdl sdl;
 
@@ -60,25 +60,25 @@ sdl_test_draw(struct sdl_test *test)
         bool toggle_maximize = false;
 
         switch (ev.type) {
-        case SDL_QUIT:
+        case SDL_EVENT_QUIT:
             quit = true;
             break;
-        case SDL_WINDOWEVENT:
-            redraw = ev.window.event == SDL_WINDOWEVENT_SHOWN ||
-                     ev.window.event == SDL_WINDOWEVENT_EXPOSED;
+        case SDL_EVENT_WINDOW_SHOWN:
+        case SDL_EVENT_WINDOW_EXPOSED:
+            redraw = true;
             break;
-        case SDL_KEYUP:
-            switch (ev.key.keysym.sym) {
-            case SDLK_f:
+        case SDL_EVENT_KEY_UP:
+            switch (ev.key.key) {
+            case SDLK_F:
                 toggle_fullscreen = true;
                 break;
-            case SDLK_m:
-                if (ev.key.keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT))
+            case SDLK_M:
+                if (ev.key.mod & SDL_KMOD_SHIFT)
                     toggle_maximize = true;
                 else
                     toggle_minimize = true;
                 break;
-            case SDLK_q:
+            case SDLK_Q:
                 quit = true;
                 break;
             default:
@@ -93,14 +93,12 @@ sdl_test_draw(struct sdl_test *test)
             break;
 
         if (toggle_fullscreen) {
-            const uint32_t win_flags = SDL_GetWindowFlags(sdl->win);
-            const uint32_t fs_flags =
-                win_flags & SDL_WINDOW_FULLSCREEN ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP;
-            SDL_SetWindowFullscreen(sdl->win, fs_flags);
+            const SDL_WindowFlags win_flags = SDL_GetWindowFlags(sdl->win);
+            SDL_SetWindowFullscreen(sdl->win, !(win_flags & SDL_WINDOW_FULLSCREEN));
         }
 
         if (toggle_minimize) {
-            const uint32_t win_flags = SDL_GetWindowFlags(sdl->win);
+            const SDL_WindowFlags win_flags = SDL_GetWindowFlags(sdl->win);
             if (win_flags & SDL_WINDOW_MINIMIZED)
                 SDL_RestoreWindow(sdl->win);
             else
@@ -108,7 +106,7 @@ sdl_test_draw(struct sdl_test *test)
         }
 
         if (toggle_maximize) {
-            const uint32_t win_flags = SDL_GetWindowFlags(sdl->win);
+            const SDL_WindowFlags win_flags = SDL_GetWindowFlags(sdl->win);
             if (win_flags & SDL_WINDOW_MAXIMIZED)
                 SDL_RestoreWindow(sdl->win);
             else
@@ -118,8 +116,9 @@ sdl_test_draw(struct sdl_test *test)
         if (redraw) {
 #if 0
             SDL_Surface *surf = SDL_GetWindowSurface(sdl->win);
-            const uint32_t color = SDL_MapRGB(surf->format, 0xff, 0x80, 0x80);
-            SDL_FillRect(surf, NULL, color);
+            const SDL_PixelFormatDetails *details = SDL_GetPixelFormatDetails(surf->format);
+            const uint32_t color = SDL_MapRGB(details, NULL, 0xff, 0x80, 0x80);
+            SDL_FillSurfaceRect(surf, NULL, color);
             SDL_UpdateWindowSurface(sdl->win);
 #else
             test->ClearColor(1.0f, 0.5f, 0.5f, 1.0f);
