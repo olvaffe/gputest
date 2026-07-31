@@ -286,7 +286,8 @@ u_convert_format(const struct u_format_conversion *conv)
             for (uint32_t y = 0; y < conv->height; y++) {
                 const uint8_t *src =
                     (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
-                uint8_t *dst = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+                uint8_t *dst =
+                    (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
                 for (uint32_t x = 0; x < conv->width; x++) {
                     memcpy(dst, src, 3);
                     dst[3] = 0xff;
@@ -304,10 +305,11 @@ u_convert_format(const struct u_format_conversion *conv)
             for (uint32_t y = 0; y < conv->height; y++) {
                 const uint8_t *src =
                     (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
-                uint8_t *dst_y = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
-                uint8_t *dst_uv =
-                    (y & 1) ? NULL
-                            : (uint8_t *)conv->dst_plane_ptrs[1] + conv->dst_plane_strides[1] * y / 2;
+                uint8_t *dst_y =
+                    (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+                uint8_t *dst_uv = (y & 1) ? NULL
+                                          : (uint8_t *)conv->dst_plane_ptrs[1] +
+                                                conv->dst_plane_strides[1] * y / 2;
 
                 for (uint32_t x = 0; x < conv->width; x++) {
                     uint8_t yuv[3];
@@ -344,9 +346,10 @@ u_convert_format(const struct u_format_conversion *conv)
             for (uint32_t y = 0; y < conv->height; y++) {
                 const uint8_t *src_y =
                     (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
-                const uint8_t *src_uv =
-                    (const uint8_t *)conv->src_plane_ptrs[1] + conv->src_plane_strides[1] * (y / 2);
-                uint8_t *dst = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+                const uint8_t *src_uv = (const uint8_t *)conv->src_plane_ptrs[1] +
+                                        conv->src_plane_strides[1] * (y / 2);
+                uint8_t *dst =
+                    (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
 
                 for (uint32_t x = 0; x < conv->width; x++) {
                     const uint32_t uv_x = (x & ~1);
@@ -367,7 +370,8 @@ u_convert_format(const struct u_format_conversion *conv)
                     (const uint8_t *)conv->src_plane_ptrs[1] + conv->src_plane_strides[1] * y;
                 const uint8_t *src_v =
                     (const uint8_t *)conv->src_plane_ptrs[2] + conv->src_plane_strides[2] * y;
-                uint8_t *dst = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+                uint8_t *dst =
+                    (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
 
                 for (uint32_t x = 0; x < conv->width; x++) {
                     u_yuv_to_rgb(src_y[x], src_u[x], src_v[x], dst + 3 * x);
@@ -382,7 +386,8 @@ u_convert_format(const struct u_format_conversion *conv)
             for (uint32_t y = 0; y < conv->height; y++) {
                 const uint8_t *src_px =
                     (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
-                uint8_t *dst = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+                uint8_t *dst =
+                    (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
 
                 for (uint32_t x = 0; x < conv->width; x++) {
                     const uint8_t *px = src_px + 4 * x;

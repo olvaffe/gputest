@@ -108,10 +108,9 @@ jpegdec_test_dump(struct jpegdec_test *test, const char *filename)
     VAImage img;
 
     unsigned int pix_format = VA_FOURCC_NV12;
-    if (file->sof0.Nf == 3 &&
-        file->sof0.Hi[0] == 1 && file->sof0.Vi[0] == 1 &&
-        file->sof0.Hi[1] == 1 && file->sof0.Vi[1] == 1 &&
-        file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
+    if (file->sof0.Nf == 3 && file->sof0.Hi[0] == 1 && file->sof0.Vi[0] == 1 &&
+        file->sof0.Hi[1] == 1 && file->sof0.Vi[1] == 1 && file->sof0.Hi[2] == 1 &&
+        file->sof0.Vi[2] == 1) {
         pix_format = VA_FOURCC_444P;
     }
 
@@ -150,19 +149,16 @@ jpegdec_test_prepare(struct jpegdec_test *test)
         rt_format = VA_RT_FORMAT_YUV400;
         pix_format = VA_FOURCC_NV12;
     } else if (file->sof0.Nf == 3) {
-        if (file->sof0.Hi[0] == 1 && file->sof0.Vi[0] == 1 &&
-            file->sof0.Hi[1] == 1 && file->sof0.Vi[1] == 1 &&
-            file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
+        if (file->sof0.Hi[0] == 1 && file->sof0.Vi[0] == 1 && file->sof0.Hi[1] == 1 &&
+            file->sof0.Vi[1] == 1 && file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
             rt_format = VA_RT_FORMAT_YUV444;
             pix_format = VA_FOURCC_444P;
-        } else if (file->sof0.Hi[0] == 2 && file->sof0.Vi[0] == 1 &&
-                   file->sof0.Hi[1] == 1 && file->sof0.Vi[1] == 1 &&
-                   file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
+        } else if (file->sof0.Hi[0] == 2 && file->sof0.Vi[0] == 1 && file->sof0.Hi[1] == 1 &&
+                   file->sof0.Vi[1] == 1 && file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
             rt_format = VA_RT_FORMAT_YUV422;
             pix_format = VA_FOURCC_NV12;
-        } else if (file->sof0.Hi[0] == 2 && file->sof0.Vi[0] == 2 &&
-                   file->sof0.Hi[1] == 1 && file->sof0.Vi[1] == 1 &&
-                   file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
+        } else if (file->sof0.Hi[0] == 2 && file->sof0.Vi[0] == 2 && file->sof0.Hi[1] == 1 &&
+                   file->sof0.Vi[1] == 1 && file->sof0.Hi[2] == 1 && file->sof0.Vi[2] == 1) {
             rt_format = VA_RT_FORMAT_YUV420;
             pix_format = VA_FOURCC_NV12;
         } else {
