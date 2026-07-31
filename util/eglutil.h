@@ -518,7 +518,8 @@ egl_teximage_2d_from_ppm(struct egl *egl, GLenum target, const void *ppm_data, s
         }
     }
 
-    gl->TexImage2D(target, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texels);
+    gl->TexStorage2D(target, 1, GL_RGBA8, width, height);
+    gl->TexSubImage2D(target, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, texels);
 
     free(texels);
 }
