@@ -167,7 +167,7 @@ endif
 util_summary += {'vautil': idep_vautil}
 
 idep_vkutil = declare_dependency(
-  sources: ['vkutil.h'],
+  sources: ['vkutil.h', 'vkutil_allocator.h', 'vkutil_profiles.hpp'],
   dependencies: [idep_util, dep_dl],
 )
 util_summary += {'vkutil': idep_vkutil}
