@@ -180,33 +180,40 @@ ff_receive_frame(struct ff *ff)
 static inline bool
 ff_decode_frame(struct ff *ff)
 {
-    if (ff_receive_frame(ff))
-        return true;
+    bool input_eof = false;
 
-    while (true) {
+    while (!ff_receive_frame(ff)) {
         int ret;
 
-        ret = av_read_frame(ff->input_ctx, ff->packet);
-        if (ret < 0) {
-            /* flush */
-            avcodec_send_packet(ff->codec_ctx, NULL);
-            break;
+        if (!ff->packet->data) {
+            if (input_eof)
+                return false;
+
+            ret = av_read_frame(ff->input_ctx, ff->packet);
+            if (ret < 0) {
+                input_eof = true;
+                /* flush */
+                avcodec_send_packet(ff->codec_ctx, NULL);
+                continue;
+            }
         }
 
-        if (ff->packet->stream_index != ff->stream_idx)
+        if (ff->packet->stream_index != ff->stream_idx) {
+            av_packet_unref(ff->packet);
             continue;
+        }
 
         ret = avcodec_send_packet(ff->codec_ctx, ff->packet);
-        if (ret < 0)
+        if (ret < 0) {
+            if (ret == AVERROR(EAGAIN))
+                continue;
             ff_die("failed to send packet");
+        }
 
         av_packet_unref(ff->packet);
-
-        if (ff_receive_frame(ff))
-            return true;
     }
 
-    return ff_receive_frame(ff);
+    return true;
 }
 
 static inline VASurfaceID
