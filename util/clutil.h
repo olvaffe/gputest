@@ -486,14 +486,24 @@ cl_init_platforms(struct cl *cl)
     }
 }
 
-static inline void
-cl_get_device_info(struct cl *cl, cl_device_id plat, cl_device_info param, void *buf, size_t size)
+static inline bool
+cl_get_device_info_optional(
+    struct cl *cl, cl_device_id plat, cl_device_info param, void *buf, size_t size)
 {
     size_t real_size;
     cl->err = cl->GetDeviceInfo(plat, param, size, buf, &real_size);
-    cl_check(cl, "failed to get device info");
+    if (cl->err != CL_SUCCESS)
+        return false;
     if (size != real_size)
         cl_die("bad device info size");
+    return true;
+}
+
+static inline void
+cl_get_device_info(struct cl *cl, cl_device_id plat, cl_device_info param, void *buf, size_t size)
+{
+    if (!cl_get_device_info_optional(cl, plat, param, buf, size))
+        cl_die("failed to get device info");
 }
 
 static inline void *
@@ -659,8 +669,8 @@ cl_init_devices(struct cl *cl, uint32_t idx)
                            sizeof(dev->single_fp_config));
         cl_get_device_info(cl, dev->id, CL_DEVICE_DOUBLE_FP_CONFIG, &dev->double_fp_config,
                            sizeof(dev->double_fp_config));
-        cl_get_device_info(cl, dev->id, CL_DEVICE_HALF_FP_CONFIG, &dev->double_fp_config,
-                           sizeof(dev->half_fp_config));
+        cl_get_device_info_optional(cl, dev->id, CL_DEVICE_HALF_FP_CONFIG, &dev->half_fp_config,
+                                    sizeof(dev->half_fp_config));
         cl_get_device_info(cl, dev->id, CL_DEVICE_GLOBAL_MEM_CACHE_TYPE,
                            &dev->global_mem_cache_type, sizeof(dev->global_mem_cache_type));
         cl_get_device_info(cl, dev->id, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE,
