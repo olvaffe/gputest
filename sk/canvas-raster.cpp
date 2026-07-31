@@ -37,10 +37,10 @@ canvas_raster_test_draw(struct canvas_raster_test *test)
     struct sk *sk = &test->sk;
 
     SkCanvas *canvas = test->surf->getCanvas();
-    canvas->clear(SK_ColorWHITE);
+    canvas->clear(SkColors::kWhite);
 
     SkPaint paint;
-    paint.setColor(SK_ColorRED);
+    paint.setColor4f(SkColors::kRed);
     paint.setAntiAlias(true);
     canvas->drawCircle(test->width / 2, test->height / 2, 30, paint);
 

@@ -6,9 +6,10 @@
 #ifndef SKUTIL_H
 #define SKUTIL_H
 
-#include "include/codec/SkPngDecoder.h"
 #include "include/core/SkBitmap.h"
 #include "include/core/SkCanvas.h"
+#include "include/core/SkData.h"
+#include "include/core/SkImage.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkSurface.h"
 #include "include/encode/SkPngEncoder.h"
@@ -63,8 +64,6 @@ sk_create_surface_raster(struct sk *sk, uint32_t width, uint32_t height)
     return surf;
 }
 
-
-
 static inline sk_sp<GrDirectContext>
 sk_create_context_ganesh_vk(struct sk *sk, const skgpu::VulkanBackendContext &backend)
 {
@@ -99,7 +98,8 @@ sk_dump_surface(struct sk *sk, sk_sp<SkSurface> surf, const char *filename)
     SkPixmap pixmap;
     if (!surf->peekPixels(&pixmap)) {
         bitmap.allocPixels(surf->imageInfo());
-        surf->readPixels(bitmap.pixmap(), 0, 0);
+        if (!surf->readPixels(bitmap.pixmap(), 0, 0))
+            sk_die("failed to read pixels from surface");
         pixmap = bitmap.pixmap();
     }
 
@@ -110,13 +110,15 @@ sk_dump_surface(struct sk *sk, sk_sp<SkSurface> surf, const char *filename)
 static inline sk_sp<SkImage>
 sk_load_png(struct sk *sk, const char *filename)
 {
-    std::unique_ptr<SkFILEStream> reader = SkFILEStream::Make(filename);
-    if (!reader)
-        sk_die("failed to open %s", filename);
+    sk_sp<SkData> data = SkData::MakeFromFileName(filename);
+    if (!data)
+        sk_die("failed to read %s", filename);
 
-    std::unique_ptr<SkCodec> codec = SkPngDecoder::Decode(std::move(reader), NULL);
+    sk_sp<SkImage> img = SkImages::DeferredFromEncodedData(std::move(data));
+    if (!img)
+        sk_die("failed to decode png %s", filename);
 
-    return std::get<0>(codec->getImage());
+    return img;
 }
 
 #endif /* SKUTIL_H */

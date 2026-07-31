@@ -23,7 +23,8 @@ canvas_svg_test_init_canvas(struct canvas_svg_test *test)
         sk_die("failed to open file");
 
     const SkRect bounds = SkRect::MakeIWH(test->width, test->height);
-    test->canvas = SkSVGCanvas::Make(bounds, test->writer.get());
+    SkSVGCanvas::Options options;
+    test->canvas = SkSVGCanvas::Make(bounds, test->writer.get(), options);
 }
 
 static void
@@ -49,10 +50,10 @@ static void
 canvas_svg_test_draw(struct canvas_svg_test *test)
 {
     SkCanvas *canvas = test->canvas.get();
-    canvas->clear(SK_ColorWHITE);
+    canvas->clear(SkColors::kWhite);
 
     SkPaint paint;
-    paint.setColor(SK_ColorRED);
+    paint.setColor4f(SkColors::kRed);
     paint.setAntiAlias(true);
     canvas->drawCircle(test->width / 2, test->height / 2, 30, paint);
 }

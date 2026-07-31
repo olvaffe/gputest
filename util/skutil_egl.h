@@ -6,10 +6,10 @@
 #ifndef SKUTIL_EGL_H
 #define SKUTIL_EGL_H
 
+#include "eglutil.h"
 #include "include/gpu/ganesh/gl/GrGLAssembleInterface.h"
 #include "include/gpu/ganesh/gl/GrGLDirectContext.h"
 #include "include/gpu/ganesh/gl/GrGLInterface.h"
-#include "eglutil.h"
 #include "skutil.h"
 
 static inline GrGLFuncPtr

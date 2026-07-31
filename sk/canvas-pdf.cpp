@@ -50,11 +50,11 @@ static void
 canvas_pdf_test_draw(struct canvas_pdf_test *test)
 {
     SkCanvas *canvas =
-        test->doc->beginPage(SkIntToScalar(test->width), SkIntToScalar(test->height));
-    canvas->clear(SK_ColorWHITE);
+        test->doc->beginPage(static_cast<float>(test->width), static_cast<float>(test->height));
+    canvas->clear(SkColors::kWhite);
 
     SkPaint paint;
-    paint.setColor(SK_ColorRED);
+    paint.setColor4f(SkColors::kRed);
     paint.setAntiAlias(true);
     canvas->drawCircle(test->width / 2, test->height / 2, 30, paint);
 

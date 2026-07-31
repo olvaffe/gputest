@@ -71,7 +71,7 @@ image_ganesh_vk_test_draw(struct image_ganesh_vk_test *test)
     struct sk *sk = &test->sk;
 
     SkCanvas *canvas = test->surf->getCanvas();
-    canvas->clear(SK_ColorWHITE);
+    canvas->clear(SkColors::kWhite);
 
     canvas->drawImage(test->img, 0, 0);
 

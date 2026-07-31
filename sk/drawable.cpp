@@ -12,7 +12,7 @@ struct drawable_test {
 
     struct sk sk;
     sk_sp<SkSurface> surf;
-    std::unique_ptr<SkDrawable> drawable;
+    sk_sp<SkDrawable> drawable;
 };
 
 class drawable_test_drawable : public SkDrawable {
@@ -23,10 +23,10 @@ class drawable_test_drawable : public SkDrawable {
 
     void onDraw(SkCanvas *canvas) override
     {
-        canvas->clear(SK_ColorWHITE);
+        canvas->clear(SkColors::kWhite);
 
         SkPaint paint;
-        paint.setColor(SK_ColorRED);
+        paint.setColor4f(SkColors::kRed);
         paint.setAntiAlias(true);
         canvas->drawCircle(test_->width / 2, test_->height / 2, 30, paint);
     }
@@ -42,7 +42,7 @@ drawable_test_init(struct drawable_test *test)
 
     sk_init(sk, NULL);
     test->surf = sk_create_surface_raster(sk, test->width, test->height);
-    test->drawable = std::make_unique<drawable_test_drawable>(test);
+    test->drawable = sk_make_sp<drawable_test_drawable>(test);
 }
 
 static void

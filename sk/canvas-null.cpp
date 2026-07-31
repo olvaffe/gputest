@@ -33,7 +33,7 @@ static void
 canvas_null_test_draw(struct canvas_null_test *test)
 {
     SkCanvas *canvas = test->canvas.get();
-    canvas->clear(SK_ColorWHITE);
+    canvas->clear(SkColors::kWhite);
 }
 
 int
