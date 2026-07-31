@@ -731,11 +731,11 @@ egl_create_stopwatch(struct egl *egl, uint32_t count)
     if (!strstr(egl->gl_exts, "GL_EXT_disjoint_timer_query"))
         egl_die("no GL_EXT_disjoint_timer_query support");
 
-    struct egl_stopwatch *stopwatch = calloc(1, sizeof(*stopwatch));
+    struct egl_stopwatch *stopwatch = (struct egl_stopwatch *)calloc(1, sizeof(*stopwatch));
     if (!stopwatch)
         egl_die("failed to alloc stopwatch");
 
-    stopwatch->queries = malloc(sizeof(*stopwatch->queries) * count);
+    stopwatch->queries = (GLuint *)malloc(sizeof(*stopwatch->queries) * count);
     if (!stopwatch->queries)
         egl_die("failed to alloc queries");
 
@@ -786,7 +786,7 @@ egl_read_stopwatch(struct egl *egl, struct egl_stopwatch *stopwatch, uint32_t id
     struct egl_gl *gl = &egl->gl;
 
     if (!stopwatch->ts) {
-        stopwatch->ts = malloc(sizeof(*stopwatch->ts) * stopwatch->query_count);
+        stopwatch->ts = (GLint64 *)malloc(sizeof(*stopwatch->ts) * stopwatch->query_count);
         if (!stopwatch->ts)
             egl_die("failed to alloc ts");
 

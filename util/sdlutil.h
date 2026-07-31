@@ -27,7 +27,7 @@ struct sdl {
     SDL_GLContext ctx;
 
     uint32_t wsi_ext_count;
-    const char * const *wsi_exts;
+    const char *const *wsi_exts;
 };
 
 #define sdl_log(format, ...) u_log("SDL", format __VA_OPT__(, ) __VA_ARGS__)

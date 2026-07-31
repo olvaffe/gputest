@@ -22,7 +22,8 @@ canvas_pdf_test_init_doc(struct canvas_pdf_test *test)
     if (!test->writer->isValid())
         sk_die("failed to open file");
 
-    const SkPDF::Metadata metadata;
+    SkPDF::Metadata metadata;
+    metadata.allowNoJpegs = true;
     test->doc = SkPDF::MakeDocument(test->writer.get(), metadata);
 }
 

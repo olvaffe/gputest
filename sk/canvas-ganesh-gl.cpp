@@ -3,8 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "eglutil.h"
-#include "skutil.h"
+#include "skutil_egl.h"
 
 struct canvas_ganesh_gl_test {
     uint32_t width;
@@ -25,7 +24,7 @@ canvas_ganesh_gl_test_init(struct canvas_ganesh_gl_test *test)
     egl_init(egl, NULL);
     sk_init(sk, NULL);
 
-    test->ctx = sk_create_context_ganesh_gl(sk);
+    test->ctx = sk_create_context_ganesh_gl(sk, egl);
     test->surf = sk_create_surface_ganesh(sk, test->ctx, test->width, test->height);
 }
 

@@ -82,9 +82,6 @@ if fs.is_absolute(skia_path) and fs.is_dir(skia_path)
     has_headers: ['include/core/SkGraphics.h'],
     header_include_directories: include_directories(skia_path),
   )
-
-  dep_egl = dependency('egl')
-  dep_glesv2 = dependency('glesv2')
 endif
 
 # for spvutil
