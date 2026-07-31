@@ -8,7 +8,6 @@
 
 #include "eglutil.h"
 #include "include/gpu/ganesh/gl/GrGLAssembleInterface.h"
-#include "include/gpu/ganesh/gl/GrGLDirectContext.h"
 #include "include/gpu/ganesh/gl/GrGLInterface.h"
 #include "skutil.h"
 
@@ -19,19 +18,10 @@ sk_egl_get_proc(void *ctx, const char name[])
     return (GrGLFuncPtr)egl->GetProcAddress(name);
 }
 
-static inline sk_sp<GrDirectContext>
-sk_create_context_ganesh_gl(struct sk *sk, struct egl *egl)
+static inline sk_sp<const GrGLInterface>
+sk_egl_create_gl_interface(struct egl *egl)
 {
-    sk_sp<const GrGLInterface> gl_interface;
-    if (egl)
-        gl_interface = GrGLMakeAssembledGLESInterface(egl, sk_egl_get_proc);
-    if (!gl_interface)
-        gl_interface = GrGLMakeNativeInterface();
-
-    sk_sp<GrDirectContext> ctx = GrDirectContexts::MakeGL(gl_interface);
-    if (!ctx)
-        sk_die("failed to create ganesh gl context");
-    return ctx;
+    return GrGLMakeAssembledGLESInterface(egl, sk_egl_get_proc);
 }
 
 #endif /* SKUTIL_EGL_H */

@@ -11,7 +11,10 @@ struct canvas_ganesh_gl_test {
 
     struct egl egl;
     struct sk sk;
+
+    sk_sp<const GrGLInterface> gl_interface;
     sk_sp<GrDirectContext> ctx;
+
     sk_sp<SkSurface> surf;
 };
 
@@ -24,7 +27,9 @@ canvas_ganesh_gl_test_init(struct canvas_ganesh_gl_test *test)
     egl_init(egl, NULL);
     sk_init(sk, NULL);
 
-    test->ctx = sk_create_context_ganesh_gl(sk, egl);
+    test->gl_interface = sk_egl_create_gl_interface(egl);
+    test->ctx = sk_create_context_ganesh_gl(sk, test->gl_interface);
+
     test->surf = sk_create_surface_ganesh(sk, test->ctx, test->width, test->height);
 }
 
@@ -36,6 +41,8 @@ canvas_ganesh_gl_test_cleanup(struct canvas_ganesh_gl_test *test)
 
     test->surf.reset();
     test->ctx.reset();
+    test->gl_interface.reset();
+
     sk_cleanup(sk);
     egl_cleanup(egl);
 }

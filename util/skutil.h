@@ -17,6 +17,8 @@
 #include "include/gpu/ganesh/GrDirectContext.h"
 #include "include/gpu/ganesh/SkImageGanesh.h"
 #include "include/gpu/ganesh/SkSurfaceGanesh.h"
+#include "include/gpu/ganesh/gl/GrGLDirectContext.h"
+#include "include/gpu/ganesh/gl/GrGLInterface.h"
 #include "include/gpu/ganesh/vk/GrVkDirectContext.h"
 #include "util.h"
 
@@ -62,6 +64,15 @@ sk_create_surface_raster(struct sk *sk, uint32_t width, uint32_t height)
     if (!surf)
         sk_die("failed to create raster surface");
     return surf;
+}
+
+static inline sk_sp<GrDirectContext>
+sk_create_context_ganesh_gl(struct sk *sk, sk_sp<const GrGLInterface> gl_interface)
+{
+    sk_sp<GrDirectContext> ctx = GrDirectContexts::MakeGL(gl_interface);
+    if (!ctx)
+        sk_die("failed to create ganesh gl context");
+    return ctx;
 }
 
 static inline sk_sp<GrDirectContext>
