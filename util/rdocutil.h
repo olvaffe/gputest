@@ -13,6 +13,8 @@
 
 #define LIBRENDERDOC_NAME "librenderdoc.so"
 
+#define rdoc_log(format, ...) u_log("RDOC", format __VA_OPT__(, ) __VA_ARGS__)
+
 struct rdoc {
     RENDERDOC_API_1_7_0 *api;
 };
@@ -59,7 +61,11 @@ rdoc_end(struct rdoc *rdoc)
     if (!rdoc->api)
         return;
 
-    rdoc->api->EndFrameCapture(NULL, NULL);
+    if (rdoc->api->EndFrameCapture(NULL, NULL)) {
+        rdoc_log("frame captured with template %s", rdoc->api->GetCaptureFilePathTemplate());
+    } else {
+        rdoc_log("frame capture failed");
+    }
 }
 
 #endif /* RDOCUTIL_H */
