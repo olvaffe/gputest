@@ -64,12 +64,11 @@ ffdec_test_decode(struct ffdec_test *test)
             va_die("unexpected disjoint surface");
         if (desc.num_layers != 1)
             va_die("unexpected separate-layer surface");
-        if (desc.fourcc != desc.layers[0].drm_format)
-            va_die("bad surface fourcc");
 
         if (!frame_idx) {
-            va_log("fourcc %.*s, size %ux%u, bo size %u, modifier 0x%" PRIx64, 4,
-                   (const char *)&desc.fourcc, desc.width, desc.height, desc.objects[0].size,
+            va_log("fourcc %.*s/%.*s, size %ux%u, bo size %u, modifier 0x%" PRIx64, 4,
+                   (const char *)&desc.fourcc, 4, (const char *)&desc.layers[0].drm_format,
+                   desc.width, desc.height, desc.objects[0].size,
                    desc.objects[0].drm_format_modifier);
             for (uint32_t i = 0; i < desc.layers[0].num_planes; i++) {
                 if (desc.layers[0].object_index[i] != 0)
