@@ -138,11 +138,18 @@ sdl_log_event(const SDL_Event *ev)
         /* keyboard events */
         CASE(SDL_EVENT_KEY_DOWN);
         CASE(SDL_EVENT_KEY_UP);
+        CASE(SDL_EVENT_KEYMAP_CHANGED);
+        CASE(SDL_EVENT_KEYBOARD_ADDED);
+        CASE(SDL_EVENT_KEYBOARD_REMOVED);
         /* mouse events */
         CASE(SDL_EVENT_MOUSE_MOTION);
         CASE(SDL_EVENT_MOUSE_BUTTON_DOWN);
         CASE(SDL_EVENT_MOUSE_BUTTON_UP);
         CASE(SDL_EVENT_MOUSE_WHEEL);
+        CASE(SDL_EVENT_MOUSE_ADDED);
+        CASE(SDL_EVENT_MOUSE_REMOVED);
+        /* clipboard events */
+        CASE(SDL_EVENT_CLIPBOARD_UPDATE);
 #undef CASE
     default:
         sdl_log("unknown event 0x%" PRIx32, ev->type);
