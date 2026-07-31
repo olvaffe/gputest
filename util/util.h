@@ -238,6 +238,24 @@ u_rgb_to_yuv(const uint8_t *rgb, uint8_t *yuv)
     }
 }
 
+static inline void
+u_yuv_to_rgb(uint8_t y, uint8_t u, uint8_t v, uint8_t *rgb)
+{
+    const int y_val = (int)y;
+    const int u_val = (int)u - 128;
+    const int v_val = (int)v - 128;
+
+    const float r = (float)y_val + 1.402000f * (float)v_val;
+    const float g = (float)y_val - 0.344136f * (float)u_val - 0.714136f * (float)v_val;
+    const float b = (float)y_val + 1.772000f * (float)u_val;
+
+#define CLAMP(val) ((val) > 255.0f ? 255 : ((val) < 0.0f ? 0 : (uint8_t)(val)))
+    rgb[0] = CLAMP(r);
+    rgb[1] = CLAMP(g);
+    rgb[2] = CLAMP(b);
+#undef CLAMP
+}
+
 struct u_format_conversion {
     uint32_t width;
     uint32_t height;
@@ -256,62 +274,131 @@ struct u_format_conversion {
 static inline void
 u_convert_format(const struct u_format_conversion *conv)
 {
-    if (conv->src_format != DRM_FORMAT_BGR888)
-        u_die("util", "unsupported src format");
-    if (conv->src_plane_count != 1)
-        u_die("util", "bad src plane count");
+    if (conv->src_format == DRM_FORMAT_BGR888) {
+        if (conv->src_plane_count != 1)
+            u_die("util", "bad src plane count");
 
-    switch (conv->dst_format) {
-    case DRM_FORMAT_ABGR8888:
+        switch (conv->dst_format) {
+        case DRM_FORMAT_ABGR8888:
+            if (conv->dst_plane_count != 1)
+                u_die("util", "bad dst plane count");
+
+            for (uint32_t y = 0; y < conv->height; y++) {
+                const uint8_t *src =
+                    (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
+                uint8_t *dst = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+                for (uint32_t x = 0; x < conv->width; x++) {
+                    memcpy(dst, src, 3);
+                    dst[3] = 0xff;
+
+                    src += 3;
+                    dst += 4;
+                }
+            }
+            break;
+        case DRM_FORMAT_NV12:
+            if (conv->dst_plane_count != 2)
+                u_die("util", "bad dst plane count");
+
+            /* be careful about 4:2:0 subsampling */
+            for (uint32_t y = 0; y < conv->height; y++) {
+                const uint8_t *src =
+                    (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
+                uint8_t *dst_y = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+                uint8_t *dst_uv =
+                    (y & 1) ? NULL
+                            : (uint8_t *)conv->dst_plane_ptrs[1] + conv->dst_plane_strides[1] * y / 2;
+
+                for (uint32_t x = 0; x < conv->width; x++) {
+                    uint8_t yuv[3];
+                    u_rgb_to_yuv(src, yuv);
+                    src += 3;
+
+                    dst_y[0] = yuv[0];
+                    dst_y += 1;
+
+                    if (dst_uv && !(x & 1)) {
+                        dst_uv[0] = yuv[1];
+                        dst_uv[1] = yuv[2];
+                        dst_uv += 2;
+                    }
+                }
+            }
+            break;
+        default:
+            u_die("util", "unsupported dst format");
+            break;
+        }
+        return;
+    }
+
+    if (conv->dst_format == DRM_FORMAT_RGB888) {
         if (conv->dst_plane_count != 1)
             u_die("util", "bad dst plane count");
 
-        for (uint32_t y = 0; y < conv->height; y++) {
-            const uint8_t *src =
-                (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
-            uint8_t *dst = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
-            for (uint32_t x = 0; x < conv->width; x++) {
-                memcpy(dst, src, 3);
-                dst[3] = 0xff;
+        switch (conv->src_format) {
+        case DRM_FORMAT_NV12: {
+            if (conv->src_plane_count != 2)
+                u_die("util", "bad src plane count");
 
-                src += 3;
-                dst += 4;
-            }
-        }
-        break;
-    case DRM_FORMAT_NV12:
-        if (conv->dst_plane_count != 2)
-            u_die("util", "bad dst plane count");
+            for (uint32_t y = 0; y < conv->height; y++) {
+                const uint8_t *src_y =
+                    (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
+                const uint8_t *src_uv =
+                    (const uint8_t *)conv->src_plane_ptrs[1] + conv->src_plane_strides[1] * (y / 2);
+                uint8_t *dst = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
 
-        /* be careful about 4:2:0 subsampling */
-        for (uint32_t y = 0; y < conv->height; y++) {
-            const uint8_t *src =
-                (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
-            uint8_t *dst_y = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
-            uint8_t *dst_uv =
-                (y & 1) ? NULL
-                        : (uint8_t *)conv->dst_plane_ptrs[1] + conv->dst_plane_strides[1] * y / 2;
-
-            for (uint32_t x = 0; x < conv->width; x++) {
-                uint8_t yuv[3];
-                u_rgb_to_yuv(src, yuv);
-                src += 3;
-
-                dst_y[0] = yuv[0];
-                dst_y += 1;
-
-                if (dst_uv && !(x & 1)) {
-                    dst_uv[0] = yuv[1];
-                    dst_uv[1] = yuv[2];
-                    dst_uv += 2;
+                for (uint32_t x = 0; x < conv->width; x++) {
+                    const uint32_t uv_x = (x & ~1);
+                    u_yuv_to_rgb(src_y[x], src_uv[uv_x], src_uv[uv_x + 1], dst + 3 * x);
                 }
             }
+            break;
         }
-        break;
-    default:
-        u_die("util", "unsupported dst format");
-        break;
+        case DRM_FORMAT_Q410:
+        case DRM_FORMAT_YUV444: {
+            if (conv->src_plane_count != 3)
+                u_die("util", "bad src plane count");
+
+            for (uint32_t y = 0; y < conv->height; y++) {
+                const uint8_t *src_y =
+                    (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
+                const uint8_t *src_u =
+                    (const uint8_t *)conv->src_plane_ptrs[1] + conv->src_plane_strides[1] * y;
+                const uint8_t *src_v =
+                    (const uint8_t *)conv->src_plane_ptrs[2] + conv->src_plane_strides[2] * y;
+                uint8_t *dst = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+
+                for (uint32_t x = 0; x < conv->width; x++) {
+                    u_yuv_to_rgb(src_y[x], src_u[x], src_v[x], dst + 3 * x);
+                }
+            }
+            break;
+        }
+        case DRM_FORMAT_AYUV: {
+            if (conv->src_plane_count != 1)
+                u_die("util", "bad src plane count");
+
+            for (uint32_t y = 0; y < conv->height; y++) {
+                const uint8_t *src_px =
+                    (const uint8_t *)conv->src_plane_ptrs[0] + conv->src_plane_strides[0] * y;
+                uint8_t *dst = (uint8_t *)conv->dst_plane_ptrs[0] + conv->dst_plane_strides[0] * y;
+
+                for (uint32_t x = 0; x < conv->width; x++) {
+                    const uint8_t *px = src_px + 4 * x;
+                    u_yuv_to_rgb(px[2], px[1], px[0], dst + 3 * x);
+                }
+            }
+            break;
+        }
+        default:
+            u_die("util", "unsupported src format");
+            break;
+        }
+        return;
     }
+
+    u_die("util", "unsupported conversion");
 }
 
 static inline uint32_t

@@ -369,58 +369,62 @@ va_get_image(
 static inline void
 va_save_image(struct va *va, const VAImage *img, const char *filename)
 {
-    if (img->format.fourcc != VA_FOURCC_NV12 &&
-        img->format.fourcc != VA_FOURCC_444P &&
-        img->format.fourcc != VA_FOURCC_AYUV)
+    uint32_t drm_format = 0;
+    uint32_t plane_count = 1;
+
+    switch (img->format.fourcc) {
+    case VA_FOURCC_NV12:
+        drm_format = DRM_FORMAT_NV12;
+        plane_count = 2;
+        break;
+    case VA_FOURCC_444P:
+        drm_format = DRM_FORMAT_YUV444;
+        plane_count = 3;
+        break;
+    case VA_FOURCC_AYUV:
+        drm_format = DRM_FORMAT_AYUV;
+        plane_count = 1;
+        break;
+    default:
         va_die("unsupported fourcc 0x%08x", img->format.fourcc);
+        break;
+    }
 
     void *ptr = va_map_buffer(va, img->buf);
+
+    const uint32_t rgb_stride = img->width * 3;
+    void *rgb_buf = malloc((size_t)rgb_stride * img->height);
+    if (!rgb_buf)
+        va_die("failed to alloc rgb buffer");
+
+    struct u_format_conversion conv = {
+        .width = img->width,
+        .height = img->height,
+        .src_format = drm_format,
+        .src_plane_count = plane_count,
+        .dst_format = DRM_FORMAT_RGB888,
+        .dst_plane_count = 1,
+        .dst_plane_ptrs = { rgb_buf },
+        .dst_plane_strides = { rgb_stride },
+    };
+
+    for (uint32_t i = 0; i < plane_count; i++) {
+        conv.src_plane_ptrs[i] = (const uint8_t *)ptr + img->offsets[i];
+        conv.src_plane_strides[i] = img->pitches[i];
+    }
+
+    u_convert_format(&conv);
 
     FILE *fp = fopen(filename, "wb");
     if (!fp)
         va_die("failed to open %s", filename);
 
     fprintf(fp, "P6 %u %u 255\n", img->width, img->height);
-    for (uint32_t y = 0; y < img->height; y++) {
-        for (uint32_t x = 0; x < img->width; x++) {
-            int yuv[3];
-
-            if (img->format.fourcc == VA_FOURCC_NV12) {
-                const uint8_t *yy = (const uint8_t *)ptr + img->offsets[0] + img->pitches[0] * y + x;
-                const uint8_t *uv = (const uint8_t *)ptr + img->offsets[1] + img->pitches[1] * (y / 2) + (x & ~1);
-
-                yuv[0] = (int)*yy;
-                yuv[1] = (int)uv[0] - 128;
-                yuv[2] = (int)uv[1] - 128;
-            } else if (img->format.fourcc == VA_FOURCC_444P) {
-                const uint8_t *yy = (const uint8_t *)ptr + img->offsets[0] + img->pitches[0] * y + x;
-                const uint8_t *uu = (const uint8_t *)ptr + img->offsets[1] + img->pitches[1] * y + x;
-                const uint8_t *vv = (const uint8_t *)ptr + img->offsets[2] + img->pitches[2] * y + x;
-
-                yuv[0] = (int)*yy;
-                yuv[1] = (int)*uu - 128;
-                yuv[2] = (int)*vv - 128;
-            } else { /* VA_FOURCC_AYUV */
-                const uint8_t *px = (const uint8_t *)ptr + img->offsets[0] + img->pitches[0] * y + 4 * x;
-
-                yuv[0] = (int)px[2]; /* Y */
-                yuv[1] = (int)px[1] - 128; /* U */
-                yuv[2] = (int)px[0] - 128; /* V */
-            }
-
-            const float r = (float)yuv[0] + 1.402000f * (float)yuv[2];
-            const float g = (float)yuv[0] - 0.344136f * (float)yuv[1] - 0.714136f * (float)yuv[2];
-            const float b = (float)yuv[0] + 1.772000f * (float)yuv[1];
-
-#define CLAMP(v) ((v) > 255.0f ? 255 : ((v) < 0.0f ? 0 : (uint8_t)(v)))
-            const uint8_t bytes[3] = { CLAMP(r), CLAMP(g), CLAMP(b) };
-#undef CLAMP
-            if (fwrite(bytes, sizeof(bytes), 1, fp) != 1)
-                va_die("failed to write pixel (%u, %u)", x, y);
-        }
-    }
+    if (fwrite(rgb_buf, (size_t)rgb_stride * img->height, 1, fp) != 1)
+        va_die("failed to write ppm pixels");
 
     fclose(fp);
+    free(rgb_buf);
 
     va_unmap_buffer(va, img->buf);
 }
