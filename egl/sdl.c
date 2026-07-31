@@ -23,7 +23,6 @@ sdl_test_init(struct sdl_test *test)
     struct sdl *sdl = &test->sdl;
 
     const struct sdl_init_params params = {
-        .gl = true,
         .width = test->width,
         .height = test->height,
         .flags = test->win_flags,

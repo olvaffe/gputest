@@ -12,8 +12,6 @@
 #include <SDL3/SDL_vulkan.h>
 
 struct sdl_init_params {
-    bool gl;
-    bool vk;
     const char *libvulkan_path;
 
     int width;
@@ -27,6 +25,9 @@ struct sdl {
     SDL_Window *win;
 
     SDL_GLContext ctx;
+
+    uint32_t wsi_ext_count;
+    const char * const *wsi_exts;
 };
 
 #define sdl_log(format, ...) u_log("SDL", format __VA_OPT__(, ) __VA_ARGS__)
@@ -40,7 +41,7 @@ sdl_init_video(struct sdl *sdl)
     if (!SDL_Init(SDL_INIT_VIDEO))
         sdl_die("failed to init sdl video: %s", SDL_GetError());
 
-    if (sdl->params.gl) {
+    if (sdl->params.flags & SDL_WINDOW_OPENGL) {
         SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
         SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
         SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
@@ -49,9 +50,15 @@ sdl_init_video(struct sdl *sdl)
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     }
 
-    if (sdl->params.vk && sdl->params.libvulkan_path) {
-        if (!SDL_Vulkan_LoadLibrary(sdl->params.libvulkan_path))
-            sdl_die("failed to load vulkan into sdl: %s", SDL_GetError());
+    if (sdl->params.flags & SDL_WINDOW_VULKAN) {
+        if (sdl->params.libvulkan_path) {
+            if (!SDL_Vulkan_LoadLibrary(sdl->params.libvulkan_path))
+                sdl_die("failed to load vulkan into sdl: %s", SDL_GetError());
+        }
+
+        sdl->wsi_exts = SDL_Vulkan_GetInstanceExtensions(&sdl->wsi_ext_count);
+        if (!sdl->wsi_exts)
+            sdl_die("failed to get vulkan wsi extensions: %s", SDL_GetError());
     }
 }
 
@@ -67,7 +74,7 @@ sdl_init_window(struct sdl *sdl)
 static inline void
 sdl_init_context(struct sdl *sdl)
 {
-    if (sdl->params.gl) {
+    if (sdl->params.flags & SDL_WINDOW_OPENGL) {
         sdl->ctx = SDL_GL_CreateContext(sdl->win);
         if (!sdl->ctx)
             sdl_die("failed to create gl context: %s", SDL_GetError());
@@ -87,12 +94,12 @@ sdl_init(struct sdl *sdl, const struct sdl_init_params *params)
 static inline void
 sdl_cleanup(struct sdl *sdl)
 {
-    if (sdl->params.gl)
+    if (sdl->params.flags & SDL_WINDOW_OPENGL)
         SDL_GL_DestroyContext(sdl->ctx);
 
     SDL_DestroyWindow(sdl->win);
 
-    if (sdl->params.vk)
+    if (sdl->params.flags & SDL_WINDOW_VULKAN)
         SDL_Vulkan_UnloadLibrary();
 
     SDL_Quit();

@@ -36,7 +36,6 @@ sdl_test_init(struct sdl_test *test)
     struct vk *vk = &test->vk;
 
     const struct sdl_init_params sdl_params = {
-        .vk = true,
         .libvulkan_path = LIBVULKAN_NAME,
         .width = test->win_width,
         .height = test->win_height,
@@ -44,18 +43,13 @@ sdl_test_init(struct sdl_test *test)
     };
     sdl_init(sdl, &sdl_params);
 
-    uint32_t wsi_ext_count = 0;
-    const char *const *wsi_exts = SDL_Vulkan_GetInstanceExtensions(&wsi_ext_count);
-    if (!wsi_exts)
-        vk_die("failed to get wsi exts");
-
     const char *dev_exts[] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 
     const struct vk_init_params params = {
-        .instance_exts = wsi_exts,
-        .instance_ext_count = wsi_ext_count,
+        .instance_exts = sdl->wsi_exts,
+        .instance_ext_count = sdl->wsi_ext_count,
         .dev_exts = dev_exts,
         .dev_ext_count = ARRAY_SIZE(dev_exts),
     };
@@ -175,7 +169,7 @@ sdl_test_wait_events(struct sdl_test *test)
     /* update win size */
     int win_width;
     int win_height;
-    SDL_GetWindowSize(sdl->win, &win_width, &win_height);
+    SDL_GetWindowSizeInPixels(sdl->win, &win_width, &win_height);
     if (test->win_width != (unsigned)win_width || test->win_height != (unsigned)win_height) {
         vk_log("win resized: %dx%d -> %dx%d", test->win_width, test->win_height, win_width,
                win_height);
