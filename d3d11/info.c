@@ -30,15 +30,9 @@ info_adapter(struct dxgi *dxgi)
 {
     dxgi_log("IDXGIAdapter%u:", dxgi->adapter_version);
 
-    DXGI_ADAPTER_DESC2 desc;
-
-    if (dxgi->adapter_version >= 2) {
-        dxgi->result = IDXGIAdapter2_GetDesc2((IDXGIAdapter2 *)dxgi->adapter, &desc);
-    } else {
-        memset(&desc, 0, sizeof(desc));
-        dxgi->result = IDXGIAdapter1_GetDesc1(dxgi->adapter, (DXGI_ADAPTER_DESC1 *)&desc);
-    }
-    dxgi_check(dxgi, "GetDesc");
+    DXGI_ADAPTER_DESC3 desc;
+    dxgi->result = IDXGIAdapter4_GetDesc3(dxgi->adapter, &desc);
+    dxgi_check(dxgi, "GetDesc3");
 
     char description[128] = { 0 };
     wcstombs(description, desc.Description, sizeof(description) - 1);
@@ -56,29 +50,25 @@ info_adapter(struct dxgi *dxgi)
     dxgi_log("  Adapter Flags:         0x%x (%s%s%s)", desc.Flags,
              (desc.Flags & DXGI_ADAPTER_FLAG_REMOTE) ? "REMOTE " : "",
              (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) ? "SOFTWARE " : "",
-             desc.Flags == DXGI_ADAPTER_FLAG_NONE ? "NONE" : "");
+             desc.Flags == DXGI_ADAPTER_FLAG3_NONE ? "NONE" : "");
     dxgi_log("  Graphics Preemption:   %u", desc.GraphicsPreemptionGranularity);
     dxgi_log("  Compute Preemption:    %u", desc.ComputePreemptionGranularity);
 
-    if (dxgi->adapter_version >= 3) {
-        IDXGIAdapter3 *adapter3 = (IDXGIAdapter3 *)dxgi->adapter;
-        DXGI_QUERY_VIDEO_MEMORY_INFO mem_info;
-        if (SUCCEEDED(IDXGIAdapter3_QueryVideoMemoryInfo(
-                adapter3, 0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &mem_info))) {
-            dxgi_log("  Local Video Memory Info:");
-            dxgi_log("    Budget:              %zu MB", mem_info.Budget / (1024 * 1024));
-            dxgi_log("    Current Usage:       %zu MB", mem_info.CurrentUsage / (1024 * 1024));
-            dxgi_log("    Available Reservation:%zu MB",
-                     mem_info.AvailableForReservation / (1024 * 1024));
-            dxgi_log("    Current Reservation: %zu MB",
-                     mem_info.CurrentReservation / (1024 * 1024));
-        }
-        if (SUCCEEDED(IDXGIAdapter3_QueryVideoMemoryInfo(
-                adapter3, 0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &mem_info))) {
-            dxgi_log("  Non-Local Video Memory Info:");
-            dxgi_log("    Budget:              %zu MB", mem_info.Budget / (1024 * 1024));
-            dxgi_log("    Current Usage:       %zu MB", mem_info.CurrentUsage / (1024 * 1024));
-        }
+    DXGI_QUERY_VIDEO_MEMORY_INFO mem_info;
+    if (SUCCEEDED(IDXGIAdapter4_QueryVideoMemoryInfo(
+            dxgi->adapter, 0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &mem_info))) {
+        dxgi_log("  Local Video Memory Info:");
+        dxgi_log("    Budget:              %zu MB", mem_info.Budget / (1024 * 1024));
+        dxgi_log("    Current Usage:       %zu MB", mem_info.CurrentUsage / (1024 * 1024));
+        dxgi_log("    Available Reservation:%zu MB",
+                 mem_info.AvailableForReservation / (1024 * 1024));
+        dxgi_log("    Current Reservation: %zu MB", mem_info.CurrentReservation / (1024 * 1024));
+    }
+    if (SUCCEEDED(IDXGIAdapter4_QueryVideoMemoryInfo(
+            dxgi->adapter, 0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &mem_info))) {
+        dxgi_log("  Non-Local Video Memory Info:");
+        dxgi_log("    Budget:              %zu MB", mem_info.Budget / (1024 * 1024));
+        dxgi_log("    Current Usage:       %zu MB", mem_info.CurrentUsage / (1024 * 1024));
     }
 }
 
@@ -86,7 +76,7 @@ static void
 info_outputs(struct dxgi *dxgi)
 {
     IDXGIOutput *output;
-    for (UINT i = 0; SUCCEEDED(IDXGIAdapter1_EnumOutputs(dxgi->adapter, i, &output)); i++) {
+    for (UINT i = 0; SUCCEEDED(IDXGIAdapter4_EnumOutputs(dxgi->adapter, i, &output)); i++) {
         DXGI_OUTPUT_DESC desc;
         dxgi->result = IDXGIOutput_GetDesc(output, &desc);
         dxgi_check(dxgi, "IDXGIOutput_GetDesc");

@@ -41,10 +41,10 @@ struct dxgi {
 
     HRESULT result;
 
-    IDXGIFactory1 *factory;
+    IDXGIFactory7 *factory;
     UINT factory_version;
 
-    IDXGIAdapter1 *adapter;
+    IDXGIAdapter4 *adapter;
     UINT adapter_version;
 };
 
@@ -76,9 +76,7 @@ dxgi_init_factory(struct dxgi *dxgi)
         UINT version;
         const GUID *iid;
     } versions[] = {
-        { 7, &IID_IDXGIFactory7 }, { 6, &IID_IDXGIFactory6 }, { 5, &IID_IDXGIFactory5 },
-        { 4, &IID_IDXGIFactory4 }, { 3, &IID_IDXGIFactory3 }, { 2, &IID_IDXGIFactory2 },
-        { 1, &IID_IDXGIFactory1 },
+        { 7, &IID_IDXGIFactory7 },
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
@@ -93,43 +91,33 @@ dxgi_init_factory(struct dxgi *dxgi)
     }
 
     if (!dxgi->factory)
-        dxgi_die("no IDXGIFactory1");
+        dxgi_die("IDXGIFactory7 required");
 }
 
 static inline void
 dxgi_init_adapter(struct dxgi *dxgi)
 {
-    IDXGIAdapter1 *adapter1 = NULL;
-    dxgi->result =
-        IDXGIFactory1_EnumAdapters1(dxgi->factory, dxgi->params.adapter_index, &adapter1);
-    dxgi_check(dxgi, "EnumAdapters1");
-
     const struct {
         UINT version;
         const GUID *iid;
     } versions[] = {
         { 4, &IID_IDXGIAdapter4 },
-        { 3, &IID_IDXGIAdapter3 },
-        { 2, &IID_IDXGIAdapter2 },
     };
 
     for (size_t i = 0; i < ARRAY_SIZE(versions); i++) {
-        HRESULT hr =
-            IDXGIAdapter1_QueryInterface(adapter1, versions[i].iid, (void **)&dxgi->adapter);
+        HRESULT hr = IDXGIFactory7_EnumAdapterByGpuPreference(
+            dxgi->factory, dxgi->params.adapter_index, DXGI_GPU_PREFERENCE_UNSPECIFIED,
+            versions[i].iid, (void **)&dxgi->adapter);
         if (SUCCEEDED(hr)) {
             dxgi->adapter_version = versions[i].version;
             break;
         }
         if (hr != E_NOINTERFACE)
-            dxgi_die("IDXGIAdapter1_QueryInterface failed: 0x%08x", (unsigned)hr);
+            dxgi_die("EnumAdapterByGpuPreference failed: 0x%08x", (unsigned)hr);
     }
 
-    if (dxgi->adapter) {
-        IDXGIAdapter1_Release(adapter1);
-    } else {
-        dxgi->adapter = adapter1;
-        dxgi->adapter_version = 1;
-    }
+    if (!dxgi->adapter)
+        dxgi_die("IDXGIAdapter4 required");
 }
 
 static inline void
@@ -148,8 +136,8 @@ dxgi_init(struct dxgi *dxgi, const struct dxgi_init_params *params)
 static inline void
 dxgi_cleanup(struct dxgi *dxgi)
 {
-    IDXGIAdapter1_Release(dxgi->adapter);
-    IDXGIFactory1_Release(dxgi->factory);
+    IDXGIAdapter4_Release(dxgi->adapter);
+    IDXGIFactory7_Release(dxgi->factory);
 
     dlclose(dxgi->handle);
 }
