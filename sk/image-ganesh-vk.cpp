@@ -36,15 +36,9 @@ image_ganesh_vk_test_init(struct image_ganesh_vk_test *test)
     test->img = sk_load_png(sk, test->filename);
     assert(!test->img->isTextureBacked());
     if (test->upload) {
-        SkPixmap pixmap;
-        test->img->peekPixels(&pixmap);
-
-        GrBackendTexture tex = test->ctx->createBackendTexture(
-            pixmap, kTopLeft_GrSurfaceOrigin, GrRenderable::kNo, GrProtected::kNo);
-        if (!tex.isValid())
-            sk_die("failed to create backend texture");
-        test->img = SkImages::AdoptTextureFrom(test->ctx.get(), tex, kTopLeft_GrSurfaceOrigin,
-                                               test->img->colorType());
+        test->img = SkImages::TextureFromImage(test->ctx.get(), test->img);
+        if (!test->img)
+            sk_die("failed to upload texture to GPU");
 
         assert(test->img->isTextureBacked());
     }
