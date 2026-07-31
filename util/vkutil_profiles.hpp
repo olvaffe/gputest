@@ -8089,11 +8089,13 @@ static const VpFeatureDesc featureDesc = {
                     s->variablePointers = VK_TRUE;
                     s->variablePointersStorageBuffer = VK_TRUE;
                 } break;
+#if 0
                 case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES: {
                     VkPhysicalDeviceVariablePointerFeaturesKHR* s = static_cast<VkPhysicalDeviceVariablePointerFeaturesKHR*>(static_cast<void*>(p));
                     s->variablePointers = VK_TRUE;
                     s->variablePointersStorageBuffer = VK_TRUE;
                 } break;
+#endif
                 default: break;
             }
     },
@@ -8139,11 +8141,13 @@ static const VpFeatureDesc featureDesc = {
                     ret = ret && (prettify_VkPhysicalDeviceVariablePointerFeatures->variablePointers == VK_TRUE); VP_DEBUG_COND_MSG(!(prettify_VkPhysicalDeviceVariablePointerFeatures->variablePointers == VK_TRUE), "Unsupported feature condition: VkPhysicalDeviceVariablePointerFeatures::variablePointers == VK_TRUE");
                     ret = ret && (prettify_VkPhysicalDeviceVariablePointerFeatures->variablePointersStorageBuffer == VK_TRUE); VP_DEBUG_COND_MSG(!(prettify_VkPhysicalDeviceVariablePointerFeatures->variablePointersStorageBuffer == VK_TRUE), "Unsupported feature condition: VkPhysicalDeviceVariablePointerFeatures::variablePointersStorageBuffer == VK_TRUE");
                 } break;
+#if 0
                 case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES: {
                     VkPhysicalDeviceVariablePointerFeaturesKHR* prettify_VkPhysicalDeviceVariablePointerFeaturesKHR = static_cast<VkPhysicalDeviceVariablePointerFeaturesKHR*>(static_cast<void*>(p));
                     ret = ret && (prettify_VkPhysicalDeviceVariablePointerFeaturesKHR->variablePointers == VK_TRUE); VP_DEBUG_COND_MSG(!(prettify_VkPhysicalDeviceVariablePointerFeaturesKHR->variablePointers == VK_TRUE), "Unsupported feature condition: VkPhysicalDeviceVariablePointerFeaturesKHR::variablePointers == VK_TRUE");
                     ret = ret && (prettify_VkPhysicalDeviceVariablePointerFeaturesKHR->variablePointersStorageBuffer == VK_TRUE); VP_DEBUG_COND_MSG(!(prettify_VkPhysicalDeviceVariablePointerFeaturesKHR->variablePointersStorageBuffer == VK_TRUE), "Unsupported feature condition: VkPhysicalDeviceVariablePointerFeaturesKHR::variablePointersStorageBuffer == VK_TRUE");
                 } break;
+#endif
                 default: break;
             }
         return ret;
@@ -8281,11 +8285,13 @@ static const VpFeatureDesc featureDesc = {
                     s->variablePointers = VK_TRUE;
                     s->variablePointersStorageBuffer = VK_TRUE;
                 } break;
+#if 0
                 case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES: {
                     VkPhysicalDeviceVariablePointerFeaturesKHR* s = static_cast<VkPhysicalDeviceVariablePointerFeaturesKHR*>(static_cast<void*>(p));
                     s->variablePointers = VK_TRUE;
                     s->variablePointersStorageBuffer = VK_TRUE;
                 } break;
+#endif
                 default: break;
             }
     },
@@ -8331,11 +8337,13 @@ static const VpFeatureDesc featureDesc = {
                     ret = ret && (prettify_VkPhysicalDeviceVariablePointerFeatures->variablePointers == VK_TRUE); VP_DEBUG_COND_MSG(!(prettify_VkPhysicalDeviceVariablePointerFeatures->variablePointers == VK_TRUE), "Unsupported feature condition: VkPhysicalDeviceVariablePointerFeatures::variablePointers == VK_TRUE");
                     ret = ret && (prettify_VkPhysicalDeviceVariablePointerFeatures->variablePointersStorageBuffer == VK_TRUE); VP_DEBUG_COND_MSG(!(prettify_VkPhysicalDeviceVariablePointerFeatures->variablePointersStorageBuffer == VK_TRUE), "Unsupported feature condition: VkPhysicalDeviceVariablePointerFeatures::variablePointersStorageBuffer == VK_TRUE");
                 } break;
+#if 0
                 case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES: {
                     VkPhysicalDeviceVariablePointerFeaturesKHR* prettify_VkPhysicalDeviceVariablePointerFeaturesKHR = static_cast<VkPhysicalDeviceVariablePointerFeaturesKHR*>(static_cast<void*>(p));
                     ret = ret && (prettify_VkPhysicalDeviceVariablePointerFeaturesKHR->variablePointers == VK_TRUE); VP_DEBUG_COND_MSG(!(prettify_VkPhysicalDeviceVariablePointerFeaturesKHR->variablePointers == VK_TRUE), "Unsupported feature condition: VkPhysicalDeviceVariablePointerFeaturesKHR::variablePointers == VK_TRUE");
                     ret = ret && (prettify_VkPhysicalDeviceVariablePointerFeaturesKHR->variablePointersStorageBuffer == VK_TRUE); VP_DEBUG_COND_MSG(!(prettify_VkPhysicalDeviceVariablePointerFeaturesKHR->variablePointersStorageBuffer == VK_TRUE), "Unsupported feature condition: VkPhysicalDeviceVariablePointerFeaturesKHR::variablePointersStorageBuffer == VK_TRUE");
                 } break;
+#endif
                 default: break;
             }
         return ret;
@@ -18201,6 +18209,7 @@ struct VpCapabilities_T : public VpVulkanFunctions {
     }
 
     void ImportVulkanFunctions_Static() {
+#if 0
         // Vulkan 1.1
         this->GetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)vkGetInstanceProcAddr;
         this->GetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)vkGetDeviceProcAddr;
@@ -18216,6 +18225,8 @@ struct VpCapabilities_T : public VpVulkanFunctions {
 
         this->CreateInstance = (PFN_vkCreateInstance)vkCreateInstance;
         this->CreateDevice = (PFN_vkCreateDevice)vkCreateDevice;
+#endif
+#define vkGetInstanceProcAddr vp.GetInstanceProcAddr
     }
 
     void ImportVulkanFunctions_Custom(VpVulkanFunctions* pFunctions) {
