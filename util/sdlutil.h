@@ -11,6 +11,9 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
+#define sdl_die(format, ...) u_die("SDL", format __VA_OPT__(, ) __VA_ARGS__)
+#define sdl_log(format, ...) u_log("SDL", format __VA_OPT__(, ) __VA_ARGS__)
+
 struct sdl_init_params {
     const char *libvulkan_path;
 
@@ -29,9 +32,6 @@ struct sdl {
     uint32_t wsi_ext_count;
     const char *const *wsi_exts;
 };
-
-#define sdl_log(format, ...) u_log("SDL", format __VA_OPT__(, ) __VA_ARGS__)
-#define sdl_die(format, ...) u_die("SDL", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 sdl_init_video(struct sdl *sdl)

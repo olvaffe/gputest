@@ -10,6 +10,9 @@
 
 #include <android/hardware_buffer.h>
 
+#define android_die(format, ...) u_die("ANDROID", format __VA_OPT__(, ) __VA_ARGS__)
+#define android_log(format, ...) u_log("ANDROID", format __VA_OPT__(, ) __VA_ARGS__)
+
 /* Assumes
  *
  *   - AHardwareBuffer_lockPlanes (API 29)
@@ -29,9 +32,6 @@ struct android_ahb {
     AHardwareBuffer *ahb;
     AHardwareBuffer_Desc desc;
 };
-
-#define android_log(format, ...) u_log("ANDROID", format __VA_OPT__(, ) __VA_ARGS__)
-#define android_die(format, ...) u_die("ANDROID", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 android_init(struct android *android, const struct android_init_params *params)

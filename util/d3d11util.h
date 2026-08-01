@@ -22,8 +22,11 @@
 
 #define LIBDXVK_D3D11_NAME "libdxvk_d3d11.so"
 
-#define d3d11_log(format, ...) u_log("D3D11", format __VA_OPT__(, ) __VA_ARGS__)
+#define d3d11_check(d3d11, msg)                                                                  \
+    u_check("D3D11", SUCCEEDED((d3d11)->result), "%s failed: 0x%08x", msg,                       \
+            (unsigned)(d3d11)->result)
 #define d3d11_die(format, ...) u_die("D3D11", format __VA_OPT__(, ) __VA_ARGS__)
+#define d3d11_log(format, ...) u_log("D3D11", format __VA_OPT__(, ) __VA_ARGS__)
 
 struct d3d11_init_params {
     IDXGIAdapter *adapter;
@@ -48,10 +51,6 @@ struct d3d11 {
     ID3D11DeviceContext4 *ctx;
     UINT ctx_version;
 };
-
-#define d3d11_check(d3d11, msg)                                                                  \
-    u_check("D3D11", SUCCEEDED((d3d11)->result), "%s failed: 0x%08x", msg,                       \
-            (unsigned)(d3d11)->result)
 
 static inline void
 d3d11_init_library(struct d3d11 *d3d11)

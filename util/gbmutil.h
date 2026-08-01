@@ -11,6 +11,9 @@
 #include <gbm.h>
 #include <sys/stat.h>
 
+#define gbm_die(format, ...) u_die("GBM", format __VA_OPT__(, ) __VA_ARGS__)
+#define gbm_log(format, ...) u_log("GBM", format __VA_OPT__(, ) __VA_ARGS__)
+
 struct gbm_format_info {
     uint32_t format;
     uint32_t flags;
@@ -49,9 +52,6 @@ struct gbm_bo_info {
 
     void *map_data;
 };
-
-#define gbm_log(format, ...) u_log("GBM", format __VA_OPT__(, ) __VA_ARGS__)
-#define gbm_die(format, ...) u_die("GBM", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline const char *
 gbm_flags_to_str(uint32_t val, char *str, size_t size)

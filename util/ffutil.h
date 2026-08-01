@@ -3,12 +3,18 @@
  * SPDX-License-Identifier: MIT
  */
 
+#ifndef FFUTIL_H
+#define FFUTIL_H
+
 #include "util.h"
 
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_vaapi.h>
+
+#define ff_die(format, ...) u_die("FF", format __VA_OPT__(, ) __VA_ARGS__)
+#define ff_log(format, ...) u_log("FF", format __VA_OPT__(, ) __VA_ARGS__)
 
 struct ff {
     AVFormatContext *input_ctx;
@@ -23,9 +29,6 @@ struct ff {
     AVPacket *packet;
     AVFrame *frame;
 };
-
-#define ff_log(format, ...) u_log("FF", format __VA_OPT__(, ) __VA_ARGS__)
-#define ff_die(format, ...) u_die("FF", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 ff_init_input(struct ff *ff, const char *filename)
@@ -221,3 +224,5 @@ ff_get_frame_surface(struct ff *ff)
 {
     return (uintptr_t)ff->frame->data[3];
 }
+
+#endif /* FFUTIL_H */

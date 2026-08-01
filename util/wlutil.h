@@ -13,6 +13,9 @@
 #include <linux/input.h>
 #include <wayland-client.h>
 
+#define wl_die(format, ...) u_die("WL", format __VA_OPT__(, ) __VA_ARGS__)
+#define wl_log(format, ...) u_log("WL", format __VA_OPT__(, ) __VA_ARGS__)
+
 struct wl_init_params {
     void *data;
     void (*redraw)(void *data);
@@ -74,9 +77,6 @@ struct wl_swapchain {
         void *data;
     } *images;
 };
-
-#define wl_log(format, ...) u_log("WL", format __VA_OPT__(, ) __VA_ARGS__)
-#define wl_die(format, ...) u_die("WL", format __VA_OPT__(, ) __VA_ARGS__)
 
 static void
 zwp_linux_dmabuf_feedback_v1_event_format_table(void *data,

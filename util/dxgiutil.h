@@ -22,8 +22,10 @@
 
 #define LIBDXVK_DXGI_NAME "libdxvk_dxgi.so"
 
-#define dxgi_log(format, ...) u_log("DXGI", format __VA_OPT__(, ) __VA_ARGS__)
+#define dxgi_check(dxgi, msg)                                                                    \
+    u_check("DXGI", SUCCEEDED((dxgi)->result), "%s failed: 0x%08x", msg, (unsigned)(dxgi)->result)
 #define dxgi_die(format, ...) u_die("DXGI", format __VA_OPT__(, ) __VA_ARGS__)
+#define dxgi_log(format, ...) u_log("DXGI", format __VA_OPT__(, ) __VA_ARGS__)
 
 struct dxgi_init_params {
     UINT flags;
@@ -47,9 +49,6 @@ struct dxgi {
     IDXGIAdapter4 *adapter;
     UINT adapter_version;
 };
-
-#define dxgi_check(dxgi, msg)                                                                    \
-    u_check("DXGI", SUCCEEDED((dxgi)->result), "%s failed: 0x%08x", msg, (unsigned)(dxgi)->result)
 
 static inline void
 dxgi_init_library(struct dxgi *dxgi)

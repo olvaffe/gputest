@@ -22,6 +22,11 @@
 #define LIBOPENCL_NAME "libOpenCL.so.1"
 #endif
 
+#define cl_check(cl, format, ...)                                                                \
+    u_check("CL", (cl)->err == CL_SUCCESS, format __VA_OPT__(, ) __VA_ARGS__)
+#define cl_die(format, ...) u_die("CL", format __VA_OPT__(, ) __VA_ARGS__)
+#define cl_log(format, ...) u_log("CL", format __VA_OPT__(, ) __VA_ARGS__)
+
 struct cl_device {
     cl_device_id id;
 
@@ -196,12 +201,6 @@ struct cl_pipeline {
     cl_program prog;
     cl_kernel kern;
 };
-
-#define cl_log(format, ...) u_log("CL", format __VA_OPT__(, ) __VA_ARGS__)
-#define cl_die(format, ...) u_die("CL", format __VA_OPT__(, ) __VA_ARGS__)
-
-#define cl_check(cl, format, ...)                                                                \
-    u_check("CL", (cl)->err == CL_SUCCESS, format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline const char *
 cl_device_type_to_str(cl_device_type val, char *str, size_t size)

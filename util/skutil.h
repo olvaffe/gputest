@@ -26,6 +26,9 @@
 
 #include <memory>
 
+#define sk_die(format, ...) u_die("SK", format __VA_OPT__(, ) __VA_ARGS__)
+#define sk_log(format, ...) u_log("SK", format __VA_OPT__(, ) __VA_ARGS__)
+
 struct sk_init_params {
     int unused;
 };
@@ -33,9 +36,6 @@ struct sk_init_params {
 struct sk {
     struct sk_init_params params;
 };
-
-#define sk_log(format, ...) u_log("SK", format __VA_OPT__(, ) __VA_ARGS__)
-#define sk_die(format, ...) u_die("SK", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 sk_init(struct sk *sk, const struct sk_init_params *params)

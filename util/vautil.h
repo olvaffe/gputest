@@ -14,6 +14,11 @@
 #include <va/va_str.h>
 #include <xf86drm.h>
 
+#define va_die(format, ...) u_die("VA", format __VA_OPT__(, ) __VA_ARGS__)
+#define va_log(format, ...) u_log("VA", format __VA_OPT__(, ) __VA_ARGS__)
+#define va_check(va, format, ...)                                                                \
+    u_check("VA", (va)->status == VA_STATUS_SUCCESS, format __VA_OPT__(, ) __VA_ARGS__)
+
 struct va_init_params {
     int drm_fd;
 };
@@ -48,12 +53,6 @@ struct va {
     unsigned int *subpic_flags;
     unsigned int subpic_count;
 };
-
-#define va_log(format, ...) u_log("VA", format __VA_OPT__(, ) __VA_ARGS__)
-#define va_die(format, ...) u_die("VA", format __VA_OPT__(, ) __VA_ARGS__)
-
-#define va_check(va, format, ...)                                                                \
-    u_check("VA", (va)->status == VA_STATUS_SUCCESS, format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 va_init_display(struct va *va)

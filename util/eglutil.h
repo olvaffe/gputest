@@ -26,6 +26,9 @@
 #define LIBEGL_NAME "libEGL.so.1"
 #endif
 
+#define egl_die(format, ...) u_die("EGL", format __VA_OPT__(, ) __VA_ARGS__)
+#define egl_log(format, ...) u_log("EGL", format __VA_OPT__(, ) __VA_ARGS__)
+
 struct egl_gl {
 #define PFN_GL(proc, name) PFNGL##proc##PROC name;
 #include "eglutil_entrypoints.inc"
@@ -120,9 +123,6 @@ struct egl_stopwatch {
 
     GLint64 *ts;
 };
-
-#define egl_log(format, ...) u_log("EGL", format __VA_OPT__(, ) __VA_ARGS__)
-#define egl_die(format, ...) u_die("EGL", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 egl_check(struct egl *egl, const char *where)

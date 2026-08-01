@@ -21,8 +21,11 @@
 
 #define LIBVKD3D_PROTON_D3D12_NAME "libvkd3d-proton-d3d12.so"
 
-#define d3d12_log(format, ...) u_log("D3D12", format __VA_OPT__(, ) __VA_ARGS__)
+#define d3d12_check(d3d12, msg)                                                                  \
+    u_check("D3D12", SUCCEEDED((d3d12)->result), "%s failed: 0x%08x", msg,                       \
+            (unsigned)(d3d12)->result)
 #define d3d12_die(format, ...) u_die("D3D12", format __VA_OPT__(, ) __VA_ARGS__)
+#define d3d12_log(format, ...) u_log("D3D12", format __VA_OPT__(, ) __VA_ARGS__)
 
 struct d3d12_init_params {
     IDXGIAdapter *adapter;
@@ -147,10 +150,6 @@ struct d3d12_pipeline {
 
     ID3D12PipelineState *pipeline;
 };
-
-#define d3d12_check(d3d12, msg)                                                                  \
-    u_check("D3D12", SUCCEEDED((d3d12)->result), "%s failed: 0x%08x", msg,                       \
-            (unsigned)(d3d12)->result)
 
 static inline void
 d3d12_init_library(struct d3d12 *d3d12)

@@ -15,6 +15,11 @@
 #define V4L2_NEW_ENOUGH
 #endif
 
+#define v4l2_check(v4l2, format, ...)                                                            \
+    u_check("V4L2", (v4l2)->ret >= 0, format __VA_OPT__(, ) __VA_ARGS__)
+#define v4l2_die(format, ...) u_die("V4L2", format __VA_OPT__(, ) __VA_ARGS__)
+#define v4l2_log(format, ...) u_log("V4L2", format __VA_OPT__(, ) __VA_ARGS__)
+
 struct v4l2_init_params {
     const char *path;
 };
@@ -26,12 +31,6 @@ struct v4l2 {
     int fd;
     struct v4l2_capability cap;
 };
-
-#define v4l2_log(format, ...) u_log("V4L2", format __VA_OPT__(, ) __VA_ARGS__)
-#define v4l2_die(format, ...) u_die("V4L2", format __VA_OPT__(, ) __VA_ARGS__)
-
-#define v4l2_check(v4l2, format, ...)                                                            \
-    u_check("V4L2", (v4l2)->ret >= 0, format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline const char *
 v4l2_cap_to_str(uint32_t val, char *str, size_t size)

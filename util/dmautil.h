@@ -13,6 +13,9 @@
 #include <linux/sync_file.h>
 #include <sys/ioctl.h>
 
+#define dma_die(format, ...) u_die("DMA", format __VA_OPT__(, ) __VA_ARGS__)
+#define dma_log(format, ...) u_log("DMA", format __VA_OPT__(, ) __VA_ARGS__)
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -28,9 +31,6 @@ struct dma_buf {
 struct dma_heap {
     int fd;
 };
-
-#define dma_log(format, ...) u_log("DMA", format __VA_OPT__(, ) __VA_ARGS__)
-#define dma_die(format, ...) u_die("DMA", format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 dma_buf_sync(int fd, uint64_t flags)

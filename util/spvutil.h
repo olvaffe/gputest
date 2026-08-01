@@ -10,6 +10,9 @@
 
 #include <spirv/unified1/spirv.h>
 
+#define spv_die(format, ...) u_die("SPV", format __VA_OPT__(, ) __VA_ARGS__)
+#define spv_log(format, ...) u_log("SPV", format __VA_OPT__(, ) __VA_ARGS__)
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -47,9 +50,6 @@ struct spv_program {
 
     struct spv_program_reflection reflection;
 };
-
-#define spv_log(format, ...) u_log("SPV", format __VA_OPT__(, ) __VA_ARGS__)
-#define spv_die(format, ...) u_die("SPV", format __VA_OPT__(, ) __VA_ARGS__)
 
 void
 spv_init(struct spv *spv, const struct spv_init_params *params);

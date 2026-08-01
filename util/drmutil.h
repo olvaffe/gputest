@@ -11,6 +11,11 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+#define drm_check(drm, format, ...)                                                              \
+    u_check("DRM", (drm)->ret >= 0, format __VA_OPT__(, ) __VA_ARGS__)
+#define drm_die(format, ...) u_die("DRM", format __VA_OPT__(, ) __VA_ARGS__)
+#define drm_log(format, ...) u_log("DRM", format __VA_OPT__(, ) __VA_ARGS__)
+
 struct drm_init_params {
     int unused;
 };
@@ -135,12 +140,6 @@ struct drm_dumb {
 
     bool replaced;
 };
-
-#define drm_log(format, ...) u_log("DRM", format __VA_OPT__(, ) __VA_ARGS__)
-#define drm_die(format, ...) u_die("DRM", format __VA_OPT__(, ) __VA_ARGS__)
-
-#define drm_check(drm, format, ...)                                                              \
-    u_check("DRM", (drm)->ret >= 0, format __VA_OPT__(, ) __VA_ARGS__)
 
 static inline void
 drm_init_devices(struct drm *drm)

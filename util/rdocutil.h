@@ -13,6 +13,7 @@
 
 #define LIBRENDERDOC_NAME "librenderdoc.so"
 
+#define rdoc_die(format, ...) u_die("RDOC", format __VA_OPT__(, ) __VA_ARGS__)
 #define rdoc_log(format, ...) u_log("RDOC", format __VA_OPT__(, ) __VA_ARGS__)
 
 struct rdoc {
@@ -37,8 +38,10 @@ rdoc_init(struct rdoc *rdoc)
     if (!get_api)
         return;
 
+    rdoc_log("renderdoc is loaded");
+
     if (!get_api(eRENDERDOC_API_Version_1_7_0, (void **)&rdoc->api))
-        rdoc->api = NULL;
+        rdoc_die("failed to get api");
 }
 
 static inline void
