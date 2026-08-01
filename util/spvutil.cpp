@@ -25,7 +25,6 @@
 #include <clang/Basic/Diagnostic.h>
 #include <clang/Basic/TargetInfo.h>
 #include <clang/CodeGen/CodeGenAction.h>
-#include <clang/Config/config.h>
 #include <clang/Driver/Driver.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/TextDiagnosticPrinter.h>
@@ -369,11 +368,9 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
 #elif LLVM_VERSION_MAJOR >= 21
     c.createDiagnostics(*llvm::vfs::getRealFileSystem(),
                         new clang::TextDiagnosticPrinter{ diag_stream, c.getDiagnosticOpts() });
-#elif LLVM_VERSION_MAJOR >= 20
+#else
     c.createDiagnostics(*llvm::vfs::getRealFileSystem(),
                         new clang::TextDiagnosticPrinter{ diag_stream, &c.getDiagnosticOpts() });
-#else
-    c.createDiagnostics(new clang::TextDiagnosticPrinter{ diag_stream, &c.getDiagnosticOpts() });
 #endif
 
     c.getFrontendOpts().ProgramAction = clang::frontend::EmitLLVMOnly;
@@ -388,11 +385,8 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
             spv_die("failed to get real path of %s", lib_info.dli_fname);
 #if LLVM_VERSION_MAJOR >= 22
         std::string res_path = clang::GetResourcesPath(lib_path);
-#elif LLVM_VERSION_MAJOR >= 20
-        std::string res_path = clang::driver::Driver::GetResourcesPath(lib_path);
 #else
-        std::string res_path =
-            clang::driver::Driver::GetResourcesPath(lib_path, CLANG_RESOURCE_DIR);
+        std::string res_path = clang::driver::Driver::GetResourcesPath(lib_path);
 #endif
         free(lib_path);
 
@@ -412,8 +406,7 @@ spv_create_llvm_module_from_kernel(struct spv *spv, llvm::LLVMContext *ctx, cons
 static void *
 spv_create_spirv_from_llvm_module(struct spv *spv, llvm::Module *mod, size_t *out_size)
 {
-    /* llvm-spirv lacks 1.5 and 1.6 support until v19 */
-    const SPIRV::VersionNumber ver = SPIRV::VersionNumber::SPIRV_1_4;
+    const SPIRV::VersionNumber ver = SPIRV::VersionNumber::SPIRV_1_6;
 
     const SPIRV::TranslatorOpts opts(ver);
     std::ostringstream spirv_ss;

@@ -112,7 +112,7 @@ endif
 
 dep_llvm = dep_not_found
 dep_clang = dep_not_found
-dep_llvm_spirv = dependency('LLVMSPIRVLib', required: false)
+dep_llvm_spirv = dependency('LLVMSPIRVLib', version: '>= 20', required: false)
 if dep_llvm_spirv.found()
   ver_arr = dep_llvm_spirv.version().split('.')
   ver_maj = ver_arr[0].to_int()
