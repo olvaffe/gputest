@@ -87,11 +87,13 @@ endif
 # for spvutil
 dep_spirv_tools = dependency('SPIRV-Tools', required: false)
 
-dep_glslang = cpp.find_library(
+dep_glslang = dependency(
     'glslang',
-    has_headers: [
-      'glslang/Include/glslang_c_interface.h',
-      'glslang/Public/resource_limits_c.h',
+    method: 'cmake',
+    modules: [
+      'glslang::glslang',
+      'glslang::SPIRV',
+      'glslang::glslang-default-resource-limits',
     ],
     required: false,
 )
@@ -120,9 +122,17 @@ if dep_llvm_spirv.found()
     '< @0@.@1@'.format(ver_maj, ver_min + 1)
   ]
 
-  dep_llvm = dependency('LLVM', version: version, method: 'cmake')
-  llvm_libdir = dep_llvm.get_variable('LLVM_LIBRARY_DIR')
-  dep_clang = cpp.find_library('clang-cpp', dirs: llvm_libdir)
+  dep_llvm = dependency('LLVM', version: version, method: 'cmake', required: false)
+  if dep_llvm.found()
+    llvm_libdir = dep_llvm.get_variable('LLVM_LIBRARY_DIR')
+    dep_clang = cpp.find_library('clang-cpp', dirs: llvm_libdir, required: false)
+  endif
+
+  if not dep_llvm.found() or not dep_clang.found()
+    dep_llvm = dep_not_found
+    dep_clang = dep_not_found
+    dep_llvm_spirv = dep_not_found
+  endif
 endif
 
 dep_spirv_reflect = dep_not_found

@@ -112,9 +112,14 @@ spvutil_compile_args = []
 spvutil_include_dirs = []
 spvutil_link_args = []
 
+spvutil_langs = ['.spv']
+spvutil_tools = []
+
 if dep_spirv_tools.found()
   spvutil_deps += [dep_spirv_tools]
   spvutil_compile_args += ['-DHAVE_SPIRV_TOOLS']
+  spvutil_langs += ['.spvasm']
+  spvutil_tools += ['disassembly']
 endif
 
 if dep_glslang.found()
@@ -122,21 +127,25 @@ if dep_glslang.found()
   spvutil_compile_args += ['-DHAVE_GLSLANG']
   spvutil_link_args = ['-lglslang-default-resource-limits',
                        '-lMachineIndependent', '-lGenericCodeGen', '-lSPIRV']
+  spvutil_langs += ['.vert/.frag/.comp/...']
 endif
 
 if dep_clspv.found()
   spvutil_deps += [dep_clspv]
   spvutil_compile_args += ['-DHAVE_CLSPV']
   spvutil_include_dirs += [clspv_path / 'include', spirv_reflect_path]
+  spvutil_langs += ['.cl (for Vulkan)']
 elif dep_llvm_spirv.found()
   spvutil_deps += [dep_dl, dep_llvm, dep_clang, dep_llvm_spirv]
   spvutil_compile_args += ['-DHAVE_LLVM_SPIRV']
+  spvutil_langs += ['.cl (for OpenCL)']
 endif
 
 if dep_spirv_reflect.found()
   spvutil_deps += [dep_spirv_reflect]
   spvutil_compile_args += ['-DHAVE_SPIRV_REFLECT']
   spvutil_include_dirs += [spirv_reflect_path]
+  spvutil_tools += ['reflection']
 endif
 
 idep_spvutil = declare_dependency(
@@ -146,7 +155,11 @@ idep_spvutil = declare_dependency(
   include_directories: spvutil_include_dirs,
   link_args: spvutil_link_args,
 )
-util_summary += {'spvutil': [idep_spvutil, spvutil_compile_args]}
+util_summary += {'spvutil': [
+  idep_spvutil,
+  'langs: ' + ', '.join(spvutil_langs),
+  'tools: ' + ', '.join(spvutil_tools)
+]}
 
 idep_v4l2util = dep_not_found
 if cc.has_header('linux/videodev2.h')
