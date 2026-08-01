@@ -142,9 +142,8 @@ sk_dump_surface_graphite(struct sk *sk,
     struct graphite_read_ctx {
         bool success;
         SkBitmap bitmap;
-        int width;
-        int height;
-    } read_ctx = { false, {}, surf->width(), surf->height() };
+        SkImageInfo info;
+    } read_ctx = { false, {}, surf->imageInfo() };
 
     ctx->asyncRescaleAndReadPixels(
         surf.get(), surf->imageInfo(), SkIRect::MakeWH(surf->width(), surf->height()),
@@ -153,11 +152,11 @@ sk_dump_surface_graphite(struct sk *sk,
            std::unique_ptr<const SkImage::AsyncReadResult> async_result) {
             auto *r = static_cast<graphite_read_ctx *>(context);
             if (async_result && async_result->count() > 0) {
-                r->bitmap.allocPixels(SkImageInfo::MakeN32Premul(r->width, r->height));
+                r->bitmap.allocPixels(r->info);
                 const uint8_t *src = static_cast<const uint8_t *>(async_result->data(0));
                 uint8_t *dst = static_cast<uint8_t *>(r->bitmap.getPixels());
                 size_t min_row_bytes = std::min(r->bitmap.rowBytes(), async_result->rowBytes(0));
-                for (int y = 0; y < r->height; ++y) {
+                for (int y = 0; y < r->info.height(); ++y) {
                     memcpy(dst + y * r->bitmap.rowBytes(), src + y * async_result->rowBytes(0),
                            min_row_bytes);
                 }

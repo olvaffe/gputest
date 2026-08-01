@@ -34,7 +34,12 @@ canvas_graphite_vk_test_init(struct canvas_graphite_vk_test *test)
     struct vk *vk = &test->vk;
     struct sk *sk = &test->sk;
 
-    vk_init(vk, NULL);
+    const struct vk_init_params vk_params = {
+        .api_version = VK_API_VERSION_1_4,
+        .enable_all_features = true,
+    };
+    vk_init(vk, &vk_params);
+
     sk_init(sk, NULL);
 
     test->backend_ctx = std::make_unique<sk_vk_backend_context>(vk);
