@@ -20,6 +20,8 @@
 #include "include/gpu/ganesh/gl/GrGLDirectContext.h"
 #include "include/gpu/ganesh/gl/GrGLInterface.h"
 #include "include/gpu/ganesh/vk/GrVkDirectContext.h"
+#include "include/gpu/graphite/Context.h"
+#include "include/gpu/graphite/Surface.h"
 #include "util.h"
 
 #include <memory>
@@ -98,6 +100,19 @@ sk_create_surface_ganesh(struct sk *sk,
     return surf;
 }
 
+static inline sk_sp<SkSurface>
+sk_create_surface_graphite(struct sk *sk,
+                           skgpu::graphite::Recorder *recorder,
+                           uint32_t width,
+                           uint32_t height)
+{
+    const SkImageInfo info = sk_make_image_info(sk, width, height);
+    sk_sp<SkSurface> surf = SkSurfaces::RenderTarget(recorder, info);
+    if (!surf)
+        sk_die("failed to create graphite surface");
+    return surf;
+}
+
 static inline void
 sk_dump_surface(struct sk *sk, sk_sp<SkSurface> surf, const char *filename)
 {
@@ -116,6 +131,52 @@ sk_dump_surface(struct sk *sk, sk_sp<SkSurface> surf, const char *filename)
 
     if (!SkPngEncoder::Encode(&writer, pixmap, SkPngEncoder::Options()))
         sk_die("failed to encode pixmap");
+}
+
+static inline void
+sk_dump_surface_graphite(struct sk *sk,
+                         skgpu::graphite::Context *ctx,
+                         sk_sp<SkSurface> surf,
+                         const char *filename)
+{
+    struct graphite_read_ctx {
+        bool success;
+        SkBitmap bitmap;
+        int width;
+        int height;
+    } read_ctx = { false, {}, surf->width(), surf->height() };
+
+    ctx->asyncRescaleAndReadPixels(
+        surf.get(), surf->imageInfo(), SkIRect::MakeWH(surf->width(), surf->height()),
+        SkImage::RescaleGamma::kSrc, SkImage::RescaleMode::kNearest,
+        [](SkImage::ReadPixelsContext context,
+           std::unique_ptr<const SkImage::AsyncReadResult> async_result) {
+            auto *r = static_cast<graphite_read_ctx *>(context);
+            if (async_result && async_result->count() > 0) {
+                r->bitmap.allocPixels(SkImageInfo::MakeN32Premul(r->width, r->height));
+                const uint8_t *src = static_cast<const uint8_t *>(async_result->data(0));
+                uint8_t *dst = static_cast<uint8_t *>(r->bitmap.getPixels());
+                size_t min_row_bytes = std::min(r->bitmap.rowBytes(), async_result->rowBytes(0));
+                for (int y = 0; y < r->height; ++y) {
+                    memcpy(dst + y * r->bitmap.rowBytes(), src + y * async_result->rowBytes(0),
+                           min_row_bytes);
+                }
+                r->success = true;
+            }
+        },
+        &read_ctx);
+
+    ctx->submit(skgpu::graphite::SyncToCpu::kYes);
+
+    if (!read_ctx.success)
+        sk_die("failed to read pixels from graphite surface");
+
+    SkFILEWStream writer(filename);
+    if (!writer.isValid())
+        sk_die("failed to create %s", filename);
+
+    if (!SkPngEncoder::Encode(&writer, read_ctx.bitmap.pixmap(), SkPngEncoder::Options()))
+        sk_die("failed to encode png");
 }
 
 static inline sk_sp<SkImage>
