@@ -14,6 +14,7 @@
 #endif
 
 #ifdef HAVE_GLSLANG
+#include <glslang/Include/glslang_c_interface.h>
 #include <glslang/Public/resource_limits_c.h>
 #endif
 
@@ -48,8 +49,6 @@ spv_init(struct spv *spv, const struct spv_init_params *params)
 
 #ifdef HAVE_GLSLANG
     glslang_initialize_process();
-    glslang_resource_t *res = glslang_resource();
-    *res = *glslang_default_resource();
 #endif
 }
 
@@ -99,11 +98,17 @@ spv_init_program_assembly(struct spv *spv,
     spv_context ctx = spvContextCreate(target_env);
 
     spv_binary bin;
-    spv_diagnostic diag;
+    spv_diagnostic diag = NULL;
     spv_result_t res =
         spvTextToBinaryWithOptions(ctx, (const char *)file_data, file_size, options, &bin, &diag);
-    if (res != SPV_SUCCESS)
+    if (res != SPV_SUCCESS) {
+        if (diag) {
+            spv_log("failed to assemble %s (%zu:%zu): %s", filename, diag->position.line + 1,
+                    diag->position.column + 1, diag->error);
+            spvDiagnosticDestroy(diag);
+        }
         spv_die("failed to assemble prog");
+    }
 
     if (!spv_init_program_binary(spv, prog, filename, bin->code,
                                  bin->wordCount * sizeof(uint32_t)))
@@ -150,7 +155,7 @@ spv_create_glslang_shader(struct spv *spv,
         .default_profile = GLSLANG_NO_PROFILE,
         .forward_compatible = true,
         .messages = messages,
-        .resource = glslang_resource(),
+        .resource = glslang_default_resource(),
     };
 
     glslang_shader_t *sh = glslang_shader_create(&input);
@@ -172,7 +177,7 @@ spv_create_glslang_program(struct spv *spv, glslang_shader_t *sh)
                              GLSLANG_MSG_VULKAN_RULES_BIT);
 
     glslang_program_t *prog = glslang_program_create();
-    if (!sh)
+    if (!prog)
         spv_die("failed to create program");
 
     glslang_program_add_shader(prog, sh);
@@ -463,40 +468,43 @@ spv_reflect_program(struct spv *spv, struct spv_program *prog)
     if (res != SPV_REFLECT_RESULT_SUCCESS)
         spv_die("failed to reflect spirv");
 
-    uint32_t max_set = 0;
-    for (uint32_t i = 0; i < mod.descriptor_set_count; i++) {
-        const SpvReflectDescriptorSet *set = &mod.descriptor_sets[i];
-        if (max_set < set->set)
-            max_set = set->set;
-    }
+    struct spv_program_reflection_set *sets = NULL;
+    uint32_t set_count = 0;
+    if (mod.descriptor_set_count > 0) {
+        uint32_t max_set = 0;
+        for (uint32_t i = 0; i < mod.descriptor_set_count; i++) {
+            const SpvReflectDescriptorSet *set = &mod.descriptor_sets[i];
+            if (max_set < set->set)
+                max_set = set->set;
+        }
 
-    const uint32_t set_count = max_set + 1;
-    struct spv_program_reflection_set *sets =
-        (struct spv_program_reflection_set *)calloc(set_count, sizeof(*sets));
-    if (!sets)
-        spv_die("failed to alloc sets");
+        set_count = max_set + 1;
+        sets = (struct spv_program_reflection_set *)calloc(set_count, sizeof(*sets));
+        if (!sets)
+            spv_die("failed to alloc sets");
 
-    for (uint32_t i = 0; i < mod.descriptor_set_count; i++) {
-        const SpvReflectDescriptorSet *src = &mod.descriptor_sets[i];
-        struct spv_program_reflection_set *dst = &sets[src->set];
+        for (uint32_t i = 0; i < mod.descriptor_set_count; i++) {
+            const SpvReflectDescriptorSet *src = &mod.descriptor_sets[i];
+            struct spv_program_reflection_set *dst = &sets[src->set];
 
-        dst->binding_count = src->binding_count;
-        dst->bindings = (struct spv_program_reflection_binding *)calloc(src->binding_count,
-                                                                        sizeof(*dst->bindings));
-        if (!dst->bindings)
-            spv_die("failed to alloc bindings");
+            dst->binding_count = src->binding_count;
+            dst->bindings = (struct spv_program_reflection_binding *)calloc(
+                src->binding_count, sizeof(*dst->bindings));
+            if (!dst->bindings)
+                spv_die("failed to alloc bindings");
 
-        for (uint32_t j = 0; j < src->binding_count; j++) {
-            const SpvReflectDescriptorBinding *s = src->bindings[j];
-            struct spv_program_reflection_binding *d = &dst->bindings[j];
-            d->binding = s->binding;
-            d->type = s->descriptor_type;
-            d->count = s->count;
+            for (uint32_t j = 0; j < src->binding_count; j++) {
+                const SpvReflectDescriptorBinding *s = src->bindings[j];
+                struct spv_program_reflection_binding *d = &dst->bindings[j];
+                d->binding = s->binding;
+                d->type = s->descriptor_type;
+                d->count = s->count;
+            }
         }
     }
 
     prog->reflection.execution_model = mod.spirv_execution_model;
-    prog->reflection.entrypoint = strdup(mod.entry_point_name);
+    prog->reflection.entrypoint = mod.entry_point_name ? strdup(mod.entry_point_name) : NULL;
     prog->reflection.set_count = set_count;
     prog->reflection.sets = sets;
 
@@ -557,11 +565,16 @@ spv_disasm_program(struct spv *spv, struct spv_program *prog)
     spv_context ctx = spvContextCreate(target_env);
 
     spv_text txt;
-    spv_diagnostic diag;
+    spv_diagnostic diag = NULL;
     spv_result_t res =
         spvBinaryToText(ctx, (const uint32_t *)prog->spirv, prog->size / 4, options, &txt, &diag);
-    if (res != SPV_SUCCESS)
+    if (res != SPV_SUCCESS) {
+        if (diag) {
+            spv_log("failed to disasm prog: %s", diag->error);
+            spvDiagnosticDestroy(diag);
+        }
         spv_die("failed to disasm prog");
+    }
 
     spv_log("spirv disassembly:\n%s", txt->str);
 
