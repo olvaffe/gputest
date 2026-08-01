@@ -6,11 +6,12 @@ project(
   ['c', 'cpp'],
   version: '0.1',
   license: 'MIT',
-  meson_version: '>=1.1.0',
+  meson_version: '>=1.8.0',
   default_options: ['c_std=c11', 'cpp_std=c++17', 'warning_level=3'],
 )
 
 fs = import('fs')
+wayland = import('wayland')
 
 cc = meson.get_compiler('c')
 cpp = meson.get_compiler('cpp')
@@ -153,8 +154,7 @@ dep_libva_drm = dependency('libva-drm', required: false)
 
 # for wlutil
 dep_wl_client = dependency('wayland-client', required: false)
-dep_wl_protocols = dependency('wayland-protocols', required: false)
-dep_wl_scanner = dependency('wayland-scanner', required: false)
+dep_wl_protocols = dependency('wayland-protocols', version: '>= 1.41', required: false)
 
 dep_ktx = dependency('Ktx', method: 'cmake', required: false)
 

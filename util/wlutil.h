@@ -6,9 +6,9 @@
 #ifndef WLUTIL_H
 #define WLUTIL_H
 
-#include "linux-dmabuf-unstable-v1-protocol.h"
+#include "linux-dmabuf-v1-client-protocol.h"
 #include "util.h"
-#include "xdg-shell-protocol.h"
+#include "xdg-shell-client-protocol.h"
 
 #include <linux/input.h>
 #include <wayland-client.h>
@@ -262,16 +262,18 @@ static const struct wl_buffer_listener wl_buffer_listener = {
 };
 
 static void
-zwp_linux_dmabuf_v1_event_format(void *data, struct zwp_linux_dmabuf_v1 *dmabuf, uint32_t format)
+zwp_linux_dmabuf_v1_event_format_legacy(void *data,
+                                        struct zwp_linux_dmabuf_v1 *dmabuf,
+                                        uint32_t format)
 {
 }
 
 static void
-zwp_linux_dmabuf_v1_event_modifier(void *data,
-                                   struct zwp_linux_dmabuf_v1 *dmabuf,
-                                   uint32_t format,
-                                   uint32_t modifier_hi,
-                                   uint32_t modifier_lo)
+zwp_linux_dmabuf_v1_event_modifier_legacy(void *data,
+                                          struct zwp_linux_dmabuf_v1 *dmabuf,
+                                          uint32_t format,
+                                          uint32_t modifier_hi,
+                                          uint32_t modifier_lo)
 {
     struct wl *wl = data;
 
@@ -299,9 +301,9 @@ zwp_linux_dmabuf_v1_event_modifier(void *data,
     *mod_iter = (uint64_t)modifier_hi << 32 | modifier_lo;
 }
 
-static const struct zwp_linux_dmabuf_v1_listener zwp_linux_dmabuf_v1_listener = {
-    .format = zwp_linux_dmabuf_v1_event_format,
-    .modifier = zwp_linux_dmabuf_v1_event_modifier,
+static const struct zwp_linux_dmabuf_v1_listener zwp_linux_dmabuf_v1_listener_legacy = {
+    .format = zwp_linux_dmabuf_v1_event_format_legacy,
+    .modifier = zwp_linux_dmabuf_v1_event_modifier_legacy,
 };
 
 static void
@@ -418,8 +420,12 @@ wl_registry_event_global(
     struct wl *wl = data;
 
     if (!strcmp(interface, wl_compositor_interface.name)) {
-        if (version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
-            version = WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION;
+        if (version < WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
+            wl_die("%s ver %d req %d", interface, version,
+                   WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION);
+        }
+        version = WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION;
+
         wl->compositor = wl_registry_bind(reg, name, &wl_compositor_interface, version);
         wl->compositor_version = version;
     } else if (!strcmp(interface, xdg_wm_base_interface.name)) {
@@ -433,15 +439,19 @@ wl_registry_event_global(
         wl_shm_add_listener(wl->shm, &wl_shm_listener, wl);
 
         wl_array_init(&wl->shm_formats);
-    } else if (!strcmp(interface, zwp_linux_dmabuf_v1_interface.name) &&
-               version >= ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION) {
+    } else if (!strcmp(interface, zwp_linux_dmabuf_v1_interface.name)) {
+        if (version < ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION) {
+            wl_die("%s ver %d req %d", interface, version,
+                   ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION);
+        }
         if (version >= ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION)
             version = ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION;
+
         wl->dmabuf = wl_registry_bind(reg, name, &zwp_linux_dmabuf_v1_interface, version);
         wl->dmabuf_version = version;
-
         if (version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
-            zwp_linux_dmabuf_v1_add_listener(wl->dmabuf, &zwp_linux_dmabuf_v1_listener, wl);
+            zwp_linux_dmabuf_v1_add_listener(wl->dmabuf, &zwp_linux_dmabuf_v1_listener_legacy,
+                                             wl);
             wl_array_init(&wl->active.formats);
             wl->active.tranche_count = 1;
         }
@@ -479,6 +489,13 @@ wl_init_globals(struct wl *wl)
     wl_display_roundtrip(wl->display);
 
     wl_registry_destroy(reg);
+
+    if (!wl->compositor)
+        wl_die("missing required global: wl_compositor");
+    if (!wl->wm_base)
+        wl_die("missing required global: xdg_wm_base");
+    if (!wl->shm)
+        wl_die("missing required global: wl_shm");
 }
 
 static inline void
@@ -800,10 +817,7 @@ wl_present_swapchain_image(struct wl *wl,
     assert(wl->xdg_ready);
 
     wl_surface_attach(wl->surface, img->buffer, 0, 0);
-    if (wl->compositor_version >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION)
-        wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
-    else
-        wl_surface_damage(wl->surface, 0, 0, swapchain->width, swapchain->height);
+    wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
     wl_surface_commit(wl->surface);
 }
 

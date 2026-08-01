@@ -195,33 +195,19 @@ idep_vkutil = declare_dependency(
 util_summary += {'vkutil': idep_vkutil}
 
 idep_wlutil = dep_not_found
-if dep_wl_client.found() and dep_wl_protocols.found() and dep_wl_scanner.found()
-  protocols = [
-    ['xdg-shell', 'stable/xdg-shell'],
-    ['linux-dmabuf-unstable-v1', 'unstable/linux-dmabuf'],
+if dep_wl_client.found() and dep_wl_protocols.found()
+  wl_wp_xmls = [
+    wayland.find_protocol('xdg-shell', state: 'stable'),
+    wayland.find_protocol('linux-dmabuf', state: 'stable', version: 1),
   ]
 
-  wl_scanner = find_program(dep_wl_scanner.get_variable(pkgconfig: 'wayland_scanner'))
-  wl_protocols_dir = dep_wl_protocols.get_variable(pkgconfig: 'pkgdatadir')
-
-  wl_protocols_files = []
-  foreach proto : protocols
-    xml_path = wl_protocols_dir / proto[1] / proto[0] + '.xml'
-
-    wl_protocols_files += custom_target(proto[0] + ' client-header',
-      command: [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
-      input: xml_path,
-      output: proto[0] + '-protocol.h',
-    )
-    wl_protocols_files += custom_target(proto[0] + ' private-code',
-      command: [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
-      input: xml_path,
-      output: proto[0] + '-protocol.c',
-    )
+  wl_wp_files = []
+  foreach xml : wl_wp_xmls
+    wl_wp_files += wayland.scan_xml(xml, include_core_only: false)
   endforeach
 
   idep_wlutil = declare_dependency(
-    sources: ['wlutil.h', wl_protocols_files],
+    sources: ['wlutil.h', wl_wp_files],
     dependencies: [idep_util, dep_wl_client],
   )
 endif
