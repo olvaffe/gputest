@@ -53,6 +53,12 @@ if dep_vkd3d_proton.found()
 endif
 util_summary += {'d3d12util': idep_d3d12util}
 
+idep_dmautil = declare_dependency(
+  sources: ['dmautil.h'],
+  dependencies: [idep_util],
+)
+util_summary += {'dmautil': idep_dmautil}
+
 idep_drmutil = dep_not_found
 if dep_drm.found()
   idep_drmutil = declare_dependency(
@@ -85,6 +91,12 @@ if dep_gbm.found()
   )
 endif
 util_summary += {'gbmutil': idep_gbmutil}
+
+idep_rdocutil = declare_dependency(
+  sources: ['rdocutil.h'],
+  dependencies: [idep_util, dep_dl],
+)
+util_summary += {'rdocutil': idep_rdocutil}
 
 idep_sdlutil = dep_not_found
 if dep_sdl3.found()
@@ -161,13 +173,10 @@ util_summary += {'spvutil': [
   'tools: ' + ', '.join(spvutil_tools)
 ]}
 
-idep_v4l2util = dep_not_found
-if cc.has_header('linux/videodev2.h')
-  idep_v4l2util = declare_dependency(
-    sources: ['v4l2util.h'],
-    dependencies: [idep_util],
-  )
-endif
+idep_v4l2util = declare_dependency(
+  sources: ['v4l2util.h'],
+  dependencies: [idep_util],
+)
 util_summary += {'v4l2util': idep_v4l2util}
 
 idep_vautil = dep_not_found

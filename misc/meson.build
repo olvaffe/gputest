@@ -33,7 +33,7 @@ if idep_drmutil.found()
     executable(
       t,
       sources: [t + '.c'],
-      dependencies: [idep_drmutil],
+      dependencies: [idep_drmutil, idep_dmautil],
     )
   endforeach
 endif

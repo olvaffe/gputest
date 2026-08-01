@@ -49,7 +49,7 @@ foreach t : tests
     endif
   endforeach
 
-  test_deps = [idep_eglutil]
+  test_deps = [idep_eglutil, idep_dmautil, idep_rdocutil]
   if t == 'ahb_image' or t == 'ahb_ssbo' or t == 'ahb_yuv_target'
     test_deps += [idep_androidutil]
   elif t == 'image'

@@ -107,7 +107,7 @@ foreach t : tests
     endif
   endforeach
 
-  test_deps = [idep_vkutil]
+  test_deps = [idep_vkutil, idep_dmautil, idep_rdocutil]
   test_args = []
 
   if t == 'ahb_rt' or t == 'android'
