@@ -11,10 +11,6 @@
 #include <linux/videodev2.h>
 #include <sys/ioctl.h>
 
-#ifdef V4L2_FMT_FLAG_CONTINUOUS_BYTESTREAM
-#define V4L2_NEW_ENOUGH
-#endif
-
 #define v4l2_check(v4l2, format, ...)                                                            \
     u_check("V4L2", (v4l2)->ret >= 0, format __VA_OPT__(, ) __VA_ARGS__)
 #define v4l2_die(format, ...) u_die("V4L2", format __VA_OPT__(, ) __VA_ARGS__)
@@ -65,9 +61,7 @@ v4l2_cap_to_str(uint32_t val, char *str, size_t size)
         DESC(STREAMING),
         DESC(META_OUTPUT),
         DESC(TOUCH),
-#ifdef V4L2_NEW_ENOUGH
         DESC(IO_MC),
-#endif
         DESC(DEVICE_CAPS),
 #undef DESC
     };
@@ -95,9 +89,7 @@ v4l2_ctrl_class_to_str(uint32_t val)
     CASE(RF_TUNER);
     CASE(DETECT);
     CASE(CODEC_STATELESS);
-#ifdef V4L2_NEW_ENOUGH
     CASE(COLORIMETRY);
-#endif
     default: return "UNKNOWN";
 #undef CASE
     }
@@ -122,7 +114,6 @@ v4l2_ctrl_type_to_str(enum v4l2_ctrl_type val)
     CASE(U8);
     CASE(U16);
     CASE(U32);
-#ifdef V4L2_NEW_ENOUGH
     CASE(AREA);
     CASE(HDR10_CLL_INFO);
     CASE(HDR10_MASTERING_DISPLAY);
@@ -144,7 +135,6 @@ v4l2_ctrl_type_to_str(enum v4l2_ctrl_type val)
     CASE(HEVC_SLICE_PARAMS);
     CASE(HEVC_SCALING_MATRIX);
     CASE(HEVC_DECODE_PARAMS);
-#endif
     default: return "UNKNOWN";
 #undef CASE
     }
@@ -230,7 +220,6 @@ v4l2_fmt_flag_to_str(uint32_t val, char *str, size_t size)
 #define DESC(v) { .bitmask = V4L2_FMT_FLAG_ ##v, .str = #v }
         DESC(COMPRESSED),
         DESC(EMULATED),
-#ifdef V4L2_NEW_ENOUGH
         DESC(CONTINUOUS_BYTESTREAM),
         DESC(DYN_RESOLUTION),
         DESC(ENC_CAP_FRAME_INTERVAL),
@@ -238,7 +227,6 @@ v4l2_fmt_flag_to_str(uint32_t val, char *str, size_t size)
         DESC(CSC_XFER_FUNC),
         DESC(CSC_YCBCR_ENC),
         DESC(CSC_QUANTIZATION),
-#endif
 #undef DESC
     };
     /* clang-format on */
@@ -291,12 +279,10 @@ v4l2_colorspace_to_str(enum v4l2_colorspace val)
     CASE(470_SYSTEM_BG);
     CASE(JPEG);
     CASE(SRGB);
-#ifdef V4L2_NEW_ENOUGH
     CASE(OPRGB);
     CASE(BT2020);
     CASE(RAW);
     CASE(DCI_P3);
-#endif
     default: return "UNKNOWN";
 #undef CASE
     }
@@ -333,13 +319,11 @@ v4l2_xfer_func_to_str(enum v4l2_xfer_func val)
     CASE(DEFAULT);
     CASE(709);
     CASE(SRGB);
-#ifdef V4L2_NEW_ENOUGH
     CASE(OPRGB);
     CASE(SMPTE240M);
     CASE(NONE);
     CASE(DCI_P3);
     CASE(SMPTE2084);
-#endif
     default: return "UNKNOWN";
 #undef CASE
     }
@@ -460,7 +444,7 @@ v4l2_vidioc_create_bufs(struct v4l2 *v4l2,
                         struct v4l2_create_buffers *args)
 {
     *args = (struct v4l2_create_buffers){
-        .memory = V4L2_MEMORY_MMAP,
+        .memory = memory,
         .format = *format,
     };
     v4l2->ret = ioctl(v4l2->fd, VIDIOC_CREATE_BUFS, args);
@@ -539,40 +523,44 @@ v4l2_vidioc_g_output(struct v4l2 *v4l2)
 }
 
 static inline uint32_t
-v4l2_vidioc_queryctrl_count(struct v4l2 *v4l2)
+v4l2_vidioc_query_ext_ctrl_count(struct v4l2 *v4l2)
 {
     const uint32_t next_flags = V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND;
-    struct v4l2_queryctrl args = {
+    struct v4l2_query_ext_ctrl args = {
         .id = 0,
     };
     for (uint32_t i = 0;; i++) {
         args.id |= next_flags;
-        if (ioctl(v4l2->fd, VIDIOC_QUERYCTRL, &args))
+        if (ioctl(v4l2->fd, VIDIOC_QUERY_EXT_CTRL, &args))
             return i;
     }
 }
 
 static inline void
-v4l2_vidioc_queryctrl_next(struct v4l2 *v4l2, uint32_t id, struct v4l2_queryctrl *args)
+v4l2_vidioc_query_ext_ctrl_next(struct v4l2 *v4l2, uint32_t id, struct v4l2_query_ext_ctrl *args)
 {
     const uint32_t next_flags = V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND;
-    *args = (struct v4l2_queryctrl){
+    *args = (struct v4l2_query_ext_ctrl){
         .id = id | next_flags,
     };
-    v4l2->ret = ioctl(v4l2->fd, VIDIOC_QUERYCTRL, args);
-    v4l2_check(v4l2, "failed to VIDIOC_QUERYCTRL");
+    v4l2->ret = ioctl(v4l2->fd, VIDIOC_QUERY_EXT_CTRL, args);
+    v4l2_check(v4l2, "failed to VIDIOC_QUERY_EXT_CTRL");
 }
 
-static inline int
-v4l2_vidioc_g_ctrl(struct v4l2 *v4l2, uint32_t id)
+static inline int64_t
+v4l2_vidioc_g_ext_ctrls(struct v4l2 *v4l2, uint32_t id)
 {
-    struct v4l2_control args = {
+    struct v4l2_ext_control ctrl = {
         .id = id,
     };
-    v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_CTRL, &args);
-    v4l2_check(v4l2, "failed to VIDIOC_G_CTRL");
+    struct v4l2_ext_controls ctrls = {
+        .count = 1,
+        .controls = &ctrl,
+    };
+    v4l2->ret = ioctl(v4l2->fd, VIDIOC_G_EXT_CTRLS, &ctrls);
+    v4l2_check(v4l2, "failed to VIDIOC_G_EXT_CTRLS");
 
-    return args.value;
+    return ctrl.value64;
 }
 
 static inline void
@@ -654,19 +642,19 @@ v4l2_enumerate_buf_types(struct v4l2 *v4l2, uint32_t *count)
     return out;
 }
 
-static inline struct v4l2_queryctrl *
+static inline struct v4l2_query_ext_ctrl *
 v4l2_enumerate_controls(struct v4l2 *v4l2, uint32_t *count)
 {
-    *count = v4l2_vidioc_queryctrl_count(v4l2);
+    *count = v4l2_vidioc_query_ext_ctrl_count(v4l2);
 
-    struct v4l2_queryctrl *ctrls = calloc(*count, sizeof(*ctrls));
+    struct v4l2_query_ext_ctrl *ctrls = calloc(*count, sizeof(*ctrls));
     if (!ctrls)
         v4l2_die("failed to alloc ctrls");
 
     for (uint32_t i = 0; i < *count; i++) {
         const uint32_t prev_id = i > 0 ? ctrls[i - 1].id : 0;
-        struct v4l2_queryctrl *ctrl = &ctrls[i];
-        v4l2_vidioc_queryctrl_next(v4l2, prev_id, ctrl);
+        struct v4l2_query_ext_ctrl *ctrl = &ctrls[i];
+        v4l2_vidioc_query_ext_ctrl_next(v4l2, prev_id, ctrl);
     }
 
     return ctrls;

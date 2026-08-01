@@ -25,19 +25,20 @@ static void
 v4l2_dump_ctrls(struct v4l2 *v4l2)
 {
     uint32_t count;
-    struct v4l2_queryctrl *ctrls = v4l2_enumerate_controls(v4l2, &count);
+    struct v4l2_query_ext_ctrl *ctrls = v4l2_enumerate_controls(v4l2, &count);
 
     v4l2_log("ctrl count: %d", count);
     for (uint32_t i = 0; i < count; i++) {
-        const struct v4l2_queryctrl *ctrl = &ctrls[i];
+        const struct v4l2_query_ext_ctrl *ctrl = &ctrls[i];
 
         char str[256];
         v4l2_log("  %s '%s': type %s, flags %s",
                  v4l2_ctrl_class_to_str(V4L2_CTRL_ID2CLASS(ctrl->id)), ctrl->name,
                  v4l2_ctrl_type_to_str(ctrl->type),
                  v4l2_ctrl_flag_to_str(ctrl->flags, str, sizeof(str)));
-        v4l2_log("    min/max/step/default: %d/%d/%d/%d", ctrl->minimum, ctrl->maximum,
-                 ctrl->step, ctrl->default_value);
+        v4l2_log("    min/max/step/default: %" PRId64 "/%" PRId64 "/%" PRIu64 "/%" PRId64,
+                 (int64_t)ctrl->minimum, (int64_t)ctrl->maximum, (uint64_t)ctrl->step,
+                 (int64_t)ctrl->default_value);
     }
 
     free(ctrls);
@@ -144,6 +145,19 @@ static void
 v4l2_dump_current_states(struct v4l2 *v4l2)
 {
     v4l2_log("current states:");
+
+    uint32_t ctrl_count;
+    struct v4l2_query_ext_ctrl *ctrls = v4l2_enumerate_controls(v4l2, &ctrl_count);
+    v4l2_log("  controls:");
+    for (uint32_t i = 0; i < ctrl_count; i++) {
+        const struct v4l2_query_ext_ctrl *ctrl = &ctrls[i];
+        if ((ctrl->flags & V4L2_CTRL_FLAG_WRITE_ONLY) || ctrl->type == V4L2_CTRL_TYPE_BUTTON)
+            continue;
+
+        const int64_t val = v4l2_vidioc_g_ext_ctrls(v4l2, ctrl->id);
+        v4l2_log("    %s: %" PRId64, ctrl->name, val);
+    }
+    free(ctrls);
 
     if (v4l2_vidioc_enuminput_count(v4l2) > 0)
         v4l2_log("  input: %d", v4l2_vidioc_g_input(v4l2));
