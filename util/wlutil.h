@@ -8,6 +8,7 @@
 
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "presentation-time-client-protocol.h"
+#include "tearing-control-v1-client-protocol.h"
 #include "util.h"
 #include "xdg-shell-client-protocol.h"
 
@@ -56,6 +57,8 @@ struct wl {
     struct wp_presentation *presentation;
     uint32_t presentation_clock_id;
 
+    struct wp_tearing_control_manager_v1 *tearing_control_manager;
+
     struct xdg_wm_base *wm_base;
 
     struct wl_shm *shm;
@@ -65,6 +68,7 @@ struct wl {
     uint32_t dmabuf_version;
 
     struct wl_surface *surface;
+    struct wp_tearing_control_v1 *tearing_control;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
     bool xdg_ready;
@@ -575,6 +579,9 @@ wl_registry_event_global(
     } else if (!strcmp(interface, wp_presentation_interface.name)) {
         wl->presentation = wl_registry_bind(reg, name, &wp_presentation_interface, 1);
         wp_presentation_add_listener(wl->presentation, &wp_presentation_listener, wl);
+    } else if (!strcmp(interface, wp_tearing_control_manager_v1_interface.name)) {
+        wl->tearing_control_manager =
+            wl_registry_bind(reg, name, &wp_tearing_control_manager_v1_interface, 1);
     } else if (!strcmp(interface, xdg_wm_base_interface.name)) {
         wl->wm_base = wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(wl->wm_base, &xdg_wm_base_listener, wl);
@@ -643,22 +650,6 @@ wl_init_globals(struct wl *wl)
 }
 
 static inline void
-wl_init_surface(struct wl *wl)
-{
-    wl->surface = wl_compositor_create_surface(wl->compositor);
-
-    wl->xdg_surface = xdg_wm_base_get_xdg_surface(wl->wm_base, wl->surface);
-    xdg_surface_add_listener(wl->xdg_surface, &xdg_surface_listener, wl);
-
-    wl->xdg_toplevel = xdg_surface_get_toplevel(wl->xdg_surface);
-    xdg_toplevel_add_listener(wl->xdg_toplevel, &xdg_toplevel_listener, wl);
-
-    xdg_toplevel_set_title(wl->xdg_toplevel, "wlutil");
-
-    wl_surface_commit(wl->surface);
-}
-
-static inline void
 wl_init_surface_dmabuf(struct wl *wl)
 {
     if (wl->dmabuf_version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION)
@@ -668,6 +659,42 @@ wl_init_surface_dmabuf(struct wl *wl)
     zwp_linux_dmabuf_feedback_v1_add_listener(wl->dmabuf_feedback,
                                               &zwp_linux_dmabuf_feedback_v1_listener, wl);
     wl_display_roundtrip(wl->display);
+}
+
+static inline void
+wl_init_surface_xdg(struct wl *wl)
+{
+    wl->xdg_surface = xdg_wm_base_get_xdg_surface(wl->wm_base, wl->surface);
+    xdg_surface_add_listener(wl->xdg_surface, &xdg_surface_listener, wl);
+
+    wl->xdg_toplevel = xdg_surface_get_toplevel(wl->xdg_surface);
+    xdg_toplevel_add_listener(wl->xdg_toplevel, &xdg_toplevel_listener, wl);
+
+    xdg_toplevel_set_title(wl->xdg_toplevel, "wlutil");
+}
+
+static inline void
+wl_init_surface_tearing(struct wl *wl)
+{
+    if (!wl->tearing_control_manager)
+        return;
+
+    wl->tearing_control = wp_tearing_control_manager_v1_get_tearing_control(
+        wl->tearing_control_manager, wl->surface);
+    wp_tearing_control_v1_set_presentation_hint(wl->tearing_control,
+                                                WP_TEARING_CONTROL_V1_PRESENTATION_HINT_VSYNC);
+}
+
+static inline void
+wl_init_surface(struct wl *wl)
+{
+    wl->surface = wl_compositor_create_surface(wl->compositor);
+
+    wl_init_surface_tearing(wl);
+    wl_init_surface_xdg(wl);
+    wl_init_surface_dmabuf(wl);
+
+    wl_surface_commit(wl->surface);
 }
 
 static inline void
@@ -690,7 +717,6 @@ wl_init(struct wl *wl, const struct wl_init_params *params)
     wl_init_display(wl);
     wl_init_globals(wl);
     wl_init_surface(wl);
-    wl_init_surface_dmabuf(wl);
 
     wl->dispatch_ready = true;
 }
@@ -708,6 +734,11 @@ wl_cleanup(struct wl *wl)
 
     if (wl->dmabuf_feedback)
         zwp_linux_dmabuf_feedback_v1_destroy(wl->dmabuf_feedback);
+
+    if (wl->tearing_control_manager) {
+        wp_tearing_control_v1_destroy(wl->tearing_control);
+        wp_tearing_control_manager_v1_destroy(wl->tearing_control_manager);
+    }
 
     xdg_toplevel_destroy(wl->xdg_toplevel);
     xdg_surface_destroy(wl->xdg_surface);
