@@ -999,6 +999,7 @@ wl_add_swapchain_image_dmabuf(struct wl *wl,
     }
     img->buffer = zwp_linux_buffer_params_v1_create_immed(
         params, swapchain->width, swapchain->height, swapchain->format, 0);
+    wl_buffer_add_listener(img->buffer, &wl_buffer_listener, img);
 }
 
 static inline const struct wl_swapchain_image *
