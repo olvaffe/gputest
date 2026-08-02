@@ -7,6 +7,7 @@
 #define WLUTIL_H
 
 #include "linux-dmabuf-v1-client-protocol.h"
+#include "presentation-time-client-protocol.h"
 #include "util.h"
 #include "xdg-shell-client-protocol.h"
 
@@ -52,6 +53,9 @@ struct wl {
     struct wl_compositor *compositor;
     uint32_t compositor_version;
 
+    struct wp_presentation *presentation;
+    uint32_t presentation_clock_id;
+
     struct xdg_wm_base *wm_base;
 
     struct wl_shm *shm;
@@ -93,6 +97,45 @@ struct wl_swapchain {
         bool busy;
         void *data;
     } *images;
+};
+
+static void
+wp_presentation_feedback_event_sync_output(void *data,
+                                           struct wp_presentation_feedback *feedback,
+                                           struct wl_output *output)
+{
+}
+
+static void
+wp_presentation_feedback_event_presented(void *data,
+                                         struct wp_presentation_feedback *feedback,
+                                         uint32_t tv_sec_hi,
+                                         uint32_t tv_sec_lo,
+                                         uint32_t tv_nsec,
+                                         uint32_t refresh,
+                                         uint32_t seq_hi,
+                                         uint32_t seq_lo,
+                                         uint32_t flags)
+{
+    const uint64_t sec = ((uint64_t)tv_sec_hi << 32) | tv_sec_lo;
+    const uint64_t seq = ((uint64_t)seq_hi << 32) | seq_lo;
+    wl_log("presented sec %" PRIu64 " nsec %u refresh %u seq %" PRIu64 " flags 0x%x", sec,
+           tv_nsec, refresh, seq, flags);
+
+    wp_presentation_feedback_destroy(feedback);
+}
+
+static void
+wp_presentation_feedback_event_discarded(void *data, struct wp_presentation_feedback *feedback)
+{
+    wl_log("presentation feedback discarded");
+    wp_presentation_feedback_destroy(feedback);
+}
+
+static const struct wp_presentation_feedback_listener wp_presentation_feedback_listener = {
+    .sync_output = wp_presentation_feedback_event_sync_output,
+    .presented = wp_presentation_feedback_event_presented,
+    .discarded = wp_presentation_feedback_event_discarded,
 };
 
 static void
@@ -345,6 +388,17 @@ static const struct xdg_wm_base_listener xdg_wm_base_listener = {
 };
 
 static void
+wp_presentation_event_clock_id(void *data, struct wp_presentation *presentation, uint32_t clk_id)
+{
+    struct wl *wl = data;
+    wl->presentation_clock_id = clk_id;
+}
+
+static const struct wp_presentation_listener wp_presentation_listener = {
+    .clock_id = wp_presentation_event_clock_id,
+};
+
+static void
 wl_keyboard_event_keymap(
     void *data, struct wl_keyboard *wl_keyboard, uint32_t format, int32_t fd, uint32_t size)
 {
@@ -518,6 +572,9 @@ wl_registry_event_global(
 
         wl->compositor = wl_registry_bind(reg, name, &wl_compositor_interface, version);
         wl->compositor_version = version;
+    } else if (!strcmp(interface, wp_presentation_interface.name)) {
+        wl->presentation = wl_registry_bind(reg, name, &wp_presentation_interface, 1);
+        wp_presentation_add_listener(wl->presentation, &wp_presentation_listener, wl);
     } else if (!strcmp(interface, xdg_wm_base_interface.name)) {
         wl->wm_base = wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(wl->wm_base, &xdg_wm_base_listener, wl);
@@ -663,6 +720,9 @@ wl_cleanup(struct wl *wl)
 
     xdg_wm_base_destroy(wl->wm_base);
 
+    if (wl->presentation)
+        wp_presentation_destroy(wl->presentation);
+
     wl_compositor_destroy(wl->compositor);
 
     wl_keyboard_destroy(wl->keyboard);
@@ -686,7 +746,7 @@ wl_info_outputs(const struct wl *wl)
     const struct wl_output_info *out;
 
     wl_list_for_each(out, &wl->outputs, node) {
-        wl_log("out %s %s: %dx%d @ %.2fHz (scale %dx)", out->make ? out->make : "unknown",
+        wl_log("output %s %s: %dx%d @ %.2fHz (scale %dx)", out->make ? out->make : "unknown",
                out->model ? out->model : "unknown", out->width, out->height,
                out->refresh_rate / 1000.0, out->scale);
     }
@@ -915,6 +975,18 @@ wl_acquire_swapchain_image(struct wl *wl, struct wl_swapchain *swapchain)
 }
 
 static inline void
+wl_surface_presentation_feedback(struct wl *wl)
+{
+    if (!wl->presentation)
+        return;
+
+    struct wp_presentation_feedback *feedback =
+        wp_presentation_feedback(wl->presentation, wl->surface);
+
+    wp_presentation_feedback_add_listener(feedback, &wp_presentation_feedback_listener, wl);
+}
+
+static inline void
 wl_present_swapchain_image(struct wl *wl,
                            struct wl_swapchain *swapchain,
                            const struct wl_swapchain_image *img)
@@ -924,6 +996,9 @@ wl_present_swapchain_image(struct wl *wl,
 
     wl_surface_attach(wl->surface, img->buffer, 0, 0);
     wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
+
+    wl_surface_presentation_feedback(wl);
+
     wl_surface_commit(wl->surface);
 }
 
