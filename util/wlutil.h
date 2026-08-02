@@ -741,22 +741,34 @@ wl_cleanup(struct wl *wl)
 }
 
 static inline void
-wl_info_outputs(const struct wl *wl)
+wl_info_dmabuf(const struct wl *wl)
 {
-    const struct wl_output_info *out;
+    wl_log("dmabuf: main %s target, scanout %d, tranche count %d",
+           wl->active.main_dev == wl->active.target_dev ? "==" : "!=", wl->active.scanout,
+           wl->active.tranche_count);
 
-    wl_list_for_each(out, &wl->outputs, node) {
-        wl_log("output %s %s: %dx%d @ %.2fHz (scale %dx)", out->make ? out->make : "unknown",
-               out->model ? out->model : "unknown", out->width, out->height,
-               out->refresh_rate / 1000.0, out->scale);
+    struct wl_array *dmabuf_iter;
+    uint32_t idx = 0;
+    wl_array_for_each(dmabuf_iter, &wl->active.formats) {
+        const uint32_t fmt = *((uint64_t *)dmabuf_iter->data);
+        uint32_t mod_count = dmabuf_iter->size / sizeof(uint64_t) - 1;
+        wl_log("dmabuf format %d: '%.*s', modifier count %d", idx++, 4, (const char *)&fmt,
+               mod_count);
+
+        if (false) {
+            const uint64_t *mod_iter;
+            wl_array_for_each(mod_iter, dmabuf_iter) {
+                if (mod_iter == dmabuf_iter->data)
+                    continue;
+                wl_log("  modifier 0x%" PRIx64, *mod_iter);
+            }
+        }
     }
 }
 
 static inline void
-wl_info(const struct wl *wl)
+wl_info_shm(const struct wl *wl)
 {
-    wl_info_outputs(wl);
-
     const uint32_t *shm_iter;
     uint32_t idx = 0;
     wl_array_for_each(shm_iter, &wl->shm_formats) {
@@ -774,28 +786,26 @@ wl_info(const struct wl *wl)
         }
         wl_log("shm format %d: '%.*s'", idx++, 4, (const char *)&drm_format);
     }
+}
 
-    wl_log("dmabuf: main %s target, scanout %d, tranche count %d",
-           wl->active.main_dev == wl->active.target_dev ? "==" : "!=", wl->active.scanout,
-           wl->active.tranche_count);
+static inline void
+wl_info_outputs(const struct wl *wl)
+{
+    const struct wl_output_info *out;
 
-    struct wl_array *dmabuf_iter;
-    idx = 0;
-    wl_array_for_each(dmabuf_iter, &wl->active.formats) {
-        const uint32_t fmt = *((uint64_t *)dmabuf_iter->data);
-        uint32_t mod_count = dmabuf_iter->size / sizeof(uint64_t) - 1;
-        wl_log("dmabuf format %d: '%.*s', modifier count %d", idx++, 4, (const char *)&fmt,
-               mod_count);
-
-        if (false) {
-            const uint64_t *mod_iter;
-            wl_array_for_each(mod_iter, dmabuf_iter) {
-                if (mod_iter == dmabuf_iter->data)
-                    continue;
-                wl_log("  modifier 0x%" PRIx64, *mod_iter);
-            }
-        }
+    wl_list_for_each(out, &wl->outputs, node) {
+        wl_log("output %s %s: %dx%d @ %.2fHz (scale %dx)", out->make ? out->make : "unknown",
+               out->model ? out->model : "unknown", out->width, out->height,
+               out->refresh_rate / 1000.0, out->scale);
     }
+}
+
+static inline void
+wl_info(const struct wl *wl)
+{
+    wl_info_outputs(wl);
+    wl_info_shm(wl);
+    wl_info_dmabuf(wl);
 }
 
 static inline void
