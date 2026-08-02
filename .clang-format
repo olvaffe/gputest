@@ -19,3 +19,5 @@ PenaltyExcessCharacter: 100
 SpaceAfterCStyleCast: false
 SpaceBeforeCpp11BracedList: false
 SpaceBeforeParens: ControlStatementsExceptForEachMacros
+ForEachMacros:
+  - wl_array_for_each

@@ -152,16 +152,14 @@ zwp_linux_dmabuf_feedback_v1_event_tranche_formats(void *data,
     wl_array_init(&wl->pending.formats);
 
     const uint16_t *idx_iter;
-    wl_array_for_each(idx_iter, indices)
-    {
+    wl_array_for_each(idx_iter, indices) {
         const uint32_t offset = *idx_iter * 16;
         const uint32_t *fmt = wl->dmabuf_format_table + offset;
         const uint64_t *mod = wl->dmabuf_format_table + offset + 8;
 
         struct wl_array *fmt_iter;
         bool found = false;
-        wl_array_for_each(fmt_iter, &wl->pending.formats)
-        {
+        wl_array_for_each(fmt_iter, &wl->pending.formats) {
             const uint64_t *fmt_iter_fmt = fmt_iter->data;
             if (*fmt_iter_fmt == *fmt) {
                 found = true;
@@ -195,7 +193,8 @@ zwp_linux_dmabuf_feedback_v1_event_done(void *data, struct zwp_linux_dmabuf_feed
     struct wl *wl = data;
 
     struct wl_array *dmabuf_iter;
-    wl_array_for_each(dmabuf_iter, &wl->active.formats) wl_array_release(dmabuf_iter);
+    wl_array_for_each(dmabuf_iter, &wl->active.formats)
+        wl_array_release(dmabuf_iter);
     wl_array_release(&wl->active.formats);
 
     wl->active = wl->pending;
@@ -281,8 +280,7 @@ zwp_linux_dmabuf_v1_event_modifier_legacy(void *data,
 
     struct wl_array *fmt_iter;
     bool found = false;
-    wl_array_for_each(fmt_iter, &wl->active.formats)
-    {
+    wl_array_for_each(fmt_iter, &wl->active.formats) {
         const uint64_t *fmt_iter_fmt = fmt_iter->data;
         if (*fmt_iter_fmt == format) {
             found = true;
@@ -553,7 +551,8 @@ static inline void
 wl_cleanup(struct wl *wl)
 {
     struct wl_array *dmabuf_iter;
-    wl_array_for_each(dmabuf_iter, &wl->active.formats) wl_array_release(dmabuf_iter);
+    wl_array_for_each(dmabuf_iter, &wl->active.formats)
+        wl_array_release(dmabuf_iter);
     wl_array_release(&wl->active.formats);
 
     if (wl->dmabuf_format_table)
@@ -587,8 +586,7 @@ wl_info(const struct wl *wl)
 {
     const uint32_t *shm_iter;
     uint32_t idx = 0;
-    wl_array_for_each(shm_iter, &wl->shm_formats)
-    {
+    wl_array_for_each(shm_iter, &wl->shm_formats) {
         uint32_t drm_format;
         switch (*shm_iter) {
         case WL_SHM_FORMAT_ARGB8888:
@@ -610,8 +608,7 @@ wl_info(const struct wl *wl)
 
     struct wl_array *dmabuf_iter;
     idx = 0;
-    wl_array_for_each(dmabuf_iter, &wl->active.formats)
-    {
+    wl_array_for_each(dmabuf_iter, &wl->active.formats) {
         const uint32_t fmt = *((uint64_t *)dmabuf_iter->data);
         uint32_t mod_count = dmabuf_iter->size / sizeof(uint64_t) - 1;
         wl_log("dmabuf format %d: '%.*s', modifier count %d", idx++, 4, (const char *)&fmt,
@@ -619,8 +616,7 @@ wl_info(const struct wl *wl)
 
         if (false) {
             const uint64_t *mod_iter;
-            wl_array_for_each(mod_iter, dmabuf_iter)
-            {
+            wl_array_for_each(mod_iter, dmabuf_iter) {
                 if (mod_iter == dmabuf_iter->data)
                     continue;
                 wl_log("  modifier 0x%" PRIx64, *mod_iter);
@@ -658,8 +654,7 @@ wl_query_shm_format_support(const struct wl *wl, uint32_t format, uint64_t modif
         return false;
 
     const uint32_t *iter;
-    wl_array_for_each(iter, &wl->shm_formats)
-    {
+    wl_array_for_each(iter, &wl->shm_formats) {
         if (*iter == format)
             return true;
     }
@@ -671,12 +666,10 @@ static inline bool
 wl_query_dmabuf_format_support(const struct wl *wl, uint32_t format, uint64_t modifier)
 {
     const struct wl_array *iter;
-    wl_array_for_each(iter, &wl->active.formats)
-    {
+    wl_array_for_each(iter, &wl->active.formats) {
         const uint64_t *iter2 = iter->data;
         if ((uint32_t)*iter2 == format) {
-            wl_array_for_each(iter2, iter)
-            {
+            wl_array_for_each(iter2, iter) {
                 if (iter2 == iter->data)
                     continue;
                 else if (*iter2 == modifier)
