@@ -6,6 +6,7 @@
 #ifndef WLUTIL_H
 #define WLUTIL_H
 
+#include "commit-timing-v1-client-protocol.h"
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "presentation-time-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
@@ -56,6 +57,9 @@ struct wl {
 
     struct wp_presentation *presentation;
     uint32_t presentation_clock_id;
+
+    struct wp_commit_timing_manager_v1 *commit_timing_manager;
+    struct wp_commit_timer_v1 *commit_timer;
 
     struct wp_tearing_control_manager_v1 *tearing_control_manager;
 
@@ -579,6 +583,9 @@ wl_registry_event_global(
     } else if (!strcmp(interface, wp_presentation_interface.name)) {
         wl->presentation = wl_registry_bind(reg, name, &wp_presentation_interface, 1);
         wp_presentation_add_listener(wl->presentation, &wp_presentation_listener, wl);
+    } else if (!strcmp(interface, wp_commit_timing_manager_v1_interface.name)) {
+        wl->commit_timing_manager =
+            wl_registry_bind(reg, name, &wp_commit_timing_manager_v1_interface, 1);
     } else if (!strcmp(interface, wp_tearing_control_manager_v1_interface.name)) {
         wl->tearing_control_manager =
             wl_registry_bind(reg, name, &wp_tearing_control_manager_v1_interface, 1);
@@ -686,10 +693,21 @@ wl_init_surface_tearing(struct wl *wl)
 }
 
 static inline void
+wl_init_surface_commit_timing(struct wl *wl)
+{
+    if (!wl->commit_timing_manager)
+        return;
+
+    wl->commit_timer =
+        wp_commit_timing_manager_v1_get_timer(wl->commit_timing_manager, wl->surface);
+}
+
+static inline void
 wl_init_surface(struct wl *wl)
 {
     wl->surface = wl_compositor_create_surface(wl->compositor);
 
+    wl_init_surface_commit_timing(wl);
     wl_init_surface_tearing(wl);
     wl_init_surface_xdg(wl);
     wl_init_surface_dmabuf(wl);
@@ -738,6 +756,11 @@ wl_cleanup(struct wl *wl)
     if (wl->tearing_control_manager) {
         wp_tearing_control_v1_destroy(wl->tearing_control);
         wp_tearing_control_manager_v1_destroy(wl->tearing_control_manager);
+    }
+
+    if (wl->commit_timing_manager) {
+        wp_commit_timer_v1_destroy(wl->commit_timer);
+        wp_commit_timing_manager_v1_destroy(wl->commit_timing_manager);
     }
 
     xdg_toplevel_destroy(wl->xdg_toplevel);
@@ -1029,6 +1052,15 @@ wl_surface_presentation_feedback(struct wl *wl)
 }
 
 static inline void
+wl_surface_commit_timing(struct wl *wl)
+{
+    if (!wl->commit_timer)
+        return;
+
+    wp_commit_timer_v1_set_timestamp(wl->commit_timer, 0, 0, 0);
+}
+
+static inline void
 wl_present_swapchain_image(struct wl *wl,
                            struct wl_swapchain *swapchain,
                            const struct wl_swapchain_image *img)
@@ -1039,6 +1071,7 @@ wl_present_swapchain_image(struct wl *wl,
     wl_surface_attach(wl->surface, img->buffer, 0, 0);
     wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
 
+    wl_surface_commit_timing(wl);
     wl_surface_presentation_feedback(wl);
 
     wl_surface_commit(wl->surface);
