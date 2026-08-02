@@ -6,6 +6,7 @@
 #ifndef WLUTIL_H
 #define WLUTIL_H
 
+#include "color-management-v1-client-protocol.h"
 #include "commit-timing-v1-client-protocol.h"
 #include "fifo-v1-client-protocol.h"
 #include "linux-dmabuf-v1-client-protocol.h"
@@ -39,6 +40,12 @@ struct wl_output_info {
 
     int32_t scale;
 
+    struct wp_color_management_output_v1 *cm_output;
+    struct wp_image_description_v1 *cm_desc;
+
+    enum wp_color_manager_v1_primaries cm_primaries;
+    enum wp_color_manager_v1_transfer_function cm_tf;
+
     struct wl_list node;
 };
 
@@ -49,6 +56,8 @@ struct wl {
     int display_fd;
 
     struct wl_list outputs;
+
+    struct wp_color_manager_v1 *color_manager;
 
     struct wl_seat *seat;
     struct wl_keyboard *keyboard;
@@ -76,6 +85,8 @@ struct wl {
     struct wl_surface *surface;
     struct wp_commit_timer_v1 *commit_timer;
     struct wp_fifo_v1 *fifo;
+    struct wp_color_management_surface_v1 *cm_surface;
+    struct wp_image_description_v1 *cm_desc;
     struct wp_tearing_control_v1 *tearing_control;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
@@ -411,6 +422,118 @@ static const struct wp_presentation_listener wp_presentation_listener = {
 };
 
 static void
+wl_image_description_info_event_done(void *data, struct wp_image_description_info_v1 *info)
+{
+}
+
+static void
+wl_image_description_info_event_icc_file(void *data,
+                                         struct wp_image_description_info_v1 *info,
+                                         int32_t icc,
+                                         uint32_t icc_size)
+{
+    close(icc);
+}
+
+static void
+wl_image_description_info_event_primaries(void *data,
+                                          struct wp_image_description_info_v1 *info,
+                                          int32_t r_x,
+                                          int32_t r_y,
+                                          int32_t g_x,
+                                          int32_t g_y,
+                                          int32_t b_x,
+                                          int32_t b_y,
+                                          int32_t w_x,
+                                          int32_t w_y)
+{
+}
+
+static void
+wl_image_description_info_event_primaries_named(void *data,
+                                                struct wp_image_description_info_v1 *info,
+                                                uint32_t primaries)
+{
+    struct wl_output_info *out = data;
+    out->cm_primaries = primaries;
+}
+
+static void
+wl_image_description_info_event_tf_power(void *data,
+                                         struct wp_image_description_info_v1 *info,
+                                         uint32_t eexp)
+{
+}
+
+static void
+wl_image_description_info_event_tf_named(void *data,
+                                         struct wp_image_description_info_v1 *info,
+                                         uint32_t tf)
+{
+    struct wl_output_info *out = data;
+    out->cm_tf = tf;
+}
+
+static void
+wl_image_description_info_event_luminances(void *data,
+                                           struct wp_image_description_info_v1 *info,
+                                           uint32_t min_lum,
+                                           uint32_t max_lum,
+                                           uint32_t reference_lum)
+{
+}
+
+static void
+wl_image_description_info_event_target_primaries(void *data,
+                                                 struct wp_image_description_info_v1 *info,
+                                                 int32_t r_x,
+                                                 int32_t r_y,
+                                                 int32_t g_x,
+                                                 int32_t g_y,
+                                                 int32_t b_x,
+                                                 int32_t b_y,
+                                                 int32_t w_x,
+                                                 int32_t w_y)
+{
+}
+
+static void
+wl_image_description_info_event_target_luminance(void *data,
+                                                 struct wp_image_description_info_v1 *info,
+                                                 uint32_t min_lum,
+                                                 uint32_t max_lum)
+{
+}
+
+static void
+wl_image_description_info_event_target_max_cll(void *data,
+                                               struct wp_image_description_info_v1 *info,
+                                               uint32_t max_cll)
+{
+}
+
+static void
+wl_image_description_info_event_target_max_fall(void *data,
+                                                struct wp_image_description_info_v1 *info,
+                                                uint32_t max_fall)
+{
+}
+
+static const struct wp_image_description_info_v1_listener wl_image_description_info_listener = {
+    .done = wl_image_description_info_event_done,
+    .icc_file = wl_image_description_info_event_icc_file,
+    .primaries = wl_image_description_info_event_primaries,
+    .primaries_named = wl_image_description_info_event_primaries_named,
+    .tf_power = wl_image_description_info_event_tf_power,
+    .tf_named = wl_image_description_info_event_tf_named,
+    .luminances = wl_image_description_info_event_luminances,
+    .target_primaries = wl_image_description_info_event_target_primaries,
+    .target_luminance = wl_image_description_info_event_target_luminance,
+    .target_max_cll = wl_image_description_info_event_target_max_cll,
+    .target_max_fall = wl_image_description_info_event_target_max_fall,
+};
+
+static void
 wl_keyboard_event_keymap(
     void *data, struct wl_keyboard *wl_keyboard, uint32_t format, int32_t fd, uint32_t size)
 {
@@ -572,6 +695,8 @@ wl_registry_event_global(
         out->output = wl_registry_bind(reg, name, &wl_output_interface, version);
         wl_output_add_listener(out->output, &wl_output_listener, out);
         wl_list_insert(&wl->outputs, &out->node);
+    } else if (!strcmp(interface, wp_color_manager_v1_interface.name)) {
+        wl->color_manager = wl_registry_bind(reg, name, &wp_color_manager_v1_interface, 1);
     } else if (!strcmp(interface, wl_seat_interface.name)) {
         wl->seat = wl_registry_bind(reg, name, &wl_seat_interface, 1);
         wl_seat_add_listener(wl->seat, &wl_seat_listener, wl);
@@ -663,6 +788,26 @@ wl_init_globals(struct wl *wl)
 }
 
 static inline void
+wl_init_outputs(struct wl *wl)
+{
+    if (wl->color_manager) {
+        struct wl_output_info *out;
+        wl_list_for_each(out, &wl->outputs, node) {
+            out->cm_output = wp_color_manager_v1_get_output(wl->color_manager, out->output);
+            out->cm_desc = wp_color_management_output_v1_get_image_description(out->cm_output);
+
+            struct wp_image_description_info_v1 *info =
+                wp_image_description_v1_get_information(out->cm_desc);
+            wp_image_description_info_v1_add_listener(info, &wl_image_description_info_listener,
+                                                      out);
+            wl_display_roundtrip(wl->display);
+
+            wp_image_description_info_v1_destroy(info);
+        }
+    }
+}
+
+static inline void
 wl_init_surface_dmabuf(struct wl *wl)
 {
     if (wl->dmabuf_version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION)
@@ -684,6 +829,30 @@ wl_init_surface_xdg(struct wl *wl)
     xdg_toplevel_add_listener(wl->xdg_toplevel, &xdg_toplevel_listener, wl);
 
     xdg_toplevel_set_title(wl->xdg_toplevel, "wlutil");
+}
+
+static inline void
+wl_init_surface_cm(struct wl *wl)
+{
+    const enum wp_color_manager_v1_primaries primaries = WP_COLOR_MANAGER_V1_PRIMARIES_SRGB;
+    const enum wp_color_manager_v1_transfer_function tf =
+        WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22;
+    const enum wp_color_manager_v1_render_intent render_intent =
+        WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL;
+
+    if (!wl->color_manager)
+        return;
+
+    wl->cm_surface = wp_color_manager_v1_get_surface(wl->color_manager, wl->surface);
+
+    struct wp_image_description_creator_params_v1 *creator =
+        wp_color_manager_v1_create_parametric_creator(wl->color_manager);
+    wp_image_description_creator_params_v1_set_primaries_named(creator, primaries);
+    wp_image_description_creator_params_v1_set_tf_named(creator, tf);
+    wl->cm_desc = wp_image_description_creator_params_v1_create(creator);
+
+    wp_color_management_surface_v1_set_image_description(wl->cm_surface, wl->cm_desc,
+                                                         render_intent);
 }
 
 static inline void
@@ -725,6 +894,7 @@ wl_init_surface(struct wl *wl)
     wl_init_surface_commit_timing(wl);
     wl_init_surface_fifo(wl);
     wl_init_surface_tearing(wl);
+    wl_init_surface_cm(wl);
     wl_init_surface_xdg(wl);
     wl_init_surface_dmabuf(wl);
 
@@ -750,8 +920,10 @@ wl_init(struct wl *wl, const struct wl_init_params *params)
 
     wl_init_display(wl);
     wl_init_globals(wl);
+    wl_init_outputs(wl);
     wl_init_surface(wl);
 
+    wl_display_roundtrip(wl->display);
     wl->dispatch_ready = true;
 }
 
@@ -772,6 +944,12 @@ wl_cleanup(struct wl *wl)
     if (wl->tearing_control_manager) {
         wp_tearing_control_v1_destroy(wl->tearing_control);
         wp_tearing_control_manager_v1_destroy(wl->tearing_control_manager);
+    }
+
+    if (wl->cm_surface) {
+        wp_color_management_surface_v1_destroy(wl->cm_surface);
+        if (wl->cm_desc)
+            wp_image_description_v1_destroy(wl->cm_desc);
     }
 
     if (wl->fifo_manager) {
@@ -803,8 +981,15 @@ wl_cleanup(struct wl *wl)
     wl_keyboard_destroy(wl->keyboard);
     wl_seat_destroy(wl->seat);
 
+    if (wl->color_manager)
+        wp_color_manager_v1_destroy(wl->color_manager);
+
     struct wl_output_info *out, *out_tmp;
     wl_list_for_each_safe(out, out_tmp, &wl->outputs, node) {
+        if (out->cm_output) {
+            wp_image_description_v1_destroy(out->cm_desc);
+            wp_color_management_output_v1_destroy(out->cm_output);
+        }
         wl_output_release(out->output);
         free(out->make);
         free(out->model);
@@ -869,9 +1054,42 @@ wl_info_outputs(const struct wl *wl)
     const struct wl_output_info *out;
 
     wl_list_for_each(out, &wl->outputs, node) {
-        wl_log("output %s %s: %dx%d @ %.2fHz (scale %dx)", out->make ? out->make : "unknown",
-               out->model ? out->model : "unknown", out->width, out->height,
-               out->refresh_rate / 1000.0, out->scale);
+        const char *primaries;
+        switch (out->cm_primaries) {
+        case WP_COLOR_MANAGER_V1_PRIMARIES_SRGB:
+            primaries = "sRGB";
+            break;
+        case WP_COLOR_MANAGER_V1_PRIMARIES_BT2020:
+            primaries = "BT.2020";
+            break;
+        case WP_COLOR_MANAGER_V1_PRIMARIES_DISPLAY_P3:
+            primaries = "Display P3";
+            break;
+        default:
+            primaries = "unknown";
+            break;
+        }
+
+        const char *tf;
+        switch (out->cm_tf) {
+        case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22:
+            tf = "Gamma 2.2";
+            break;
+        case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_SRGB:
+            tf = "sRGB";
+            break;
+        case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ:
+            tf = "ST2084 PQ";
+            break;
+        default:
+            tf = "unknown";
+            break;
+        }
+
+        wl_log("output %s %s: %dx%d @ %.2fHz (scale %dx), CMS %s (%s / %s)",
+               out->make ? out->make : "unknown", out->model ? out->model : "unknown", out->width,
+               out->height, out->refresh_rate / 1000.0, out->scale,
+               out->cm_output ? "supported" : "unsupported", primaries, tf);
     }
 }
 
