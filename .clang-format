@@ -21,3 +21,5 @@ SpaceBeforeCpp11BracedList: false
 SpaceBeforeParens: ControlStatementsExceptForEachMacros
 ForEachMacros:
   - wl_array_for_each
+  - wl_list_for_each
+  - wl_list_for_each_safe

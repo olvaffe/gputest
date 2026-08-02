@@ -10,7 +10,7 @@
 #include "util.h"
 #include "xdg-shell-client-protocol.h"
 
-#include <linux/input.h>
+#include <linux/input-event-codes.h>
 #include <wayland-client.h>
 
 #define wl_die(format, ...) u_die("WL", format __VA_OPT__(, ) __VA_ARGS__)
@@ -23,17 +23,34 @@ struct wl_init_params {
     void (*key)(void *data, uint32_t key);
 };
 
+struct wl_output_info {
+    struct wl_output *output;
+
+    char *make;
+    char *model;
+
+    int32_t width;
+    int32_t height;
+    int32_t refresh_rate;
+
+    int32_t scale;
+
+    struct wl_list node;
+};
+
 struct wl {
     struct wl_init_params params;
 
     struct wl_display *display;
     int display_fd;
 
-    struct wl_compositor *compositor;
-    uint32_t compositor_version;
+    struct wl_list outputs;
 
     struct wl_seat *seat;
     struct wl_keyboard *keyboard;
+
+    struct wl_compositor *compositor;
+    uint32_t compositor_version;
 
     struct xdg_wm_base *wm_base;
 
@@ -318,6 +335,16 @@ static const struct wl_shm_listener wl_shm_listener = {
 };
 
 static void
+xdg_wm_base_event_ping(void *data, struct xdg_wm_base *wm_base, uint32_t serial)
+{
+    xdg_wm_base_pong(wm_base, serial);
+}
+
+static const struct xdg_wm_base_listener xdg_wm_base_listener = {
+    .ping = xdg_wm_base_event_ping,
+};
+
+static void
 wl_keyboard_event_keymap(
     void *data, struct wl_keyboard *wl_keyboard, uint32_t format, int32_t fd, uint32_t size)
 {
@@ -402,13 +429,61 @@ static const struct wl_seat_listener wl_seat_listener = {
 };
 
 static void
-xdg_wm_base_event_ping(void *data, struct xdg_wm_base *wm_base, uint32_t serial)
+wl_output_event_geometry(void *data,
+                         struct wl_output *output,
+                         int32_t x,
+                         int32_t y,
+                         int32_t physical_width,
+                         int32_t physical_height,
+                         int32_t subpixel,
+                         const char *make,
+                         const char *model,
+                         int32_t transform)
 {
-    xdg_wm_base_pong(wm_base, serial);
+    struct wl_output_info *out = data;
+
+    free(out->make);
+    free(out->model);
+    out->make = strdup(make);
+    out->model = strdup(model);
 }
 
-static const struct xdg_wm_base_listener xdg_wm_base_listener = {
-    .ping = xdg_wm_base_event_ping,
+static void
+wl_output_event_mode(void *data,
+                     struct wl_output *output,
+                     uint32_t flags,
+                     int32_t width,
+                     int32_t height,
+                     int32_t refresh)
+{
+    struct wl_output_info *out = data;
+
+    if (!(flags & WL_OUTPUT_MODE_CURRENT))
+        return;
+
+    out->width = width;
+    out->height = height;
+    out->refresh_rate = refresh;
+}
+
+static void
+wl_output_event_done(void *data, struct wl_output *output)
+{
+}
+
+static void
+wl_output_event_scale(void *data, struct wl_output *output, int32_t factor)
+{
+    struct wl_output_info *out = data;
+
+    out->scale = factor;
+}
+
+static const struct wl_output_listener wl_output_listener = {
+    .geometry = wl_output_event_geometry,
+    .mode = wl_output_event_mode,
+    .done = wl_output_event_done,
+    .scale = wl_output_event_scale,
 };
 
 static void
@@ -417,7 +492,24 @@ wl_registry_event_global(
 {
     struct wl *wl = data;
 
-    if (!strcmp(interface, wl_compositor_interface.name)) {
+    if (!strcmp(interface, wl_output_interface.name)) {
+        if (version < WL_OUTPUT_RELEASE_SINCE_VERSION) {
+            wl_die("%s ver %d req %d", interface, version, WL_OUTPUT_RELEASE_SINCE_VERSION);
+        }
+        version = WL_OUTPUT_RELEASE_SINCE_VERSION;
+
+        struct wl_output_info *out = calloc(1, sizeof(*out));
+        if (!out)
+            wl_die("failed to alloc output info");
+        out->scale = 1;
+
+        out->output = wl_registry_bind(reg, name, &wl_output_interface, version);
+        wl_output_add_listener(out->output, &wl_output_listener, out);
+        wl_list_insert(&wl->outputs, &out->node);
+    } else if (!strcmp(interface, wl_seat_interface.name)) {
+        wl->seat = wl_registry_bind(reg, name, &wl_seat_interface, 1);
+        wl_seat_add_listener(wl->seat, &wl_seat_listener, wl);
+    } else if (!strcmp(interface, wl_compositor_interface.name)) {
         if (version < WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
             wl_die("%s ver %d req %d", interface, version,
                    WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION);
@@ -429,9 +521,6 @@ wl_registry_event_global(
     } else if (!strcmp(interface, xdg_wm_base_interface.name)) {
         wl->wm_base = wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(wl->wm_base, &xdg_wm_base_listener, wl);
-    } else if (!strcmp(interface, wl_seat_interface.name)) {
-        wl->seat = wl_registry_bind(reg, name, &wl_seat_interface, 1);
-        wl_seat_add_listener(wl->seat, &wl_seat_listener, wl);
     } else if (!strcmp(interface, wl_shm_interface.name)) {
         wl->shm = wl_registry_bind(reg, name, &wl_shm_interface, 1);
         wl_shm_add_listener(wl->shm, &wl_shm_listener, wl);
@@ -534,6 +623,8 @@ static inline void
 wl_init(struct wl *wl, const struct wl_init_params *params)
 {
     memset(wl, 0, sizeof(*wl));
+    wl_list_init(&wl->outputs);
+
     if (params)
         wl->params = *params;
 
@@ -572,18 +663,40 @@ wl_cleanup(struct wl *wl)
 
     xdg_wm_base_destroy(wl->wm_base);
 
+    wl_compositor_destroy(wl->compositor);
+
     wl_keyboard_destroy(wl->keyboard);
     wl_seat_destroy(wl->seat);
 
-    wl_compositor_destroy(wl->compositor);
+    struct wl_output_info *out, *out_tmp;
+    wl_list_for_each_safe(out, out_tmp, &wl->outputs, node) {
+        wl_output_release(out->output);
+        free(out->make);
+        free(out->model);
+        free(out);
+    }
 
     wl_display_flush(wl->display);
     wl_display_disconnect(wl->display);
 }
 
 static inline void
+wl_info_outputs(const struct wl *wl)
+{
+    const struct wl_output_info *out;
+
+    wl_list_for_each(out, &wl->outputs, node) {
+        wl_log("out %s %s: %dx%d @ %.2fHz (scale %dx)", out->make ? out->make : "unknown",
+               out->model ? out->model : "unknown", out->width, out->height,
+               out->refresh_rate / 1000.0, out->scale);
+    }
+}
+
+static inline void
 wl_info(const struct wl *wl)
 {
+    wl_info_outputs(wl);
+
     const uint32_t *shm_iter;
     uint32_t idx = 0;
     wl_array_for_each(shm_iter, &wl->shm_formats) {
