@@ -7,6 +7,7 @@
 #define WLUTIL_H
 
 #include "commit-timing-v1-client-protocol.h"
+#include "fifo-v1-client-protocol.h"
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "presentation-time-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
@@ -59,7 +60,8 @@ struct wl {
     uint32_t presentation_clock_id;
 
     struct wp_commit_timing_manager_v1 *commit_timing_manager;
-    struct wp_commit_timer_v1 *commit_timer;
+
+    struct wp_fifo_manager_v1 *fifo_manager;
 
     struct wp_tearing_control_manager_v1 *tearing_control_manager;
 
@@ -72,6 +74,8 @@ struct wl {
     uint32_t dmabuf_version;
 
     struct wl_surface *surface;
+    struct wp_commit_timer_v1 *commit_timer;
+    struct wp_fifo_v1 *fifo;
     struct wp_tearing_control_v1 *tearing_control;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
@@ -586,6 +590,8 @@ wl_registry_event_global(
     } else if (!strcmp(interface, wp_commit_timing_manager_v1_interface.name)) {
         wl->commit_timing_manager =
             wl_registry_bind(reg, name, &wp_commit_timing_manager_v1_interface, 1);
+    } else if (!strcmp(interface, wp_fifo_manager_v1_interface.name)) {
+        wl->fifo_manager = wl_registry_bind(reg, name, &wp_fifo_manager_v1_interface, 1);
     } else if (!strcmp(interface, wp_tearing_control_manager_v1_interface.name)) {
         wl->tearing_control_manager =
             wl_registry_bind(reg, name, &wp_tearing_control_manager_v1_interface, 1);
@@ -693,6 +699,15 @@ wl_init_surface_tearing(struct wl *wl)
 }
 
 static inline void
+wl_init_surface_fifo(struct wl *wl)
+{
+    if (!wl->fifo_manager)
+        return;
+
+    wl->fifo = wp_fifo_manager_v1_get_fifo(wl->fifo_manager, wl->surface);
+}
+
+static inline void
 wl_init_surface_commit_timing(struct wl *wl)
 {
     if (!wl->commit_timing_manager)
@@ -708,6 +723,7 @@ wl_init_surface(struct wl *wl)
     wl->surface = wl_compositor_create_surface(wl->compositor);
 
     wl_init_surface_commit_timing(wl);
+    wl_init_surface_fifo(wl);
     wl_init_surface_tearing(wl);
     wl_init_surface_xdg(wl);
     wl_init_surface_dmabuf(wl);
@@ -756,6 +772,11 @@ wl_cleanup(struct wl *wl)
     if (wl->tearing_control_manager) {
         wp_tearing_control_v1_destroy(wl->tearing_control);
         wp_tearing_control_manager_v1_destroy(wl->tearing_control_manager);
+    }
+
+    if (wl->fifo_manager) {
+        wp_fifo_v1_destroy(wl->fifo);
+        wp_fifo_manager_v1_destroy(wl->fifo_manager);
     }
 
     if (wl->commit_timing_manager) {
@@ -1052,6 +1073,19 @@ wl_surface_presentation_feedback(struct wl *wl)
 }
 
 static inline void
+wl_surface_fifo(struct wl *wl)
+{
+    if (!wl->fifo)
+        return;
+
+    /* add a dependency on the barrier bit */
+    wp_fifo_v1_wait_barrier(wl->fifo);
+
+    /* set the barrier bit which auto-clear on deadline latch */
+    wp_fifo_v1_set_barrier(wl->fifo);
+}
+
+static inline void
 wl_surface_commit_timing(struct wl *wl)
 {
     if (!wl->commit_timer)
@@ -1072,8 +1106,17 @@ wl_present_swapchain_image(struct wl *wl,
     wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
 
     wl_surface_commit_timing(wl);
+    wl_surface_fifo(wl);
     wl_surface_presentation_feedback(wl);
 
+    /* Every surface commit creates a transaction from the pending state. The
+     * transaction updates the active state only when its dependencies are
+     * resolved. Explicit/implicit fencing, commit timing, fifo barrier wait,
+     * etc. are all examples of dependencies.
+     *
+     * Transactions always update the active state in order. Deadline latch
+     * uses the active state.
+     */
     wl_surface_commit(wl->surface);
 }
 

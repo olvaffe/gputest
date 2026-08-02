@@ -198,6 +198,7 @@ idep_wlutil = dep_not_found
 if dep_wl_client.found() and dep_wl_protocols.found()
   wl_wp_xmls = [
     wayland.find_protocol('commit-timing', state: 'staging', version: 1),
+    wayland.find_protocol('fifo', state: 'staging', version: 1),
     wayland.find_protocol('linux-dmabuf', state: 'stable', version: 1),
     wayland.find_protocol('presentation-time', state: 'stable'),
     wayland.find_protocol('tearing-control', state: 'staging', version: 1),
