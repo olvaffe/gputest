@@ -51,6 +51,8 @@ struct wl_output_info {
 };
 
 struct wl_globals {
+    struct wl_fixes *fixes;
+
     struct wl_array outputs;
 
     struct wp_color_manager_v1 *color_manager;
@@ -627,7 +629,7 @@ wl_seat_event_capabilities(void *data, struct wl_seat *seat, uint32_t capabiliti
         wl->globals.keyboard = wl_seat_get_keyboard(seat);
         wl_keyboard_add_listener(wl->globals.keyboard, &wl_keyboard_listener, wl);
     } else if (!(capabilities & WL_SEAT_CAPABILITY_KEYBOARD) && wl->globals.keyboard) {
-        wl_keyboard_destroy(wl->globals.keyboard);
+        wl_keyboard_release(wl->globals.keyboard);
         wl->globals.keyboard = NULL;
     }
 }
@@ -700,7 +702,9 @@ wl_registry_event_global(
 {
     struct wl *wl = data;
 
-    if (!strcmp(interface, wl_output_interface.name)) {
+    if (!strcmp(interface, wl_fixes_interface.name)) {
+        wl->globals.fixes = wl_registry_bind(reg, name, &wl_fixes_interface, 1);
+    } else if (!strcmp(interface, wl_output_interface.name)) {
         if (version < WL_OUTPUT_RELEASE_SINCE_VERSION) {
             wl_die("%s ver %d req %d", interface, version, WL_OUTPUT_RELEASE_SINCE_VERSION);
         }
@@ -718,7 +722,12 @@ wl_registry_event_global(
         wl->globals.color_manager =
             wl_registry_bind(reg, name, &wp_color_manager_v1_interface, 1);
     } else if (!strcmp(interface, wl_seat_interface.name)) {
-        wl->globals.seat = wl_registry_bind(reg, name, &wl_seat_interface, 1);
+        if (version < WL_SEAT_RELEASE_SINCE_VERSION) {
+            wl_die("%s ver %d req %d", interface, version, WL_SEAT_RELEASE_SINCE_VERSION);
+        }
+        version = WL_SEAT_RELEASE_SINCE_VERSION;
+
+        wl->globals.seat = wl_registry_bind(reg, name, &wl_seat_interface, version);
         wl_seat_add_listener(wl->globals.seat, &wl_seat_listener, wl);
     } else if (!strcmp(interface, wl_compositor_interface.name)) {
         if (version < WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
@@ -797,6 +806,8 @@ wl_init_globals(struct wl *wl)
     /* roundtrip again because we might have called wl_registry_bind */
     wl_display_roundtrip(wl->display);
 
+    if (wl->globals.fixes)
+        wl_fixes_destroy_registry(wl->globals.fixes, reg);
     wl_registry_destroy(reg);
 
     if (!wl->globals.compositor)
@@ -1007,11 +1018,14 @@ wl_cleanup_globals(struct wl *wl)
     wl_compositor_destroy(wl->globals.compositor);
 
     if (wl->globals.keyboard)
-        wl_keyboard_destroy(wl->globals.keyboard);
-    wl_seat_destroy(wl->globals.seat);
+        wl_keyboard_release(wl->globals.keyboard);
+    wl_seat_release(wl->globals.seat);
 
     if (wl->globals.color_manager)
         wp_color_manager_v1_destroy(wl->globals.color_manager);
+
+    if (wl->globals.fixes)
+        wl_fixes_destroy(wl->globals.fixes);
 
     struct wl_output_info **out_iter;
     wl_array_for_each(out_iter, &wl->globals.outputs) {
@@ -1334,6 +1348,8 @@ wl_add_swapchain_image_dmabuf(struct wl *wl,
     }
     img->buffer = zwp_linux_buffer_params_v1_create_immed(
         params, swapchain->width, swapchain->height, swapchain->format, 0);
+    zwp_linux_buffer_params_v1_destroy(params);
+
     if (wl->params.explicit_sync)
         assert(img->acquire_timeline && img->release_timeline);
     else
