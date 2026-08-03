@@ -426,6 +426,7 @@ static const struct wp_presentation_listener wp_presentation_listener = {
 static void
 wl_image_description_info_event_done(void *data, struct wp_image_description_info_v1 *info)
 {
+    wp_image_description_info_v1_destroy(info);
 }
 
 static void
@@ -802,9 +803,6 @@ wl_init_outputs(struct wl *wl)
                 wp_image_description_v1_get_information(out->cm_desc);
             wp_image_description_info_v1_add_listener(info, &wl_image_description_info_listener,
                                                       out);
-            wl_display_roundtrip(wl->display);
-
-            wp_image_description_info_v1_destroy(info);
         }
     }
 }
