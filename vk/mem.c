@@ -120,7 +120,12 @@ memory_test_draw(struct memory_test *test)
 
         VkDeviceMemory mem = vk_alloc_memory(vk, size, i);
         void *src;
-        vk->result = vk->MapMemory(vk->dev, mem, 0, size, 0, &src);
+        const VkMemoryMapInfo map_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+            .memory = mem,
+            .size = size,
+        };
+        vk->result = vk->MapMemory2(vk->dev, &map_info, &src);
         vk_check(vk, "failed to map memory");
 
         const bool mt_local = mt->propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;

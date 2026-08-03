@@ -133,14 +133,24 @@ class gputest_vulkan_memory_allocator : public skgpu::VulkanMemoryAllocator {
         const skgpu::VulkanAlloc *a = reinterpret_cast<const skgpu::VulkanAlloc *>(memory);
         if (!a)
             return VK_ERROR_INITIALIZATION_FAILED;
-        return vk->MapMemory(vk->dev, a->fMemory, 0, a->fSize, 0, data);
+        const VkMemoryMapInfo map_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+            .memory = a->fMemory,
+            .size = a->fSize,
+        };
+        return vk->MapMemory2(vk->dev, &map_info, data);
     }
 
     void unmapMemory(const skgpu::VulkanBackendMemory &memory) override
     {
         const skgpu::VulkanAlloc *a = reinterpret_cast<const skgpu::VulkanAlloc *>(memory);
-        if (a)
-            vk->UnmapMemory(vk->dev, a->fMemory);
+        if (a) {
+            const VkMemoryUnmapInfo unmap_info = {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_UNMAP_INFO,
+                .memory = a->fMemory,
+            };
+            vk->UnmapMemory2(vk->dev, &unmap_info);
+        }
     }
 
     void freeMemory(const skgpu::VulkanBackendMemory &memory) override

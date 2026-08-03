@@ -377,7 +377,12 @@ bench_buffer_test_draw_mt(struct bench_buffer_test *test, uint32_t mt_idx)
         VkDeviceMemory mem = vk_alloc_memory(vk, test->size, mt_idx);
 
         void *mem_ptr;
-        vk->result = vk->MapMemory(vk->dev, mem, 0, test->size, 0, &mem_ptr);
+        const VkMemoryMapInfo map_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+            .memory = mem,
+            .size = test->size,
+        };
+        vk->result = vk->MapMemory2(vk->dev, &map_info, &mem_ptr);
         vk_check(vk, "failed to map memory");
 
         uint64_t dur = bench_buffer_test_memset(test, mem_ptr);
@@ -393,9 +398,19 @@ bench_buffer_test_draw_mt(struct bench_buffer_test *test, uint32_t mt_idx)
 
         void *dst_ptr;
         void *src_ptr;
-        vk->result = vk->MapMemory(vk->dev, dst, 0, test->size, 0, &dst_ptr);
+        const VkMemoryMapInfo dst_map_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+            .memory = dst,
+            .size = test->size,
+        };
+        vk->result = vk->MapMemory2(vk->dev, &dst_map_info, &dst_ptr);
         vk_check(vk, "failed to map memory");
-        vk->result = vk->MapMemory(vk->dev, src, 0, test->size, 0, &src_ptr);
+        const VkMemoryMapInfo src_map_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+            .memory = src,
+            .size = test->size,
+        };
+        vk->result = vk->MapMemory2(vk->dev, &src_map_info, &src_ptr);
         vk_check(vk, "failed to map memory");
 
         uint64_t dur = bench_buffer_test_memcpy(test, dst_ptr, src_ptr);

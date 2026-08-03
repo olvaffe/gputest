@@ -737,7 +737,12 @@ vk_create_buffer_with_mt(struct vk *vk,
 
     const VkMemoryType *mt = &vk->mem_props.memoryTypes[mt_idx];
     if (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
-        vk->result = vk->MapMemory(vk->dev, buf->mem, 0, buf->mem_size, 0, &buf->mem_ptr);
+        const VkMemoryMapInfo map_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+            .memory = buf->mem,
+            .size = buf->mem_size,
+        };
+        vk->result = vk->MapMemory2(vk->dev, &map_info, &buf->mem_ptr);
         vk_check(vk, "failed to map buffer memory");
 
         buf->is_coherent = mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -860,7 +865,12 @@ vk_init_image(struct vk *vk, struct vk_image *img, uint32_t mt_idx)
 
     const VkMemoryType *mt = &vk->mem_props.memoryTypes[mt_idx];
     if (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
-        vk->result = vk->MapMemory(vk->dev, img->mem, 0, img->mem_size, 0, &img->mem_ptr);
+        const VkMemoryMapInfo map_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+            .memory = img->mem,
+            .size = img->mem_size,
+        };
+        vk->result = vk->MapMemory2(vk->dev, &map_info, &img->mem_ptr);
         vk_check(vk, "failed to map image memory");
 
         img->is_coherent = mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;

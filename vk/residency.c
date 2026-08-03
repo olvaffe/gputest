@@ -123,7 +123,12 @@ residency_test_run_vulkan(struct residency_test *test, uint32_t mt)
     const VkMemoryPropertyFlags mt_flags = vk->mem_props.memoryTypes[mt].propertyFlags;
     if (mt_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
         void *ptr;
-        vk->result = vk->MapMemory(vk->dev, mem, 0, VK_WHOLE_SIZE, 0, &ptr);
+        const VkMemoryMapInfo map_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+            .memory = mem,
+            .size = VK_WHOLE_SIZE,
+        };
+        vk->result = vk->MapMemory2(vk->dev, &map_info, &ptr);
         vk_check(vk, "failed to map memory");
         residency_test_log_statm(test, "  after map");
 

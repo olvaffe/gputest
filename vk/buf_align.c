@@ -41,7 +41,12 @@ buf_align_test_init(struct buf_align_test *test)
     /* allocate a page to be suballocated for VkBuffer */
     test->mem = vk_alloc_memory(vk, 4096, vk->buf_mt_index);
     test->mem_used = 0;
-    vk->result = vk->MapMemory(vk->dev, test->mem, 0, test->mem_size, 0, &test->mem_ptr);
+    const VkMemoryMapInfo map_info = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+        .memory = test->mem,
+        .size = test->mem_size,
+    };
+    vk->result = vk->MapMemory2(vk->dev, &map_info, &test->mem_ptr);
     vk_check(vk, "failed to map memory");
 
     const VkBufferCreateInfo buf_info = {
@@ -103,7 +108,11 @@ buf_align_test_cleanup(struct buf_align_test *test)
     vk->DestroyBuffer(vk->dev, test->src_buf, NULL);
     vk->DestroyBuffer(vk->dev, test->disturb, NULL);
 
-    vk->UnmapMemory(vk->dev, test->mem);
+    const VkMemoryUnmapInfo unmap_info = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_UNMAP_INFO,
+        .memory = test->mem,
+    };
+    vk->UnmapMemory2(vk->dev, &unmap_info);
     vk->FreeMemory(vk->dev, test->mem, NULL);
 
     vk_cleanup(vk);

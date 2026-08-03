@@ -686,7 +686,12 @@ vk_allocator_bo_map(struct vk_allocator *alloc, struct vk_allocator_bo *bo, uint
     struct vk *vk = &alloc->vk;
 
     void *ptr;
-    vk->result = vk->MapMemory(vk->dev, bo->mems[mem_plane], 0, VK_WHOLE_SIZE, 0, &ptr);
+    const VkMemoryMapInfo map_info = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+        .memory = bo->mems[mem_plane],
+        .size = VK_WHOLE_SIZE,
+    };
+    vk->result = vk->MapMemory2(vk->dev, &map_info, &ptr);
     if (vk->result != VK_SUCCESS)
         return NULL;
 
@@ -698,7 +703,11 @@ vk_allocator_bo_map(struct vk_allocator *alloc, struct vk_allocator_bo *bo, uint
         };
         vk->result = vk->InvalidateMappedMemoryRanges(vk->dev, 1, &range);
         if (vk->result != VK_SUCCESS) {
-            vk->UnmapMemory(vk->dev, bo->mems[mem_plane]);
+            const VkMemoryUnmapInfo unmap_info = {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_UNMAP_INFO,
+                .memory = bo->mems[mem_plane],
+            };
+            vk->UnmapMemory2(vk->dev, &unmap_info);
             return NULL;
         }
     }
@@ -722,7 +731,11 @@ vk_allocator_bo_unmap(struct vk_allocator *alloc, struct vk_allocator_bo *bo, ui
             vk_log("failed to flush mapped memory");
     }
 
-    vk->UnmapMemory(vk->dev, bo->mems[mem_plane]);
+    const VkMemoryUnmapInfo unmap_info = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_UNMAP_INFO,
+        .memory = bo->mems[mem_plane],
+    };
+    vk->UnmapMemory2(vk->dev, &unmap_info);
 }
 
 static inline struct vk_allocator_transfer *

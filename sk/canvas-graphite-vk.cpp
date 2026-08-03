@@ -35,7 +35,6 @@ canvas_graphite_vk_test_init(struct canvas_graphite_vk_test *test)
     struct sk *sk = &test->sk;
 
     const struct vk_init_params vk_params = {
-        .api_version = VK_API_VERSION_1_4,
         .enable_all_features = true,
     };
     vk_init(vk, &vk_params);

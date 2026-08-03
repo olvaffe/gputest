@@ -83,7 +83,12 @@ dma_heap_test_init_memory(struct dma_heap_test *test)
         /* Some implementations refuse to map imported memory. Some map imported memory via the
          * dma-buf and do not respect coherent/cached bits.
          */
-        if (vk->MapMemory(vk->dev, test->mem, 0, VK_WHOLE_SIZE, 0, &test->mem_ptr) != VK_SUCCESS)
+        const VkMemoryMapInfo map_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
+            .memory = test->mem,
+            .size = VK_WHOLE_SIZE,
+        };
+        if (vk->MapMemory2(vk->dev, &map_info, &test->mem_ptr) != VK_SUCCESS)
             vk_log("failed to map memory");
 
         /* some trigger SIGBUS on access */
