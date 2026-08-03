@@ -201,6 +201,7 @@ if dep_wl_client.found() and dep_wl_protocols.found()
     wayland.find_protocol('commit-timing', state: 'staging', version: 1),
     wayland.find_protocol('fifo', state: 'staging', version: 1),
     wayland.find_protocol('linux-dmabuf', state: 'stable', version: 1),
+    wayland.find_protocol('linux-drm-syncobj', state: 'staging', version: 1),
     wayland.find_protocol('presentation-time', state: 'stable'),
     wayland.find_protocol('tearing-control', state: 'staging', version: 1),
     wayland.find_protocol('xdg-shell', state: 'stable'),

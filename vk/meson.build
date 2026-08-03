@@ -68,7 +68,7 @@ endif
 if idep_sdlutil.found()
   tests += ['sdl']
 endif
-if idep_wlutil.found()
+if idep_wlutil.found() and idep_drmutil.found()
   tests += ['wl']
 endif
 
@@ -133,7 +133,7 @@ foreach t : tests
   elif t == 'sdl'
     test_deps += [idep_sdlutil]
   elif t == 'wl'
-    test_deps += [idep_wlutil]
+    test_deps += [idep_wlutil, idep_drmutil]
   endif
 
   if t == 'android'

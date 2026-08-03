@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "drmutil.h"
 #include "vkutil_allocator.h"
 #include "wlutil.h"
 
@@ -13,9 +14,11 @@ struct wl_test {
     uint32_t drm_format;
     uint64_t modifier;
     bool shm;
+    bool explicit_sync;
 
     struct wl wl;
     struct vk_allocator alloc;
+    struct drm drm;
 
     struct wl_swapchain *swapchain;
     bool quit;
@@ -149,12 +152,37 @@ wl_test_paint_rgba_pattern(struct wl_test *test, void *dst, uint32_t pitch)
 }
 
 static void
+wl_test_wait_explicit_sync(struct wl_test *test)
+{
+    struct drm *drm = &test->drm;
+    struct wl_swapchain *swapchain = test->swapchain;
+    uint32_t handles[8];
+    uint64_t points[8];
+
+    if (!test->explicit_sync)
+        return;
+
+    assert(swapchain->image_count <= ARRAY_SIZE(handles));
+    for (uint32_t i = 0; i < swapchain->image_count; i++) {
+        const struct wl_swapchain_image *img = &swapchain->images[i];
+        handles[i] = img->release_handle;
+        points[i] = img->release_point;
+    }
+
+    const uint32_t idx = drm_syncobj_wait(drm, handles, points, swapchain->image_count, 0);
+    struct wl_swapchain_image *img = &swapchain->images[idx];
+    img->busy = false;
+}
+
+static void
 wl_test_dispatch_redraw(void *data)
 {
     struct wl_test *test = data;
     struct wl *wl = &test->wl;
     struct vk_allocator *alloc = &test->alloc;
+    struct drm *drm = &test->drm;
 
+    wl_test_wait_explicit_sync(test);
     const struct wl_swapchain_image *img = wl_acquire_swapchain_image(wl, test->swapchain);
 
     if (test->shm) {
@@ -220,6 +248,8 @@ wl_test_dispatch_redraw(void *data)
         }
     }
 
+    if (test->explicit_sync)
+        drm_syncobj_signal(drm, img->acquire_handle, img->acquire_point);
     wl_present_swapchain_image(wl, test->swapchain, img);
 }
 
@@ -236,6 +266,28 @@ wl_test_loop(struct wl_test *test)
 }
 
 static void
+wl_test_init_swapchain_timelines(struct wl_test *test)
+{
+    struct wl *wl = &test->wl;
+    struct drm *drm = &test->drm;
+    struct wl_swapchain *swapchain = test->swapchain;
+
+    if (!test->explicit_sync)
+        return;
+
+    for (uint32_t i = 0; i < swapchain->image_count; i++) {
+        struct wl_swapchain_image *img = &test->swapchain->images[i];
+
+        img->acquire_handle = drm_syncobj_create(drm);
+        img->release_handle = drm_syncobj_create(drm);
+
+        const int acquire_fd = drm_syncobj_export(drm, img->acquire_handle);
+        const int release_fd = drm_syncobj_export(drm, img->release_handle);
+        wl_add_swapchain_image_timelines(wl, swapchain, img, acquire_fd, release_fd);
+    }
+}
+
+static void
 wl_test_init_swapchain(struct wl_test *test)
 {
     const uint32_t image_count = 3;
@@ -244,6 +296,7 @@ wl_test_init_swapchain(struct wl_test *test)
 
     test->swapchain = wl_create_swapchain(wl, test->width, test->height, test->drm_format,
                                           test->modifier, image_count);
+    wl_test_init_swapchain_timelines(test);
 
     if (test->shm) {
         wl_add_swapchain_images_shm(wl, test->swapchain);
@@ -310,6 +363,7 @@ wl_test_init(struct wl_test *test)
 {
     struct wl *wl = &test->wl;
     struct vk_allocator *alloc = &test->alloc;
+    struct drm *drm = &test->drm;
 
     const struct wl_init_params wl_params = {
         .data = test,
@@ -322,6 +376,10 @@ wl_test_init(struct wl_test *test)
 
     /* TODO use wl->active.{main_dev,target_dev} */
     vk_allocator_init(alloc, NULL, false);
+    if (test->explicit_sync) {
+        drm_init(drm, NULL);
+        drm_open(drm, 0, DRM_NODE_RENDER);
+    }
 
     wl_test_init_swapchain(test);
 }
@@ -331,6 +389,7 @@ wl_test_cleanup(struct wl_test *test)
 {
     struct wl *wl = &test->wl;
     struct vk_allocator *alloc = &test->alloc;
+    struct drm *drm = &test->drm;
 
     if (!test->shm) {
         for (uint32_t i = 0; i < test->swapchain->image_count; i++) {
@@ -339,6 +398,11 @@ wl_test_cleanup(struct wl_test *test)
         }
     }
     wl_destroy_swapchain(wl, test->swapchain);
+
+    if (test->explicit_sync) {
+        drm_close(drm);
+        drm_cleanup(drm);
+    }
 
     vk_allocator_cleanup(alloc);
     wl_cleanup(wl);
@@ -354,6 +418,7 @@ main(void)
         .drm_format = DRM_FORMAT_NV12,
         .modifier = DRM_FORMAT_MOD_LINEAR,
         .shm = false,
+        .explicit_sync = false,
     };
 
     wl_test_init(&test);

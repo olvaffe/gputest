@@ -10,6 +10,7 @@
 #include "commit-timing-v1-client-protocol.h"
 #include "fifo-v1-client-protocol.h"
 #include "linux-dmabuf-v1-client-protocol.h"
+#include "linux-drm-syncobj-v1-client-protocol.h"
 #include "presentation-time-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
 #include "util.h"
@@ -69,6 +70,8 @@ struct wl_globals {
 
     struct xdg_wm_base *wm_base;
 
+    struct wp_linux_drm_syncobj_manager_v1 *syncobj_manager;
+
     struct wl_shm *shm;
     struct wl_array shm_formats;
 
@@ -93,6 +96,7 @@ struct wl {
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
     bool xdg_ready;
+    struct wp_linux_drm_syncobj_surface_v1 *syncobj_surface;
 
     struct zwp_linux_dmabuf_feedback_v1 *dmabuf_feedback;
     const void *dmabuf_format_table;
@@ -108,20 +112,30 @@ struct wl {
     bool dispatch_ready;
 };
 
+struct wl_swapchain_image {
+    struct wl_buffer *buffer;
+    bool busy;
+    void *data;
+
+    uint32_t acquire_handle;
+    struct wp_linux_drm_syncobj_timeline_v1 *acquire_timeline;
+    uint64_t acquire_point;
+
+    uint32_t release_handle;
+    uint64_t release_point;
+    struct wp_linux_drm_syncobj_timeline_v1 *release_timeline;
+};
+
 struct wl_swapchain {
     uint32_t width;
     uint32_t height;
     uint32_t format;
     uint64_t modifier;
+
+    struct wl_swapchain_image *images;
     uint32_t image_count;
 
     uint32_t shm_size;
-
-    struct wl_swapchain_image {
-        struct wl_buffer *buffer;
-        bool busy;
-        void *data;
-    } *images;
 };
 
 static void
@@ -725,6 +739,9 @@ wl_registry_event_global(
     } else if (!strcmp(interface, xdg_wm_base_interface.name)) {
         wl->globals.wm_base = wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(wl->globals.wm_base, &xdg_wm_base_listener, wl);
+    } else if (!strcmp(interface, wp_linux_drm_syncobj_manager_v1_interface.name)) {
+        wl->globals.syncobj_manager =
+            wl_registry_bind(reg, name, &wp_linux_drm_syncobj_manager_v1_interface, 1);
     } else if (!strcmp(interface, wl_shm_interface.name)) {
         wl->globals.shm = wl_registry_bind(reg, name, &wl_shm_interface, 1);
         wl_shm_add_listener(wl->globals.shm, &wl_shm_listener, wl);
@@ -879,6 +896,12 @@ wl_init_surface(struct wl *wl)
 
     wl_init_surface_cm(wl);
     wl_init_surface_xdg(wl);
+
+    if (wl->globals.syncobj_manager) {
+        wl->syncobj_surface =
+            wp_linux_drm_syncobj_manager_v1_get_surface(wl->globals.syncobj_manager, wl->surface);
+    }
+
     wl_init_surface_dmabuf(wl);
 
     wl_surface_commit(wl->surface);
@@ -924,6 +947,9 @@ wl_cleanup_surface(struct wl *wl)
     if (wl->dmabuf_feedback)
         zwp_linux_dmabuf_feedback_v1_destroy(wl->dmabuf_feedback);
 
+    if (wl->syncobj_surface)
+        wp_linux_drm_syncobj_surface_v1_destroy(wl->syncobj_surface);
+
     xdg_toplevel_destroy(wl->xdg_toplevel);
     xdg_surface_destroy(wl->xdg_surface);
 
@@ -951,6 +977,9 @@ wl_cleanup_globals(struct wl *wl)
 
     wl_array_release(&wl->globals.shm_formats);
     wl_shm_destroy(wl->globals.shm);
+
+    if (wl->globals.syncobj_manager)
+        wp_linux_drm_syncobj_manager_v1_destroy(wl->globals.syncobj_manager);
 
     xdg_wm_base_destroy(wl->globals.wm_base);
 
@@ -1191,8 +1220,13 @@ wl_destroy_swapchain(struct wl *wl, struct wl_swapchain *swapchain)
 {
     for (uint32_t i = 0; i < swapchain->image_count; i++) {
         struct wl_swapchain_image *img = &swapchain->images[i];
+
         if (img->buffer)
             wl_buffer_destroy(img->buffer);
+        if (img->acquire_timeline)
+            wp_linux_drm_syncobj_timeline_v1_destroy(img->acquire_timeline);
+        if (img->release_timeline)
+            wp_linux_drm_syncobj_timeline_v1_destroy(img->release_timeline);
     }
 
     if (swapchain->shm_size)
@@ -1200,6 +1234,25 @@ wl_destroy_swapchain(struct wl *wl, struct wl_swapchain *swapchain)
 
     free(swapchain->images);
     free(swapchain);
+}
+
+static inline void
+wl_add_swapchain_image_timelines(struct wl *wl,
+                                 struct wl_swapchain *swapchain,
+                                 struct wl_swapchain_image *img,
+                                 int acquire_fd,
+                                 int release_fd)
+{
+    if (!wl->globals.syncobj_manager)
+        wl_die("no syncobj manager");
+
+    img->acquire_timeline =
+        wp_linux_drm_syncobj_manager_v1_import_timeline(wl->globals.syncobj_manager, acquire_fd);
+    img->release_timeline =
+        wp_linux_drm_syncobj_manager_v1_import_timeline(wl->globals.syncobj_manager, release_fd);
+
+    close(acquire_fd);
+    close(release_fd);
 }
 
 static inline void
@@ -1233,7 +1286,9 @@ wl_add_swapchain_images_shm(struct wl *wl, struct wl_swapchain *swapchain)
 
         img->buffer = wl_shm_pool_create_buffer(shm_pool, shm_offset, swapchain->width,
                                                 swapchain->height, img_pitch, shm_format);
-        wl_buffer_add_listener(img->buffer, &wl_buffer_listener, img);
+        if (!(img->acquire_timeline && img->release_timeline))
+            wl_buffer_add_listener(img->buffer, &wl_buffer_listener, img);
+
         img->data = shm_ptr + shm_offset;
     }
 
@@ -1265,21 +1320,31 @@ wl_add_swapchain_image_dmabuf(struct wl *wl,
     }
     img->buffer = zwp_linux_buffer_params_v1_create_immed(
         params, swapchain->width, swapchain->height, swapchain->format, 0);
-    wl_buffer_add_listener(img->buffer, &wl_buffer_listener, img);
+    if (!(img->acquire_timeline && img->release_timeline))
+        wl_buffer_add_listener(img->buffer, &wl_buffer_listener, img);
 }
 
 static inline const struct wl_swapchain_image *
 wl_acquire_swapchain_image(struct wl *wl, struct wl_swapchain *swapchain)
 {
+    struct wl_swapchain_image *img = NULL;
     for (uint32_t i = 0; i < swapchain->image_count; i++) {
-        struct wl_swapchain_image *img = &swapchain->images[i];
-        if (!img->busy) {
-            img->busy = true;
-            return img;
+        if (!swapchain->images[i].busy) {
+            img = &swapchain->images[i];
+            break;
         }
     }
+    if (!img)
+        vk_die("no idle swapchain image");
 
-    vk_die("no idle swapchain image");
+    img->busy = true;
+
+    if (img->acquire_timeline && img->release_timeline) {
+        img->acquire_point++;
+        img->release_point++;
+    }
+
+    return img;
 }
 
 static inline void
@@ -1292,6 +1357,16 @@ wl_present_swapchain_image(struct wl *wl,
 
     wl_surface_attach(wl->surface, img->buffer, 0, 0);
     wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
+
+    if (img->acquire_timeline && img->release_timeline) {
+        wp_linux_drm_syncobj_surface_v1_set_acquire_point(
+            wl->syncobj_surface, img->acquire_timeline, (uint32_t)(img->acquire_point >> 32),
+            (uint32_t)img->acquire_point);
+
+        wp_linux_drm_syncobj_surface_v1_set_release_point(
+            wl->syncobj_surface, img->release_timeline, (uint32_t)(img->release_point >> 32),
+            (uint32_t)img->release_point);
+    }
 
     if (wl->commit_timer)
         wp_commit_timer_v1_set_timestamp(wl->commit_timer, 0, 0, 0);
