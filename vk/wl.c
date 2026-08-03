@@ -366,6 +366,8 @@ wl_test_init(struct wl_test *test)
     struct drm *drm = &test->drm;
 
     const struct wl_init_params wl_params = {
+        .explicit_sync = test->explicit_sync,
+
         .data = test,
         .close = wl_test_dispatch_close,
         .redraw = wl_test_dispatch_redraw,

@@ -23,6 +23,8 @@
 #define wl_log(format, ...) u_log("WL", format __VA_OPT__(, ) __VA_ARGS__)
 
 struct wl_init_params {
+    bool explicit_sync;
+
     void *data;
     void (*redraw)(void *data);
     void (*close)(void *data);
@@ -803,6 +805,9 @@ wl_init_globals(struct wl *wl)
         wl_die("missing required global: xdg_wm_base");
     if (!wl->globals.shm)
         wl_die("missing required global: wl_shm");
+
+    if (wl->params.explicit_sync && !wl->globals.syncobj_manager)
+        wl_die("missing required global: wp_linux_drm_syncobj_manager_v1");
 }
 
 static inline void
@@ -897,7 +902,7 @@ wl_init_surface(struct wl *wl)
     wl_init_surface_cm(wl);
     wl_init_surface_xdg(wl);
 
-    if (wl->globals.syncobj_manager) {
+    if (wl->params.explicit_sync) {
         wl->syncobj_surface =
             wp_linux_drm_syncobj_manager_v1_get_surface(wl->globals.syncobj_manager, wl->surface);
     }
@@ -1250,8 +1255,8 @@ wl_add_swapchain_image_timelines(struct wl *wl,
                                  int acquire_fd,
                                  int release_fd)
 {
-    if (!wl->globals.syncobj_manager)
-        wl_die("no syncobj manager");
+    if (!wl->params.explicit_sync)
+        wl_die("no explicit sync");
 
     img->acquire_timeline =
         wp_linux_drm_syncobj_manager_v1_import_timeline(wl->globals.syncobj_manager, acquire_fd);
@@ -1293,7 +1298,9 @@ wl_add_swapchain_images_shm(struct wl *wl, struct wl_swapchain *swapchain)
 
         img->buffer = wl_shm_pool_create_buffer(shm_pool, shm_offset, swapchain->width,
                                                 swapchain->height, img_pitch, shm_format);
-        if (!(img->acquire_timeline && img->release_timeline))
+        if (wl->params.explicit_sync)
+            assert(img->acquire_timeline && img->release_timeline);
+        else
             wl_buffer_add_listener(img->buffer, &wl_buffer_listener, img);
 
         img->data = shm_ptr + shm_offset;
@@ -1327,7 +1334,9 @@ wl_add_swapchain_image_dmabuf(struct wl *wl,
     }
     img->buffer = zwp_linux_buffer_params_v1_create_immed(
         params, swapchain->width, swapchain->height, swapchain->format, 0);
-    if (!(img->acquire_timeline && img->release_timeline))
+    if (wl->params.explicit_sync)
+        assert(img->acquire_timeline && img->release_timeline);
+    else
         wl_buffer_add_listener(img->buffer, &wl_buffer_listener, img);
 }
 
@@ -1346,7 +1355,7 @@ wl_acquire_swapchain_image(struct wl *wl, struct wl_swapchain *swapchain)
 
     img->busy = true;
 
-    if (img->acquire_timeline && img->release_timeline) {
+    if (wl->params.explicit_sync) {
         img->acquire_point++;
         img->release_point++;
     }
@@ -1365,7 +1374,7 @@ wl_present_swapchain_image(struct wl *wl,
     wl_surface_attach(wl->surface, img->buffer, 0, 0);
     wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
 
-    if (img->acquire_timeline && img->release_timeline) {
+    if (wl->params.explicit_sync) {
         wp_linux_drm_syncobj_surface_v1_set_acquire_point(
             wl->syncobj_surface, img->acquire_timeline, (uint32_t)(img->acquire_point >> 32),
             (uint32_t)img->acquire_point);
