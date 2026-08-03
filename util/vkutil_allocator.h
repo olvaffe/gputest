@@ -93,7 +93,7 @@ vk_allocator_init(struct vk_allocator *alloc, const char *render_node, bool prot
 
     const struct vk_init_params params = {
         .render_node = render_node,
-        .api_version = VK_API_VERSION_1_1,
+        .api_version = VK_API_VERSION_1_2,
         .protected_memory = protected,
         /* some of the exts can be dropped if we require 1.2 */
         .dev_exts = dev_exts,

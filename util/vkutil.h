@@ -24,7 +24,7 @@
 #define LIBVULKAN_NAME "libvulkan.so.1"
 #endif
 
-#define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_1
+#define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_2
 
 #define vk_check(vk, format, ...)                                                                \
     do {                                                                                         \
@@ -88,8 +88,6 @@ struct vk {
     VkPhysicalDeviceVulkan13Features vulkan_13_features;
     VkPhysicalDeviceVulkan14Features vulkan_14_features;
 
-    VkPhysicalDeviceSamplerYcbcrConversionFeatures sampler_ycbcr_conversion_features;
-    VkPhysicalDeviceHostQueryResetFeatures host_query_reset_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
     VkPhysicalDeviceExternalFormatResolveFeaturesANDROID external_format_resolve_features;
     VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features;
@@ -328,23 +326,13 @@ vk_init_physical_device_features(struct vk *vk)
     vk->features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 
     void **pnext = &vk->features.pNext;
-    if (vk->params.api_version >= VK_API_VERSION_1_2) {
-        vk->vulkan_11_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
-        vk->vulkan_12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    vk->vulkan_11_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+    vk->vulkan_12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
 
-        *pnext = &vk->vulkan_11_features;
-        vk->vulkan_11_features.pNext = &vk->vulkan_12_features;
-        pnext = &vk->vulkan_12_features.pNext;
-    } else {
-        vk->sampler_ycbcr_conversion_features.sType =
-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
-        vk->host_query_reset_features.sType =
-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
+    *pnext = &vk->vulkan_11_features;
+    vk->vulkan_11_features.pNext = &vk->vulkan_12_features;
+    pnext = &vk->vulkan_12_features.pNext;
 
-        *pnext = &vk->sampler_ycbcr_conversion_features;
-        vk->sampler_ycbcr_conversion_features.pNext = &vk->host_query_reset_features;
-        pnext = &vk->host_query_reset_features.pNext;
-    }
     if (vk->params.api_version >= VK_API_VERSION_1_3) {
         vk->vulkan_13_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
 
@@ -391,14 +379,13 @@ vk_init_physical_device_properties(struct vk *vk)
     vk->props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
 
     void **pnext = &vk->props.pNext;
-    if (vk->params.api_version >= VK_API_VERSION_1_2) {
-        vk->vulkan_11_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
-        vk->vulkan_12_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
+    vk->vulkan_11_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
+    vk->vulkan_12_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
 
-        *pnext = &vk->vulkan_11_props;
-        vk->vulkan_11_props.pNext = &vk->vulkan_12_props;
-        pnext = &vk->vulkan_12_props.pNext;
-    }
+    *pnext = &vk->vulkan_11_props;
+    vk->vulkan_11_props.pNext = &vk->vulkan_12_props;
+    pnext = &vk->vulkan_12_props.pNext;
+
     if (vk->params.api_version >= VK_API_VERSION_1_3) {
         vk->vulkan_13_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES;
 
@@ -491,22 +478,14 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     if (vk->params.fill_mode_non_solid && !vk->features.features.fillModeNonSolid)
         vk_die("no non-solid fill mode support");
 
-    if (vk->params.api_version >= VK_API_VERSION_1_2) {
-        if (vk->params.protected_memory && !vk->vulkan_11_features.protectedMemory)
-            vk_die("no protected memory support");
+    if (vk->params.protected_memory && !vk->vulkan_11_features.protectedMemory)
+        vk_die("no protected memory support");
 
-        // if (!vk->vulkan_11_features.samplerYcbcrConversion)
-        //     vk_die("no ycbcr conversion support");
+    // if (!vk->vulkan_11_features.samplerYcbcrConversion)
+    //     vk_die("no ycbcr conversion support");
 
-        if (!vk->vulkan_12_features.hostQueryReset)
-            vk_die("no host query reset support");
-    } else {
-        if (vk->params.protected_memory && !vk->protected_memory_features.protectedMemory)
-            vk_die("no protected memory support");
-
-        // if (!vk->sampler_ycbcr_conversion_features.samplerYcbcrConversion)
-        //     vk_die("no ycbcr conversion support");
-    }
+    if (!vk->vulkan_12_features.hostQueryReset)
+        vk_die("no host query reset support");
 
     if (vk->params.enable_all_features) {
         *features = vk->features;
@@ -523,14 +502,10 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     };
 
     void **pnext = &features->pNext;
-    if (vk->params.api_version >= VK_API_VERSION_1_2) {
-        *pnext = &vk->vulkan_11_features;
-        vk->vulkan_11_features.pNext = &vk->vulkan_12_features;
-        pnext = &vk->vulkan_12_features.pNext;
-    } else {
-        *pnext = &vk->sampler_ycbcr_conversion_features;
-        pnext = &vk->sampler_ycbcr_conversion_features.pNext;
-    }
+    *pnext = &vk->vulkan_11_features;
+    vk->vulkan_11_features.pNext = &vk->vulkan_12_features;
+    pnext = &vk->vulkan_12_features.pNext;
+
     if (vk->params.api_version >= VK_API_VERSION_1_3) {
         *pnext = &vk->vulkan_13_features;
         pnext = &vk->vulkan_13_features.pNext;

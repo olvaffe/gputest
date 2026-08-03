@@ -126,19 +126,11 @@ info_device_features(struct vk *vk)
     vk_log("    textureCompressionBC: %d", vk->features.features.textureCompressionBC);
     vk_log("    pipelineStatisticsQuery: %d", vk->features.features.pipelineStatisticsQuery);
 
-    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_1) {
-        vk_log("    protectedMemory: %d", vk->vulkan_11_features.protectedMemory);
-        vk_log("    samplerYcbcrConversion: %d", vk->vulkan_11_features.samplerYcbcrConversion);
-    } else {
-        vk_log("    protectedMemory: %d", vk->protected_memory_features.protectedMemory);
-        vk_log("    samplerYcbcrConversion: %d",
-               vk->sampler_ycbcr_conversion_features.samplerYcbcrConversion);
-    }
+    vk_log("    protectedMemory: %d", vk->vulkan_11_features.protectedMemory);
+    vk_log("    samplerYcbcrConversion: %d", vk->vulkan_11_features.samplerYcbcrConversion);
 
-    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_2) {
-        vk_log("    descriptorIndexing: %d", vk->vulkan_12_features.descriptorIndexing);
-        vk_log("    timelineSemaphore: %d", vk->vulkan_12_features.timelineSemaphore);
-    }
+    vk_log("    descriptorIndexing: %d", vk->vulkan_12_features.descriptorIndexing);
+    vk_log("    timelineSemaphore: %d", vk->vulkan_12_features.timelineSemaphore);
 
     if (vk->props.properties.apiVersion >= VK_API_VERSION_1_3) {
         vk_log("    textureCompressionASTC_HDR: %d",
@@ -176,16 +168,10 @@ info_device_properties(struct vk *vk)
            VK_API_VERSION_PATCH(vk->props.properties.driverVersion));
     vk_log("    deviceName: %s", vk->props.properties.deviceName);
 
-    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_1) {
-        vk_log("    protectedNoFault: %d", vk->vulkan_11_props.protectedNoFault);
-    } else {
-        vk_log("    protectedNoFault: %d", vk->protected_props.protectedNoFault);
-    }
+    vk_log("    protectedNoFault: %d", vk->vulkan_11_props.protectedNoFault);
 
-    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_2) {
-        vk_log("    driverName: %s", vk->vulkan_12_props.driverName);
-        vk_log("    driverInfo: %s", vk->vulkan_12_props.driverInfo);
-    }
+    vk_log("    driverName: %s", vk->vulkan_12_props.driverName);
+    vk_log("    driverInfo: %s", vk->vulkan_12_props.driverInfo);
 
     vk_log("    nullColorAttachmentWithExternalFormatResolve: %d",
            vk->external_format_resolve_props.nullColorAttachmentWithExternalFormatResolve);
