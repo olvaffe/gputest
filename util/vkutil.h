@@ -484,9 +484,6 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     // if (!vk->vulkan_11_features.samplerYcbcrConversion)
     //     vk_die("no ycbcr conversion support");
 
-    if (!vk->vulkan_12_features.hostQueryReset)
-        vk_die("no host query reset support");
-
     if (vk->params.enable_all_features) {
         *features = vk->features;
         return;
