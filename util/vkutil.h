@@ -105,8 +105,11 @@ struct vk {
     VkCommandPool cmd_pool;
     VkCommandPool protected_cmd_pool;
     struct {
+        VkSemaphore sem;
+        uint64_t sem_next;
+
         VkCommandBuffer cmds[4];
-        VkFence fences[4];
+        uint64_t sem_vals[4];
         bool protected_submits[4];
         uint32_t count;
         uint32_t next;
@@ -664,6 +667,28 @@ vk_init_cmd_pool(struct vk *vk)
 }
 
 static inline void
+vk_init_submit(struct vk *vk)
+{
+    const VkSemaphoreTypeCreateInfo sem_type_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+        .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+        .initialValue = 0,
+    };
+    const VkSemaphoreCreateInfo sem_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = &sem_type_info,
+    };
+    vk->result = vk->CreateSemaphore(vk->dev, &sem_info, NULL, &vk->submit.sem);
+    vk_check(vk, "failed to create submit semaphore");
+
+    vk->submit.sem_next = 1;
+
+    static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.sem_vals), "");
+    static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.protected_submits), "");
+    vk->submit.count = ARRAY_SIZE(vk->submit.cmds);
+}
+
+static inline void
 vk_init(struct vk *vk, const struct vk_init_params *params)
 {
     memset(vk, 0, sizeof(*vk));
@@ -677,10 +702,7 @@ vk_init(struct vk *vk, const struct vk_init_params *params)
 
     vk_init_desc_pool(vk);
     vk_init_cmd_pool(vk);
-
-    static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.fences), "");
-    static_assert(ARRAY_SIZE(vk->submit.cmds) == ARRAY_SIZE(vk->submit.protected_submits), "");
-    vk->submit.count = ARRAY_SIZE(vk->submit.cmds);
+    vk_init_submit(vk);
 
     /* avoid accessing dangling pointers */
     vk->params.instance_ext_count = 0;
@@ -692,15 +714,10 @@ vk_cleanup(struct vk *vk)
 {
     vk->DeviceWaitIdle(vk->dev);
 
-    for (uint32_t i = 0; i < vk->submit.count; i++) {
-        if (vk->submit.fences[i] == VK_NULL_HANDLE)
-            break;
-        vk->DestroyFence(vk->dev, vk->submit.fences[i], NULL);
-    }
-
     vk->DestroyDescriptorPool(vk->dev, vk->desc_pool, NULL);
     vk->DestroyCommandPool(vk->dev, vk->protected_cmd_pool, NULL);
     vk->DestroyCommandPool(vk->dev, vk->cmd_pool, NULL);
+    vk->DestroySemaphore(vk->dev, vk->submit.sem, NULL);
 
     vk->DestroyDevice(vk->dev, NULL);
 
@@ -2112,19 +2129,22 @@ static inline VkCommandBuffer
 vk_begin_cmd(struct vk *vk, bool prot)
 {
     VkCommandBuffer *cmd = &vk->submit.cmds[vk->submit.next];
-    VkFence *fence = &vk->submit.fences[vk->submit.next];
+    const uint64_t *sem_val = &vk->submit.sem_vals[vk->submit.next];
     bool *protected_submit = &vk->submit.protected_submits[vk->submit.next];
+
+    const VkSemaphoreWaitInfo wait_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+        .semaphoreCount = 1,
+        .pSemaphores = &vk->submit.sem,
+        .pValues = sem_val,
+    };
+    vk->result = vk->WaitSemaphores(vk->dev, &wait_info, UINT64_MAX);
+    vk_check(vk, "failed to wait submit semaphore");
 
     /* reuse or allocate */
     if (*cmd && *protected_submit == prot) {
-        vk->result = vk->WaitForFences(vk->dev, 1, fence, true, UINT64_MAX);
-        vk_check(vk, "failed to wait fence");
-
         vk->result = vk->ResetCommandBuffer(*cmd, 0);
         vk_check(vk, "failed to reset command buffer");
-
-        vk->result = vk->ResetFences(vk->dev, 1, fence);
-        vk_check(vk, "failed to reset fence");
     } else {
         if (*cmd) {
             vk->FreeCommandBuffers(
@@ -2140,12 +2160,6 @@ vk_begin_cmd(struct vk *vk, bool prot)
 
         vk->result = vk->AllocateCommandBuffers(vk->dev, &alloc_info, cmd);
         vk_check(vk, "failed to allocate command buffer");
-
-        const VkFenceCreateInfo fence_info = {
-            .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        };
-        vk->result = vk->CreateFence(vk->dev, &fence_info, NULL, fence);
-        vk_check(vk, "failed to create fence");
 
         *protected_submit = prot;
     }
@@ -2163,8 +2177,10 @@ static inline void
 vk_end_cmd(struct vk *vk)
 {
     VkCommandBuffer cmd = vk->submit.cmds[vk->submit.next];
-    VkFence fence = vk->submit.fences[vk->submit.next];
+    uint64_t *sem_val = &vk->submit.sem_vals[vk->submit.next];
     bool protected_submit = vk->submit.protected_submits[vk->submit.next];
+
+    *sem_val = vk->submit.sem_next++;
 
     /* increment */
     vk->submit.next = (vk->submit.next + 1) % vk->submit.count;
@@ -2172,8 +2188,14 @@ vk_end_cmd(struct vk *vk)
     vk->result = vk->EndCommandBuffer(cmd);
     vk_check(vk, "failed to end command buffer");
 
+    const VkTimelineSemaphoreSubmitInfo timeline_info = {
+        .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+        .signalSemaphoreValueCount = 1,
+        .pSignalSemaphoreValues = sem_val,
+    };
     const VkProtectedSubmitInfo protected_info = {
         .sType = VK_STRUCTURE_TYPE_PROTECTED_SUBMIT_INFO,
+        .pNext = &timeline_info,
         .protectedSubmit = protected_submit,
     };
     const VkSubmitInfo submit_info = {
@@ -2181,8 +2203,10 @@ vk_end_cmd(struct vk *vk)
         .pNext = &protected_info,
         .commandBufferCount = 1,
         .pCommandBuffers = &cmd,
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = &vk->submit.sem,
     };
-    vk->result = vk->QueueSubmit(vk->queue, 1, &submit_info, fence);
+    vk->result = vk->QueueSubmit(vk->queue, 1, &submit_info, VK_NULL_HANDLE);
     vk_check(vk, "failed to submit command buffer");
 }
 
