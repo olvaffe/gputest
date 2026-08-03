@@ -911,7 +911,7 @@ wl_init(struct wl *wl, const struct wl_init_params *params)
 }
 
 static inline void
-wl_cleanup(struct wl *wl)
+wl_cleanup_surface(struct wl *wl)
 {
     struct wl_array *dmabuf_iter;
     wl_array_for_each(dmabuf_iter, &wl->active.formats)
@@ -924,30 +924,39 @@ wl_cleanup(struct wl *wl)
     if (wl->dmabuf_feedback)
         zwp_linux_dmabuf_feedback_v1_destroy(wl->dmabuf_feedback);
 
-    if (wl->globals.tearing_control_manager) {
-        wp_tearing_control_v1_destroy(wl->tearing_control);
-        wp_tearing_control_manager_v1_destroy(wl->globals.tearing_control_manager);
-    }
+    xdg_toplevel_destroy(wl->xdg_toplevel);
+    xdg_surface_destroy(wl->xdg_surface);
 
     if (wl->cm_surface) {
         wp_color_management_surface_v1_destroy(wl->cm_surface);
-        if (wl->cm_desc)
-            wp_image_description_v1_destroy(wl->cm_desc);
+	wp_image_description_v1_destroy(wl->cm_desc);
     }
 
-    if (wl->globals.fifo_manager) {
+    if (wl->tearing_control)
+        wp_tearing_control_v1_destroy(wl->tearing_control);
+
+    if (wl->fifo)
         wp_fifo_v1_destroy(wl->fifo);
-        wp_fifo_manager_v1_destroy(wl->globals.fifo_manager);
-    }
 
-    if (wl->globals.commit_timing_manager) {
+    if (wl->commit_timer)
         wp_commit_timer_v1_destroy(wl->commit_timer);
-        wp_commit_timing_manager_v1_destroy(wl->globals.commit_timing_manager);
-    }
 
-    xdg_toplevel_destroy(wl->xdg_toplevel);
-    xdg_surface_destroy(wl->xdg_surface);
     wl_surface_destroy(wl->surface);
+}
+
+static inline void
+wl_cleanup(struct wl *wl)
+{
+    wl_cleanup_surface(wl);
+
+    if (wl->globals.tearing_control_manager)
+        wp_tearing_control_manager_v1_destroy(wl->globals.tearing_control_manager);
+
+    if (wl->globals.fifo_manager)
+        wp_fifo_manager_v1_destroy(wl->globals.fifo_manager);
+
+    if (wl->globals.commit_timing_manager)
+        wp_commit_timing_manager_v1_destroy(wl->globals.commit_timing_manager);
 
     zwp_linux_dmabuf_v1_destroy(wl->globals.dmabuf);
 
