@@ -262,8 +262,8 @@ wl_test_loop(struct wl_test *test)
 {
     struct wl *wl = &test->wl;
 
-    if (wl->xdg_ready)
-        wl_test_dispatch_redraw(test);
+    /* initial draw */
+    wl_test_dispatch_redraw(test);
 
     while (!test->quit)
         wl_dispatch(wl);

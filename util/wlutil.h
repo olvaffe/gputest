@@ -957,7 +957,10 @@ wl_init(struct wl *wl, const struct wl_init_params *params)
     wl_init_outputs(wl);
     wl_init_surface(wl);
 
-    wl_display_roundtrip(wl->display);
+    do {
+        wl_display_roundtrip(wl->display);
+    } while (!wl->xdg_ready);
+
     wl->dispatch_ready = true;
 }
 
