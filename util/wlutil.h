@@ -1285,35 +1285,6 @@ wl_acquire_swapchain_image(struct wl *wl, struct wl_swapchain *swapchain)
 static inline void
 wl_surface_presentation_feedback(struct wl *wl)
 {
-    if (!wl->globals.presentation)
-        return;
-
-    struct wp_presentation_feedback *feedback =
-        wp_presentation_feedback(wl->globals.presentation, wl->surface);
-
-    wp_presentation_feedback_add_listener(feedback, &wp_presentation_feedback_listener, wl);
-}
-
-static inline void
-wl_surface_fifo(struct wl *wl)
-{
-    if (!wl->fifo)
-        return;
-
-    /* add a dependency on the barrier bit */
-    wp_fifo_v1_wait_barrier(wl->fifo);
-
-    /* set the barrier bit which auto-clear on deadline latch */
-    wp_fifo_v1_set_barrier(wl->fifo);
-}
-
-static inline void
-wl_surface_commit_timing(struct wl *wl)
-{
-    if (!wl->commit_timer)
-        return;
-
-    wp_commit_timer_v1_set_timestamp(wl->commit_timer, 0, 0, 0);
 }
 
 static inline void
@@ -1327,9 +1298,23 @@ wl_present_swapchain_image(struct wl *wl,
     wl_surface_attach(wl->surface, img->buffer, 0, 0);
     wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
 
-    wl_surface_commit_timing(wl);
-    wl_surface_fifo(wl);
-    wl_surface_presentation_feedback(wl);
+    if (wl->commit_timer)
+        wp_commit_timer_v1_set_timestamp(wl->commit_timer, 0, 0, 0);
+
+    if (wl->fifo) {
+        /* add a dependency on the barrier bit */
+        wp_fifo_v1_wait_barrier(wl->fifo);
+
+        /* set the barrier bit which auto-clear on deadline latch */
+        wp_fifo_v1_set_barrier(wl->fifo);
+    }
+
+    if (wl->globals.presentation) {
+        struct wp_presentation_feedback *feedback =
+            wp_presentation_feedback(wl->globals.presentation, wl->surface);
+
+        wp_presentation_feedback_add_listener(feedback, &wp_presentation_feedback_listener, wl);
+    }
 
     /* Every surface commit creates a transaction from the pending state. The
      * transaction updates the active state only when its dependencies are
