@@ -61,6 +61,14 @@ struct wl_globals {
     struct wl_array outputs;
     struct wp_color_manager_v1 *color_manager;
 
+    /* buffer */
+    struct wl_shm *shm;
+    struct wl_array shm_formats;
+
+    struct zwp_linux_dmabuf_v1 *dmabuf;
+    uint32_t dmabuf_version;
+
+    /* surface */
     struct wl_compositor *compositor;
     uint32_t compositor_version;
 
@@ -76,12 +84,6 @@ struct wl_globals {
     struct xdg_wm_base *wm_base;
 
     struct wp_linux_drm_syncobj_manager_v1 *syncobj_manager;
-
-    struct wl_shm *shm;
-    struct wl_array shm_formats;
-
-    struct zwp_linux_dmabuf_v1 *dmabuf;
-    uint32_t dmabuf_version;
 };
 
 struct wl {
@@ -354,6 +356,27 @@ static const struct xdg_surface_listener xdg_surface_listener = {
 };
 
 static void
+xdg_wm_base_event_ping(void *data, struct xdg_wm_base *wm_base, uint32_t serial)
+{
+    xdg_wm_base_pong(wm_base, serial);
+}
+
+static const struct xdg_wm_base_listener xdg_wm_base_listener = {
+    .ping = xdg_wm_base_event_ping,
+};
+
+static void
+wp_presentation_event_clock_id(void *data, struct wp_presentation *presentation, uint32_t clk_id)
+{
+    struct wl *wl = data;
+    wl->globals.presentation_clock_id = clk_id;
+}
+
+static const struct wp_presentation_listener wp_presentation_listener = {
+    .clock_id = wp_presentation_event_clock_id,
+};
+
+static void
 wl_buffer_event_release(void *data, struct wl_buffer *buffer)
 {
     struct wl_swapchain_image *img = data;
@@ -419,27 +442,6 @@ wl_shm_event_format(void *data, struct wl_shm *wl_shm, uint32_t format)
 
 static const struct wl_shm_listener wl_shm_listener = {
     .format = wl_shm_event_format,
-};
-
-static void
-xdg_wm_base_event_ping(void *data, struct xdg_wm_base *wm_base, uint32_t serial)
-{
-    xdg_wm_base_pong(wm_base, serial);
-}
-
-static const struct xdg_wm_base_listener xdg_wm_base_listener = {
-    .ping = xdg_wm_base_event_ping,
-};
-
-static void
-wp_presentation_event_clock_id(void *data, struct wp_presentation *presentation, uint32_t clk_id)
-{
-    struct wl *wl = data;
-    wl->globals.presentation_clock_id = clk_id;
-}
-
-static const struct wp_presentation_listener wp_presentation_listener = {
-    .clock_id = wp_presentation_event_clock_id,
 };
 
 static void
@@ -736,6 +738,24 @@ wl_registry_event_global(
     } else if (!strcmp(interface, wp_color_manager_v1_interface.name)) {
         wl->globals.color_manager =
             wl_registry_bind(reg, name, &wp_color_manager_v1_interface, 1);
+    } else if (!strcmp(interface, wl_shm_interface.name)) {
+        wl->globals.shm = wl_registry_bind(reg, name, &wl_shm_interface, 1);
+        wl_shm_add_listener(wl->globals.shm, &wl_shm_listener, wl);
+    } else if (!strcmp(interface, zwp_linux_dmabuf_v1_interface.name)) {
+        if (version < ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION) {
+            wl_die("%s ver %d req %d", interface, version,
+                   ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION);
+        }
+        if (version >= ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION)
+            version = ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION;
+
+        wl->globals.dmabuf = wl_registry_bind(reg, name, &zwp_linux_dmabuf_v1_interface, version);
+        wl->globals.dmabuf_version = version;
+        if (version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
+            zwp_linux_dmabuf_v1_add_listener(wl->globals.dmabuf,
+                                             &zwp_linux_dmabuf_v1_listener_legacy, wl);
+            wl->active.tranche_count = 1;
+        }
     } else if (!strcmp(interface, wl_compositor_interface.name)) {
         if (version < WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
             wl_die("%s ver %d req %d", interface, version,
@@ -762,24 +782,6 @@ wl_registry_event_global(
     } else if (!strcmp(interface, wp_linux_drm_syncobj_manager_v1_interface.name)) {
         wl->globals.syncobj_manager =
             wl_registry_bind(reg, name, &wp_linux_drm_syncobj_manager_v1_interface, 1);
-    } else if (!strcmp(interface, wl_shm_interface.name)) {
-        wl->globals.shm = wl_registry_bind(reg, name, &wl_shm_interface, 1);
-        wl_shm_add_listener(wl->globals.shm, &wl_shm_listener, wl);
-    } else if (!strcmp(interface, zwp_linux_dmabuf_v1_interface.name)) {
-        if (version < ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION) {
-            wl_die("%s ver %d req %d", interface, version,
-                   ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION);
-        }
-        if (version >= ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION)
-            version = ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION;
-
-        wl->globals.dmabuf = wl_registry_bind(reg, name, &zwp_linux_dmabuf_v1_interface, version);
-        wl->globals.dmabuf_version = version;
-        if (version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
-            zwp_linux_dmabuf_v1_add_listener(wl->globals.dmabuf,
-                                             &zwp_linux_dmabuf_v1_listener_legacy, wl);
-            wl->active.tranche_count = 1;
-        }
     }
 }
 
@@ -982,7 +984,7 @@ wl_cleanup_surface(struct wl *wl)
 
     if (wl->cm_surface) {
         wp_color_management_surface_v1_destroy(wl->cm_surface);
-	wp_image_description_v1_destroy(wl->cm_desc);
+        wp_image_description_v1_destroy(wl->cm_desc);
     }
 
     if (wl->tearing_control)
@@ -1000,11 +1002,6 @@ wl_cleanup_surface(struct wl *wl)
 static inline void
 wl_cleanup_globals(struct wl *wl)
 {
-    zwp_linux_dmabuf_v1_destroy(wl->globals.dmabuf);
-
-    wl_array_release(&wl->globals.shm_formats);
-    wl_shm_destroy(wl->globals.shm);
-
     if (wl->globals.syncobj_manager)
         wp_linux_drm_syncobj_manager_v1_destroy(wl->globals.syncobj_manager);
 
@@ -1023,6 +1020,11 @@ wl_cleanup_globals(struct wl *wl)
         wp_presentation_destroy(wl->globals.presentation);
 
     wl_compositor_destroy(wl->globals.compositor);
+
+    zwp_linux_dmabuf_v1_destroy(wl->globals.dmabuf);
+
+    wl_array_release(&wl->globals.shm_formats);
+    wl_shm_destroy(wl->globals.shm);
 
     if (wl->globals.color_manager)
         wp_color_manager_v1_destroy(wl->globals.color_manager);
