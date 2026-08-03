@@ -634,8 +634,14 @@ wl_seat_event_capabilities(void *data, struct wl_seat *seat, uint32_t capabiliti
     }
 }
 
+static void
+wl_seat_event_name(void *data, struct wl_seat *seat, const char *name)
+{
+}
+
 static const struct wl_seat_listener wl_seat_listener = {
     .capabilities = wl_seat_event_capabilities,
+    .name = wl_seat_event_name,
 };
 
 static void
