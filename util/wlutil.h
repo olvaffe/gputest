@@ -248,8 +248,6 @@ zwp_linux_dmabuf_feedback_v1_event_tranche_formats(void *data,
     if (wl->pending.tranche_count)
         return;
 
-    wl_array_init(&wl->pending.formats);
-
     const uint16_t *idx_iter;
     wl_array_for_each(idx_iter, indices) {
         const uint32_t offset = *idx_iter * 16;
@@ -297,6 +295,8 @@ zwp_linux_dmabuf_feedback_v1_event_done(void *data, struct zwp_linux_dmabuf_feed
     wl_array_release(&wl->active.formats);
 
     wl->active = wl->pending;
+
+    wl_array_init(&wl->pending.formats);
 }
 
 static const struct zwp_linux_dmabuf_feedback_v1_listener zwp_linux_dmabuf_feedback_v1_listener = {
@@ -747,8 +747,6 @@ wl_registry_event_global(
     } else if (!strcmp(interface, wl_shm_interface.name)) {
         wl->globals.shm = wl_registry_bind(reg, name, &wl_shm_interface, 1);
         wl_shm_add_listener(wl->globals.shm, &wl_shm_listener, wl);
-
-        wl_array_init(&wl->globals.shm_formats);
     } else if (!strcmp(interface, zwp_linux_dmabuf_v1_interface.name)) {
         if (version < ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION) {
             wl_die("%s ver %d req %d", interface, version,
@@ -762,7 +760,6 @@ wl_registry_event_global(
         if (version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
             zwp_linux_dmabuf_v1_add_listener(wl->globals.dmabuf,
                                              &zwp_linux_dmabuf_v1_listener_legacy, wl);
-            wl_array_init(&wl->active.formats);
             wl->active.tranche_count = 1;
         }
     }
@@ -920,7 +917,11 @@ static inline void
 wl_init(struct wl *wl, const struct wl_init_params *params)
 {
     memset(wl, 0, sizeof(*wl));
+    wl->display_fd = -1;
     wl_array_init(&wl->globals.outputs);
+    wl_array_init(&wl->globals.shm_formats);
+    wl_array_init(&wl->pending.formats);
+    wl_array_init(&wl->active.formats);
 
     if (params)
         wl->params = *params;
