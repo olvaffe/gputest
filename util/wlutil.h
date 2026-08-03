@@ -72,18 +72,15 @@ struct wl_globals {
     struct wl_compositor *compositor;
     uint32_t compositor_version;
 
-    struct wp_presentation *presentation;
-    uint32_t presentation_clock_id;
-
-    struct wp_commit_timing_manager_v1 *commit_timing_manager;
-
-    struct wp_fifo_manager_v1 *fifo_manager;
-
-    struct wp_tearing_control_manager_v1 *tearing_control_manager;
-
     struct xdg_wm_base *wm_base;
 
     struct wp_linux_drm_syncobj_manager_v1 *syncobj_manager;
+    struct wp_commit_timing_manager_v1 *commit_timing_manager;
+    struct wp_fifo_manager_v1 *fifo_manager;
+
+    struct wp_tearing_control_manager_v1 *tearing_control_manager;
+    struct wp_presentation *presentation;
+    uint32_t presentation_clock_id;
 };
 
 struct wl {
@@ -182,6 +179,66 @@ static const struct wp_presentation_feedback_listener wp_presentation_feedback_l
     .sync_output = wp_presentation_feedback_event_sync_output,
     .presented = wp_presentation_feedback_event_presented,
     .discarded = wp_presentation_feedback_event_discarded,
+};
+
+static void
+wp_presentation_event_clock_id(void *data, struct wp_presentation *presentation, uint32_t clk_id)
+{
+    struct wl *wl = data;
+    wl->globals.presentation_clock_id = clk_id;
+}
+
+static const struct wp_presentation_listener wp_presentation_listener = {
+    .clock_id = wp_presentation_event_clock_id,
+};
+
+static void
+xdg_toplevel_event_configure(void *data,
+                             struct xdg_toplevel *toplevel,
+                             int32_t width,
+                             int32_t height,
+                             struct wl_array *states)
+{
+}
+
+static void
+xdg_toplevel_event_close(void *data, struct xdg_toplevel *toplevel)
+{
+    struct wl *wl = data;
+
+    if (wl->dispatch_ready && wl->params.close)
+        wl->params.close(wl->params.data);
+}
+
+static const struct xdg_toplevel_listener xdg_toplevel_listener = {
+    .configure = xdg_toplevel_event_configure,
+    .close = xdg_toplevel_event_close,
+};
+
+static void
+xdg_surface_event_configure(void *data, struct xdg_surface *surface, uint32_t serial)
+{
+    struct wl *wl = data;
+
+    xdg_surface_ack_configure(surface, serial);
+    wl->xdg_ready = true;
+
+    if (wl->dispatch_ready && wl->params.redraw)
+        wl->params.redraw(wl->params.data);
+}
+
+static const struct xdg_surface_listener xdg_surface_listener = {
+    .configure = xdg_surface_event_configure,
+};
+
+static void
+xdg_wm_base_event_ping(void *data, struct xdg_wm_base *wm_base, uint32_t serial)
+{
+    xdg_wm_base_pong(wm_base, serial);
+}
+
+static const struct xdg_wm_base_listener xdg_wm_base_listener = {
+    .ping = xdg_wm_base_event_ping,
 };
 
 static void
@@ -317,77 +374,6 @@ static const struct zwp_linux_dmabuf_feedback_v1_listener zwp_linux_dmabuf_feedb
 };
 
 static void
-xdg_toplevel_event_configure(void *data,
-                             struct xdg_toplevel *toplevel,
-                             int32_t width,
-                             int32_t height,
-                             struct wl_array *states)
-{
-}
-
-static void
-xdg_toplevel_event_close(void *data, struct xdg_toplevel *toplevel)
-{
-    struct wl *wl = data;
-
-    if (wl->dispatch_ready && wl->params.close)
-        wl->params.close(wl->params.data);
-}
-
-static const struct xdg_toplevel_listener xdg_toplevel_listener = {
-    .configure = xdg_toplevel_event_configure,
-    .close = xdg_toplevel_event_close,
-};
-
-static void
-xdg_surface_event_configure(void *data, struct xdg_surface *surface, uint32_t serial)
-{
-    struct wl *wl = data;
-
-    xdg_surface_ack_configure(surface, serial);
-    wl->xdg_ready = true;
-
-    if (wl->dispatch_ready && wl->params.redraw)
-        wl->params.redraw(wl->params.data);
-}
-
-static const struct xdg_surface_listener xdg_surface_listener = {
-    .configure = xdg_surface_event_configure,
-};
-
-static void
-xdg_wm_base_event_ping(void *data, struct xdg_wm_base *wm_base, uint32_t serial)
-{
-    xdg_wm_base_pong(wm_base, serial);
-}
-
-static const struct xdg_wm_base_listener xdg_wm_base_listener = {
-    .ping = xdg_wm_base_event_ping,
-};
-
-static void
-wp_presentation_event_clock_id(void *data, struct wp_presentation *presentation, uint32_t clk_id)
-{
-    struct wl *wl = data;
-    wl->globals.presentation_clock_id = clk_id;
-}
-
-static const struct wp_presentation_listener wp_presentation_listener = {
-    .clock_id = wp_presentation_event_clock_id,
-};
-
-static void
-wl_buffer_event_release(void *data, struct wl_buffer *buffer)
-{
-    struct wl_swapchain_image *img = data;
-    img->busy = false;
-}
-
-static const struct wl_buffer_listener wl_buffer_listener = {
-    .release = wl_buffer_event_release,
-};
-
-static void
 zwp_linux_dmabuf_v1_event_format_legacy(void *data,
                                         struct zwp_linux_dmabuf_v1 *dmabuf,
                                         uint32_t format)
@@ -442,6 +428,17 @@ wl_shm_event_format(void *data, struct wl_shm *wl_shm, uint32_t format)
 
 static const struct wl_shm_listener wl_shm_listener = {
     .format = wl_shm_event_format,
+};
+
+static void
+wl_buffer_event_release(void *data, struct wl_buffer *buffer)
+{
+    struct wl_swapchain_image *img = data;
+    img->busy = false;
+}
+
+static const struct wl_buffer_listener wl_buffer_listener = {
+    .release = wl_buffer_event_release,
 };
 
 static void
@@ -765,9 +762,12 @@ wl_registry_event_global(
 
         wl->globals.compositor = wl_registry_bind(reg, name, &wl_compositor_interface, version);
         wl->globals.compositor_version = version;
-    } else if (!strcmp(interface, wp_presentation_interface.name)) {
-        wl->globals.presentation = wl_registry_bind(reg, name, &wp_presentation_interface, 1);
-        wp_presentation_add_listener(wl->globals.presentation, &wp_presentation_listener, wl);
+    } else if (!strcmp(interface, xdg_wm_base_interface.name)) {
+        wl->globals.wm_base = wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
+        xdg_wm_base_add_listener(wl->globals.wm_base, &xdg_wm_base_listener, wl);
+    } else if (!strcmp(interface, wp_linux_drm_syncobj_manager_v1_interface.name)) {
+        wl->globals.syncobj_manager =
+            wl_registry_bind(reg, name, &wp_linux_drm_syncobj_manager_v1_interface, 1);
     } else if (!strcmp(interface, wp_commit_timing_manager_v1_interface.name)) {
         wl->globals.commit_timing_manager =
             wl_registry_bind(reg, name, &wp_commit_timing_manager_v1_interface, 1);
@@ -776,12 +776,9 @@ wl_registry_event_global(
     } else if (!strcmp(interface, wp_tearing_control_manager_v1_interface.name)) {
         wl->globals.tearing_control_manager =
             wl_registry_bind(reg, name, &wp_tearing_control_manager_v1_interface, 1);
-    } else if (!strcmp(interface, xdg_wm_base_interface.name)) {
-        wl->globals.wm_base = wl_registry_bind(reg, name, &xdg_wm_base_interface, 1);
-        xdg_wm_base_add_listener(wl->globals.wm_base, &xdg_wm_base_listener, wl);
-    } else if (!strcmp(interface, wp_linux_drm_syncobj_manager_v1_interface.name)) {
-        wl->globals.syncobj_manager =
-            wl_registry_bind(reg, name, &wp_linux_drm_syncobj_manager_v1_interface, 1);
+    } else if (!strcmp(interface, wp_presentation_interface.name)) {
+        wl->globals.presentation = wl_registry_bind(reg, name, &wp_presentation_interface, 1);
+        wp_presentation_add_listener(wl->globals.presentation, &wp_presentation_listener, wl);
     }
 }
 
@@ -1002,10 +999,8 @@ wl_cleanup_surface(struct wl *wl)
 static inline void
 wl_cleanup_globals(struct wl *wl)
 {
-    if (wl->globals.syncobj_manager)
-        wp_linux_drm_syncobj_manager_v1_destroy(wl->globals.syncobj_manager);
-
-    xdg_wm_base_destroy(wl->globals.wm_base);
+    if (wl->globals.presentation)
+        wp_presentation_destroy(wl->globals.presentation);
 
     if (wl->globals.tearing_control_manager)
         wp_tearing_control_manager_v1_destroy(wl->globals.tearing_control_manager);
@@ -1016,8 +1011,10 @@ wl_cleanup_globals(struct wl *wl)
     if (wl->globals.commit_timing_manager)
         wp_commit_timing_manager_v1_destroy(wl->globals.commit_timing_manager);
 
-    if (wl->globals.presentation)
-        wp_presentation_destroy(wl->globals.presentation);
+    if (wl->globals.syncobj_manager)
+        wp_linux_drm_syncobj_manager_v1_destroy(wl->globals.syncobj_manager);
+
+    xdg_wm_base_destroy(wl->globals.wm_base);
 
     wl_compositor_destroy(wl->globals.compositor);
 
