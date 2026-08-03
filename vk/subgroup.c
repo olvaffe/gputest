@@ -108,7 +108,6 @@ subgroup_test_init(struct subgroup_test *test)
     struct vk *vk = &test->vk;
 
     const struct vk_init_params params = {
-        .api_version = VK_API_VERSION_1_2,
         .enable_all_features = true,
     };
     vk_init(vk, &params);

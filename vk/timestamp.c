@@ -21,7 +21,6 @@ timestamp_test_init(struct timestamp_test *test)
     struct vk *vk = &test->vk;
 
     const struct vk_init_params params = {
-        .api_version = VK_API_VERSION_1_2,
         .dev_exts = (const char *[]){ VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME },
         .dev_ext_count = test->EXT_calibrated_timestamps,
     };

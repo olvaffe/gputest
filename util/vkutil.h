@@ -80,7 +80,6 @@ struct vk {
 
     VkPhysicalDeviceExternalFormatResolvePropertiesANDROID external_format_resolve_props;
     VkPhysicalDeviceDrmPropertiesEXT drm_props;
-    VkPhysicalDeviceProtectedMemoryProperties protected_props;
 
     VkPhysicalDeviceFeatures2 features;
     VkPhysicalDeviceVulkan11Features vulkan_11_features;
@@ -90,7 +89,6 @@ struct vk {
 
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
     VkPhysicalDeviceExternalFormatResolveFeaturesANDROID external_format_resolve_features;
-    VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features;
     VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR global_priority_query_features;
 
     VkPhysicalDeviceMemoryProperties mem_props;
@@ -360,13 +358,6 @@ vk_init_physical_device_features(struct vk *vk)
     *pnext = &vk->custom_border_color_features;
     pnext = &vk->custom_border_color_features.pNext;
 
-    if (vk->params.protected_memory) {
-        vk->protected_memory_features.sType =
-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES;
-        *pnext = &vk->protected_memory_features;
-        pnext = &vk->protected_memory_features.pNext;
-    }
-
     if (vk->params.high_priority) {
         vk->global_priority_query_features.sType =
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES_KHR;
@@ -413,11 +404,6 @@ vk_init_physical_device_properties(struct vk *vk)
         vk->drm_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRM_PROPERTIES_EXT;
         *pnext = &vk->drm_props;
         pnext = &vk->drm_props.pNext;
-    }
-    if (vk->params.protected_memory) {
-        vk->protected_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_PROPERTIES;
-        *pnext = &vk->protected_props;
-        pnext = &vk->protected_props.pNext;
     }
 
     vk->GetPhysicalDeviceProperties2(vk->physical_dev, &vk->props);
@@ -519,10 +505,6 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     if (vk->EXT_custom_border_color) {
         *pnext = &vk->custom_border_color_features;
         pnext = &vk->custom_border_color_features.pNext;
-    }
-    if (vk->params.protected_memory) {
-        *pnext = &vk->protected_memory_features;
-        pnext = &vk->protected_memory_features.pNext;
     }
     if (vk->params.high_priority) {
         *pnext = &vk->global_priority_query_features;
@@ -1910,8 +1892,6 @@ vk_create_semaphore(struct vk *vk,
         vk_die("failed to alloc semaphore");
 
     if (type == VK_SEMAPHORE_TYPE_TIMELINE) {
-        if (!(vk->vulkan_12_features.timelineSemaphore && vk->params.enable_all_features))
-            vk_die("no support for timeline semaphore");
         if (handle_type == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT)
             vk_die("timeline sync fd is invalid");
     }

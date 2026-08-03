@@ -72,7 +72,6 @@ vk_allocator_init(struct vk_allocator *alloc, const char *render_node, bool prot
 
     /* VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT */
     dev_exts[dev_ext_count++] = VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME;
-    dev_exts[dev_ext_count++] = VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME;
 
     /* VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT */
     dev_exts[dev_ext_count++] = VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME;
@@ -87,15 +86,11 @@ vk_allocator_init(struct vk_allocator *alloc, const char *render_node, bool prot
 
     /* to skip staging VkBuffer for transfers */
     dev_exts[dev_ext_count++] = VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME;
-    dev_exts[dev_ext_count++] = VK_KHR_FORMAT_FEATURE_FLAGS2_EXTENSION_NAME;
-    dev_exts[dev_ext_count++] = VK_KHR_COPY_COMMANDS2_EXTENSION_NAME;
 #endif
 
     const struct vk_init_params params = {
         .render_node = render_node,
-        .api_version = VK_API_VERSION_1_2,
         .protected_memory = protected,
-        /* some of the exts can be dropped if we require 1.2 */
         .dev_exts = dev_exts,
         .dev_ext_count = dev_ext_count,
     };
