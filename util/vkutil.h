@@ -324,13 +324,14 @@ static inline void
 vk_init_physical_device_features(struct vk *vk)
 {
     vk->features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-
     void **pnext = &vk->features.pNext;
-    vk->vulkan_11_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
-    vk->vulkan_12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
 
+    vk->vulkan_11_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
     *pnext = &vk->vulkan_11_features;
-    vk->vulkan_11_features.pNext = &vk->vulkan_12_features;
+    pnext = &vk->vulkan_11_features.pNext;
+
+    vk->vulkan_12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    *pnext = &vk->vulkan_12_features;
     pnext = &vk->vulkan_12_features.pNext;
 
     if (vk->params.api_version >= VK_API_VERSION_1_3) {
@@ -377,13 +378,14 @@ static inline void
 vk_init_physical_device_properties(struct vk *vk)
 {
     vk->props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-
     void **pnext = &vk->props.pNext;
-    vk->vulkan_11_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
-    vk->vulkan_12_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
 
+    vk->vulkan_11_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
     *pnext = &vk->vulkan_11_props;
-    vk->vulkan_11_props.pNext = &vk->vulkan_12_props;
+    pnext = &vk->vulkan_11_props.pNext;
+
+    vk->vulkan_12_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
+    *pnext = &vk->vulkan_12_props;
     pnext = &vk->vulkan_12_props.pNext;
 
     if (vk->params.api_version >= VK_API_VERSION_1_3) {
