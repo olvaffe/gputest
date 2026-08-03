@@ -126,7 +126,7 @@ struct vk_buffer {
 
 struct vk_image {
     VkImageCreateInfo info;
-    VkFormatFeatureFlags features;
+    VkFormatFeatureFlags2 features;
     VkImage img;
 
     VkDeviceMemory mem;
@@ -800,27 +800,31 @@ vk_destroy_buffer(struct vk *vk, struct vk_buffer *buf)
     free(buf);
 }
 
-static inline VkFormatFeatureFlags
+static inline VkFormatFeatureFlags2
 vk_validate_image_info(struct vk *vk, const VkImageCreateInfo *info)
 {
+    VkFormatProperties3 fmt_props3 = {
+        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3,
+    };
     VkFormatProperties2 fmt_props = {
         .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+        .pNext = &fmt_props3,
     };
     vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, info->format, &fmt_props);
-    const VkFormatFeatureFlags features = info->tiling == VK_IMAGE_TILING_OPTIMAL
-                                              ? fmt_props.formatProperties.optimalTilingFeatures
-                                              : fmt_props.formatProperties.linearTilingFeatures;
+    const VkFormatFeatureFlags2 features = info->tiling == VK_IMAGE_TILING_OPTIMAL
+                                               ? fmt_props3.optimalTilingFeatures
+                                               : fmt_props3.linearTilingFeatures;
 
     const struct {
         VkImageUsageFlagBits usage;
-        VkFormatFeatureFlagBits feature;
+        VkFormatFeatureFlags2 feature;
     } pairs[] = {
-        { VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT },
-        { VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_FORMAT_FEATURE_TRANSFER_DST_BIT },
-        { VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT },
-        { VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT },
+        { VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT },
+        { VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT },
+        { VK_IMAGE_USAGE_SAMPLED_BIT, VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT },
+        { VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT },
         { VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-          VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT },
+          VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT },
     };
 
     for (uint32_t i = 0; i < ARRAY_SIZE(pairs); i++) {
@@ -1052,14 +1056,14 @@ vk_create_image_ycbcr_conversion(struct vk *vk,
                                  VkFilter chroma_filter)
 {
     if (chroma_offset == VK_CHROMA_LOCATION_MIDPOINT &&
-        !(img->features & VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT))
+        !(img->features & VK_FORMAT_FEATURE_2_MIDPOINT_CHROMA_SAMPLES_BIT))
         vk_die("image does not support midpoint chroma offset");
     else if (chroma_offset == VK_CHROMA_LOCATION_COSITED_EVEN &&
-             !(img->features & VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT))
+             !(img->features & VK_FORMAT_FEATURE_2_COSITED_CHROMA_SAMPLES_BIT))
         vk_die("image does not support cosited chroma offset");
 
     if (chroma_filter == VK_FILTER_LINEAR &&
-        !(img->features & VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT))
+        !(img->features & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT))
         vk_die("image does not support linear chroma offset");
 
     const VkPhysicalDeviceImageFormatInfo2 fmt_info = {

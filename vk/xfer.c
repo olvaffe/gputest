@@ -32,6 +32,7 @@ struct xfer_test_format {
     uint32_t plane_count;
 
     VkFormatProperties2 props;
+    VkFormatProperties3 props3;
 };
 
 static struct xfer_test_format xfer_test_formats[] = {
@@ -40,41 +41,33 @@ static struct xfer_test_format xfer_test_formats[] = {
 #define FMT(fmt)                                                                                 \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
-        .color = true,                                                                           \
-        .plane_count = 1,                                                                        \
     },
-#define FMT_D(fmt)                                                                               \
+#define FMT_COLOR(fmt)                                                                           \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+        .color = true,                                                                           \
+    },
+#define FMT_DEPTH(fmt)                                                                           \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
         .depth = true,                                                                           \
-        .plane_count = 1,                                                                        \
     },
-#define FMT_S(fmt)                                                                               \
+#define FMT_STENCIL(fmt)                                                                         \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
         .stencil = true,                                                                         \
-        .plane_count = 1,                                                                        \
     },
 #define FMT_DS(fmt)                                                                              \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
         .depth = true,                                                                           \
         .stencil = true,                                                                         \
-        .plane_count = 1,                                                                        \
     },
 #define FMT_COMPRESSED(fmt)                                                                      \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
         .color = true,                                                                           \
         .compressed = true,                                                                      \
-        .plane_count = 1,                                                                        \
-    },
-#define FMT_YCBCR(fmt)                                                                           \
-    {                                                                                            \
-        FMT_COMMON(fmt),                                                                         \
-        .color = true,                                                                           \
-        .ycbcr = true,                                                                           \
-        .plane_count = 1,                                                                        \
     },
 #define FMT_2PLANE(fmt)                                                                          \
     {                                                                                            \
@@ -103,7 +96,9 @@ xfer_test_init_formats(struct xfer_test *test)
     for (uint32_t i = 0; i < ARRAY_SIZE(xfer_test_formats); i++) {
         struct xfer_test_format *fmt = &xfer_test_formats[i];
 
+        fmt->props3.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3;
         fmt->props.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+        fmt->props.pNext = &fmt->props3;
         vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, fmt->format, &fmt->props);
     }
 }
@@ -908,11 +903,11 @@ xfer_test_draw(struct xfer_test *test)
 
     for (uint32_t i = 0; i < ARRAY_SIZE(xfer_test_formats); i++) {
         const struct xfer_test_format *fmt = &xfer_test_formats[i];
-        const VkFormatFeatureFlags linear = fmt->props.formatProperties.linearTilingFeatures;
-        const VkFormatFeatureFlags optimal = fmt->props.formatProperties.optimalTilingFeatures;
-        const uint32_t xfer_bits =
-            VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT |
-            VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+        const VkFormatFeatureFlags2 linear = fmt->props3.linearTilingFeatures;
+        const VkFormatFeatureFlags2 optimal = fmt->props3.optimalTilingFeatures;
+        const VkFormatFeatureFlags2 xfer_bits =
+            VK_FORMAT_FEATURE_2_BLIT_SRC_BIT | VK_FORMAT_FEATURE_2_BLIT_DST_BIT |
+            VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT;
 
         if (!((linear | optimal) & xfer_bits))
             continue;
@@ -920,55 +915,53 @@ xfer_test_draw(struct xfer_test *test)
         vk_log("%s", fmt->name);
 
         /* vkCmdCopyImageToBuffer */
-        if (linear & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)
+        if (linear & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT)
             xfer_test_draw_copy_image_to_buffer(test, fmt, VK_IMAGE_TILING_LINEAR);
-        if (optimal & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)
+        if (optimal & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT)
             xfer_test_draw_copy_image_to_buffer(test, fmt, VK_IMAGE_TILING_OPTIMAL);
 
         /* vkCmdCopyBufferToImage */
-        if (linear & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
+        if (linear & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT)
             xfer_test_draw_copy_buffer_to_image(test, fmt, VK_IMAGE_TILING_LINEAR);
-        if (optimal & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
+        if (optimal & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT)
             xfer_test_draw_copy_buffer_to_image(test, fmt, VK_IMAGE_TILING_OPTIMAL);
 
         /* vkCmdClearColorImage */
-        if (linear & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
+        if (linear & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT)
             xfer_test_draw_clear_color_image(test, fmt, VK_IMAGE_TILING_LINEAR);
-        if (optimal & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
+        if (optimal & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT)
             xfer_test_draw_clear_color_image(test, fmt, VK_IMAGE_TILING_OPTIMAL);
 
         /* vkCmdClearDepthStencilImage */
-        if (linear & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
+        if (linear & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT)
             xfer_test_draw_clear_depth_stencil_image(test, fmt, VK_IMAGE_TILING_LINEAR);
-        if (optimal & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
+        if (optimal & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT)
             xfer_test_draw_clear_depth_stencil_image(test, fmt, VK_IMAGE_TILING_OPTIMAL);
 
         /* vkCmdCopyImage */
-        if ((linear | optimal) & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT) {
+        if ((linear | optimal) & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT) {
             for (uint32_t j = 0; j < ARRAY_SIZE(xfer_test_formats); j++) {
                 const struct xfer_test_format *dst_fmt = &xfer_test_formats[j];
-                const VkFormatFeatureFlags dst_linear =
-                    dst_fmt->props.formatProperties.linearTilingFeatures;
-                const VkFormatFeatureFlags dst_optimal =
-                    dst_fmt->props.formatProperties.optimalTilingFeatures;
+                const VkFormatFeatureFlags2 dst_linear = dst_fmt->props3.linearTilingFeatures;
+                const VkFormatFeatureFlags2 dst_optimal = dst_fmt->props3.optimalTilingFeatures;
 
-                if (linear & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT) {
-                    if (dst_linear & VK_FORMAT_FEATURE_TRANSFER_DST_BIT) {
+                if (linear & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT) {
+                    if (dst_linear & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT) {
                         xfer_test_draw_copy_image(test, fmt, VK_IMAGE_TILING_LINEAR, dst_fmt,
                                                   VK_IMAGE_TILING_LINEAR);
                     }
-                    if (dst_optimal & VK_FORMAT_FEATURE_TRANSFER_DST_BIT) {
+                    if (dst_optimal & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT) {
                         xfer_test_draw_copy_image(test, fmt, VK_IMAGE_TILING_LINEAR, dst_fmt,
                                                   VK_IMAGE_TILING_OPTIMAL);
                     }
                 }
 
-                if (optimal & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT) {
-                    if (dst_linear & VK_FORMAT_FEATURE_TRANSFER_DST_BIT) {
+                if (optimal & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT) {
+                    if (dst_linear & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT) {
                         xfer_test_draw_copy_image(test, fmt, VK_IMAGE_TILING_OPTIMAL, dst_fmt,
                                                   VK_IMAGE_TILING_LINEAR);
                     }
-                    if (dst_optimal & VK_FORMAT_FEATURE_TRANSFER_DST_BIT) {
+                    if (dst_optimal & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT) {
                         xfer_test_draw_copy_image(test, fmt, VK_IMAGE_TILING_OPTIMAL, dst_fmt,
                                                   VK_IMAGE_TILING_OPTIMAL);
                     }
@@ -977,31 +970,29 @@ xfer_test_draw(struct xfer_test *test)
         }
 
         /* vkCmdBlitImage */
-        if ((linear | optimal) & VK_FORMAT_FEATURE_BLIT_SRC_BIT) {
+        if ((linear | optimal) & VK_FORMAT_FEATURE_2_BLIT_SRC_BIT) {
             for (uint32_t j = 0; j < ARRAY_SIZE(xfer_test_formats); j++) {
                 const struct xfer_test_format *dst_fmt = &xfer_test_formats[j];
-                const VkFormatFeatureFlags dst_linear =
-                    dst_fmt->props.formatProperties.linearTilingFeatures;
-                const VkFormatFeatureFlags dst_optimal =
-                    dst_fmt->props.formatProperties.optimalTilingFeatures;
+                const VkFormatFeatureFlags2 dst_linear = dst_fmt->props3.linearTilingFeatures;
+                const VkFormatFeatureFlags2 dst_optimal = dst_fmt->props3.optimalTilingFeatures;
 
-                if (linear & VK_FORMAT_FEATURE_BLIT_SRC_BIT) {
-                    if (dst_linear & VK_FORMAT_FEATURE_BLIT_DST_BIT) {
+                if (linear & VK_FORMAT_FEATURE_2_BLIT_SRC_BIT) {
+                    if (dst_linear & VK_FORMAT_FEATURE_2_BLIT_DST_BIT) {
                         xfer_test_draw_blit_image(test, fmt, VK_IMAGE_TILING_LINEAR, dst_fmt,
                                                   VK_IMAGE_TILING_LINEAR);
                     }
-                    if (dst_optimal & VK_FORMAT_FEATURE_BLIT_DST_BIT) {
+                    if (dst_optimal & VK_FORMAT_FEATURE_2_BLIT_DST_BIT) {
                         xfer_test_draw_blit_image(test, fmt, VK_IMAGE_TILING_LINEAR, dst_fmt,
                                                   VK_IMAGE_TILING_OPTIMAL);
                     }
                 }
 
-                if (optimal & VK_FORMAT_FEATURE_BLIT_SRC_BIT) {
-                    if (dst_linear & VK_FORMAT_FEATURE_BLIT_DST_BIT) {
+                if (optimal & VK_FORMAT_FEATURE_2_BLIT_SRC_BIT) {
+                    if (dst_linear & VK_FORMAT_FEATURE_2_BLIT_DST_BIT) {
                         xfer_test_draw_blit_image(test, fmt, VK_IMAGE_TILING_OPTIMAL, dst_fmt,
                                                   VK_IMAGE_TILING_LINEAR);
                     }
-                    if (dst_optimal & VK_FORMAT_FEATURE_BLIT_DST_BIT) {
+                    if (dst_optimal & VK_FORMAT_FEATURE_2_BLIT_DST_BIT) {
                         xfer_test_draw_blit_image(test, fmt, VK_IMAGE_TILING_OPTIMAL, dst_fmt,
                                                   VK_IMAGE_TILING_OPTIMAL);
                     }
@@ -1025,9 +1016,9 @@ xfer_test_draw(struct xfer_test *test)
          * The format features of dstImage must contain
          * VK_FORMAT_FEATURE_TRANSFER_DST_BIT
          */
-        const uint32_t resolve_bits = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT |
-                                      VK_FORMAT_FEATURE_TRANSFER_DST_BIT |
-                                      VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT;
+        const VkFormatFeatureFlags2 resolve_bits = VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT |
+                                                   VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT |
+                                                   VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT;
 
         /* vkCmdResolveImage */
         if ((linear & resolve_bits) == resolve_bits)

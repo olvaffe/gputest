@@ -178,7 +178,7 @@ vk_allocator_query_format_modifiers(struct vk_allocator *alloc, VkFormat format,
 
     uint64_t *modifiers = NULL;
     uint32_t *mem_plane_counts;
-    VkFormatFeatureFlags *format_features;
+    VkFormatFeatureFlags2 *format_features;
     VkDrmFormatModifierPropertiesEXT *mod_props;
 
     if (mod_list.drmFormatModifierCount) {

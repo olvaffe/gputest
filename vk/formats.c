@@ -77,32 +77,32 @@ static const struct formats_test_name formats_test_usage_names[] = {
 };
 
 static const struct formats_test_name formats_test_feature_names[] = {
-    { VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT, "sampled" },
-    { VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT, "storage" },
-    { VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT, "atomic" },
-    { VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT, "sampled" },
-    { VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT, "storage" },
-    { VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT, "atomic" },
-    { VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT, "vertex" },
-    { VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT, "color" },
-    { VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT, "blend" },
-    { VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT, "depth" },
-    { VK_FORMAT_FEATURE_BLIT_SRC_BIT, "blits" },
-    { VK_FORMAT_FEATURE_BLIT_DST_BIT, "blitd" },
-    { VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT, "filtering" },
-    { VK_FORMAT_FEATURE_TRANSFER_SRC_BIT, "xfers" },
-    { VK_FORMAT_FEATURE_TRANSFER_DST_BIT, "xferd" },
-    { VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT, "midpoint" },
-    { VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT, "chroma" },
-    { VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT,
+    { VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT, "sampled" },
+    { VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT, "storage" },
+    { VK_FORMAT_FEATURE_2_STORAGE_IMAGE_ATOMIC_BIT, "atomic" },
+    { VK_FORMAT_FEATURE_2_UNIFORM_TEXEL_BUFFER_BIT, "sampled" },
+    { VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_BIT, "storage" },
+    { VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_ATOMIC_BIT, "atomic" },
+    { VK_FORMAT_FEATURE_2_VERTEX_BUFFER_BIT, "vertex" },
+    { VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT, "color" },
+    { VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BLEND_BIT, "blend" },
+    { VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT, "depth" },
+    { VK_FORMAT_FEATURE_2_BLIT_SRC_BIT, "blits" },
+    { VK_FORMAT_FEATURE_2_BLIT_DST_BIT, "blitd" },
+    { VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_LINEAR_BIT, "filtering" },
+    { VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT, "xfers" },
+    { VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT, "xferd" },
+    { VK_FORMAT_FEATURE_2_MIDPOINT_CHROMA_SAMPLES_BIT, "midpoint" },
+    { VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT, "chroma" },
+    { VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT,
       "separate" },
-    { VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_BIT,
+    { VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_BIT,
       "explicit" },
-    { VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE_BIT,
+    { VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE_BIT,
       "forceable" },
-    { VK_FORMAT_FEATURE_DISJOINT_BIT, "disjoint" },
-    { VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT, "cosited" },
-    { VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_MINMAX_BIT, "minmax" },
+    { VK_FORMAT_FEATURE_2_DISJOINT_BIT, "disjoint" },
+    { VK_FORMAT_FEATURE_2_COSITED_CHROMA_SAMPLES_BIT, "cosited" },
+    { VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_FILTER_MINMAX_BIT, "minmax" },
 };
 
 static void
@@ -134,7 +134,7 @@ formats_get_usage_str(VkImageUsageFlags usage, char *str, size_t size)
 }
 
 static void
-formats_get_feature_str(VkFormatFeatureFlags features, char *str, size_t size)
+formats_get_feature_str(VkFormatFeatureFlags2 features, char *str, size_t size)
 {
     formats_get_str(features, formats_test_feature_names, ARRAY_SIZE(formats_test_feature_names),
                     str, size);
@@ -258,9 +258,13 @@ formats_test_dump_format(struct vk *vk, const struct formats_test_format *fmt)
     VkDrmFormatModifierPropertiesListEXT mod_props = {
         .sType = VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT,
     };
+    VkFormatProperties3 props3 = {
+        .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3,
+        .pNext = &mod_props,
+    };
     VkFormatProperties2 props = {
         .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
-        .pNext = &mod_props,
+        .pNext = &props3,
     };
     vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, fmt->format, &props);
 
@@ -272,9 +276,8 @@ formats_test_dump_format(struct vk *vk, const struct formats_test_format *fmt)
         vk->GetPhysicalDeviceFormatProperties2(vk->physical_dev, fmt->format, &props);
     }
 
-    const bool can_buffer = props.formatProperties.bufferFeatures;
-    const bool can_img = props.formatProperties.linearTilingFeatures ||
-                         props.formatProperties.optimalTilingFeatures ||
+    const bool can_buffer = props3.bufferFeatures;
+    const bool can_img = props3.linearTilingFeatures || props3.optimalTilingFeatures ||
                          mod_props.drmFormatModifierCount;
 
     if (!can_buffer && !can_img) {
@@ -287,8 +290,7 @@ formats_test_dump_format(struct vk *vk, const struct formats_test_format *fmt)
 
     char features_str[128];
     if (can_buffer) {
-        formats_get_feature_str(props.formatProperties.bufferFeatures, features_str,
-                                ARRAY_SIZE(features_str));
+        formats_get_feature_str(props3.bufferFeatures, features_str, ARRAY_SIZE(features_str));
         vk_log("  bufferFeatures: %s", features_str);
     }
 
@@ -297,12 +299,10 @@ formats_test_dump_format(struct vk *vk, const struct formats_test_format *fmt)
         return;
     }
 
-    formats_get_feature_str(props.formatProperties.linearTilingFeatures, features_str,
-                            ARRAY_SIZE(features_str));
+    formats_get_feature_str(props3.linearTilingFeatures, features_str, ARRAY_SIZE(features_str));
     vk_log("  linearTilingFeatures: %s", features_str);
 
-    formats_get_feature_str(props.formatProperties.optimalTilingFeatures, features_str,
-                            ARRAY_SIZE(features_str));
+    formats_get_feature_str(props3.optimalTilingFeatures, features_str, ARRAY_SIZE(features_str));
     vk_log("  optimalTilingFeatures: %s", features_str);
 
     for (uint32_t i = 0; i < mod_props.drmFormatModifierCount; i++) {
