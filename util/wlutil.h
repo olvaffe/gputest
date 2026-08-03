@@ -53,12 +53,13 @@ struct wl_output_info {
 struct wl_globals {
     struct wl_fixes *fixes;
 
-    struct wl_array outputs;
-
-    struct wp_color_manager_v1 *color_manager;
-
+    /* input */
     struct wl_seat *seat;
     struct wl_keyboard *keyboard;
+
+    /* output */
+    struct wl_array outputs;
+    struct wp_color_manager_v1 *color_manager;
 
     struct wl_compositor *compositor;
     uint32_t compositor_version;
@@ -555,6 +556,64 @@ static const struct wp_image_description_info_v1_listener wl_image_description_i
 };
 
 static void
+wl_output_event_geometry(void *data,
+                         struct wl_output *output,
+                         int32_t x,
+                         int32_t y,
+                         int32_t physical_width,
+                         int32_t physical_height,
+                         int32_t subpixel,
+                         const char *make,
+                         const char *model,
+                         int32_t transform)
+{
+    struct wl_output_info *out = data;
+
+    free(out->make);
+    free(out->model);
+    out->make = strdup(make);
+    out->model = strdup(model);
+}
+
+static void
+wl_output_event_mode(void *data,
+                     struct wl_output *output,
+                     uint32_t flags,
+                     int32_t width,
+                     int32_t height,
+                     int32_t refresh)
+{
+    struct wl_output_info *out = data;
+
+    if (!(flags & WL_OUTPUT_MODE_CURRENT))
+        return;
+
+    out->width = width;
+    out->height = height;
+    out->refresh_rate = refresh;
+}
+
+static void
+wl_output_event_done(void *data, struct wl_output *output)
+{
+}
+
+static void
+wl_output_event_scale(void *data, struct wl_output *output, int32_t factor)
+{
+    struct wl_output_info *out = data;
+
+    out->scale = factor;
+}
+
+static const struct wl_output_listener wl_output_listener = {
+    .geometry = wl_output_event_geometry,
+    .mode = wl_output_event_mode,
+    .done = wl_output_event_done,
+    .scale = wl_output_event_scale,
+};
+
+static void
 wl_keyboard_event_keymap(
     void *data, struct wl_keyboard *wl_keyboard, uint32_t format, int32_t fd, uint32_t size)
 {
@@ -645,64 +704,6 @@ static const struct wl_seat_listener wl_seat_listener = {
 };
 
 static void
-wl_output_event_geometry(void *data,
-                         struct wl_output *output,
-                         int32_t x,
-                         int32_t y,
-                         int32_t physical_width,
-                         int32_t physical_height,
-                         int32_t subpixel,
-                         const char *make,
-                         const char *model,
-                         int32_t transform)
-{
-    struct wl_output_info *out = data;
-
-    free(out->make);
-    free(out->model);
-    out->make = strdup(make);
-    out->model = strdup(model);
-}
-
-static void
-wl_output_event_mode(void *data,
-                     struct wl_output *output,
-                     uint32_t flags,
-                     int32_t width,
-                     int32_t height,
-                     int32_t refresh)
-{
-    struct wl_output_info *out = data;
-
-    if (!(flags & WL_OUTPUT_MODE_CURRENT))
-        return;
-
-    out->width = width;
-    out->height = height;
-    out->refresh_rate = refresh;
-}
-
-static void
-wl_output_event_done(void *data, struct wl_output *output)
-{
-}
-
-static void
-wl_output_event_scale(void *data, struct wl_output *output, int32_t factor)
-{
-    struct wl_output_info *out = data;
-
-    out->scale = factor;
-}
-
-static const struct wl_output_listener wl_output_listener = {
-    .geometry = wl_output_event_geometry,
-    .mode = wl_output_event_mode,
-    .done = wl_output_event_done,
-    .scale = wl_output_event_scale,
-};
-
-static void
 wl_registry_event_global(
     void *data, struct wl_registry *reg, uint32_t name, const char *interface, uint32_t version)
 {
@@ -710,6 +711,14 @@ wl_registry_event_global(
 
     if (!strcmp(interface, wl_fixes_interface.name)) {
         wl->globals.fixes = wl_registry_bind(reg, name, &wl_fixes_interface, 1);
+    } else if (!strcmp(interface, wl_seat_interface.name)) {
+        if (version < WL_SEAT_RELEASE_SINCE_VERSION) {
+            wl_die("%s ver %d req %d", interface, version, WL_SEAT_RELEASE_SINCE_VERSION);
+        }
+        version = WL_SEAT_RELEASE_SINCE_VERSION;
+
+        wl->globals.seat = wl_registry_bind(reg, name, &wl_seat_interface, version);
+        wl_seat_add_listener(wl->globals.seat, &wl_seat_listener, wl);
     } else if (!strcmp(interface, wl_output_interface.name)) {
         if (version < WL_OUTPUT_RELEASE_SINCE_VERSION) {
             wl_die("%s ver %d req %d", interface, version, WL_OUTPUT_RELEASE_SINCE_VERSION);
@@ -727,14 +736,6 @@ wl_registry_event_global(
     } else if (!strcmp(interface, wp_color_manager_v1_interface.name)) {
         wl->globals.color_manager =
             wl_registry_bind(reg, name, &wp_color_manager_v1_interface, 1);
-    } else if (!strcmp(interface, wl_seat_interface.name)) {
-        if (version < WL_SEAT_RELEASE_SINCE_VERSION) {
-            wl_die("%s ver %d req %d", interface, version, WL_SEAT_RELEASE_SINCE_VERSION);
-        }
-        version = WL_SEAT_RELEASE_SINCE_VERSION;
-
-        wl->globals.seat = wl_registry_bind(reg, name, &wl_seat_interface, version);
-        wl_seat_add_listener(wl->globals.seat, &wl_seat_listener, wl);
     } else if (!strcmp(interface, wl_compositor_interface.name)) {
         if (version < WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
             wl_die("%s ver %d req %d", interface, version,
@@ -1023,15 +1024,8 @@ wl_cleanup_globals(struct wl *wl)
 
     wl_compositor_destroy(wl->globals.compositor);
 
-    if (wl->globals.keyboard)
-        wl_keyboard_release(wl->globals.keyboard);
-    wl_seat_release(wl->globals.seat);
-
     if (wl->globals.color_manager)
         wp_color_manager_v1_destroy(wl->globals.color_manager);
-
-    if (wl->globals.fixes)
-        wl_fixes_destroy(wl->globals.fixes);
 
     struct wl_output_info **out_iter;
     wl_array_for_each(out_iter, &wl->globals.outputs) {
@@ -1046,6 +1040,13 @@ wl_cleanup_globals(struct wl *wl)
         free(out);
     }
     wl_array_release(&wl->globals.outputs);
+
+    if (wl->globals.keyboard)
+        wl_keyboard_release(wl->globals.keyboard);
+    wl_seat_release(wl->globals.seat);
+
+    if (wl->globals.fixes)
+        wl_fixes_destroy(wl->globals.fixes);
 }
 
 static inline void
