@@ -120,7 +120,7 @@ storage_3d_test_init_buffer(struct storage_3d_test *test)
     for (uint32_t i = 0; i < test->img->info.mipLevels; i++)
         size += storage_3d_test_get_miplevel_size(test, i);
 
-    test->buf = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    test->buf = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_2_TRANSFER_DST_BIT);
 }
 
 static void

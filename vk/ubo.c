@@ -124,7 +124,7 @@ ubo_test_init_ubo(struct ubo_test *test)
         [1] = { -s, c },
     };
 
-    test->ubo = vk_create_buffer(vk, 0, sizeof(transform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    test->ubo = vk_create_buffer(vk, 0, sizeof(transform), VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT);
     memcpy(test->ubo->mem_ptr, transform, sizeof(transform));
 }
 
@@ -134,7 +134,7 @@ ubo_test_init_vb(struct ubo_test *test)
     struct vk *vk = &test->vk;
 
     test->vb =
-        vk_create_buffer(vk, 0, sizeof(ubo_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        vk_create_buffer(vk, 0, sizeof(ubo_test_vertices), VK_BUFFER_USAGE_2_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, ubo_test_vertices, sizeof(ubo_test_vertices));
 }
 

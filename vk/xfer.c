@@ -129,7 +129,7 @@ xfer_test_begin_cmd(struct xfer_test *test)
 }
 
 static struct vk_buffer *
-xfer_test_begin_buffer(struct xfer_test *test, VkBufferUsageFlags usage)
+xfer_test_begin_buffer(struct xfer_test *test, VkBufferUsageFlags2 usage)
 {
     struct vk *vk = &test->vk;
 
@@ -222,7 +222,7 @@ xfer_test_draw_fill_buffer(struct xfer_test *test)
     struct vk *vk = &test->vk;
 
     VkCommandBuffer cmd = xfer_test_begin_cmd(test);
-    struct vk_buffer *buf = xfer_test_begin_buffer(test, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    struct vk_buffer *buf = xfer_test_begin_buffer(test, VK_BUFFER_USAGE_2_TRANSFER_DST_BIT);
 
     vk->CmdFillBuffer(cmd, buf->buf, 0, VK_WHOLE_SIZE, 0x37);
 
@@ -236,7 +236,7 @@ xfer_test_draw_update_buffer(struct xfer_test *test)
     const uint32_t data[] = { 0x37, 0x38, 0x39, 0x40 };
 
     VkCommandBuffer cmd = xfer_test_begin_cmd(test);
-    struct vk_buffer *buf = xfer_test_begin_buffer(test, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    struct vk_buffer *buf = xfer_test_begin_buffer(test, VK_BUFFER_USAGE_2_TRANSFER_DST_BIT);
 
     vk->CmdUpdateBuffer(cmd, buf->buf, 0, ARRAY_SIZE(data), data);
 
@@ -250,7 +250,7 @@ xfer_test_draw_copy_buffer(struct xfer_test *test)
 
     VkCommandBuffer cmd = xfer_test_begin_cmd(test);
     struct vk_buffer *buf = xfer_test_begin_buffer(
-        test, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+        test, VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_2_TRANSFER_DST_BIT);
 
     const VkDeviceSize size = buf->info.size / 2;
     const VkBufferCopy2 region = {
@@ -434,7 +434,7 @@ xfer_test_draw_copy_image_to_buffer(struct xfer_test *test,
     struct vk_image *img = xfer_test_begin_image(test, fmt, VK_SAMPLE_COUNT_1_BIT, tiling,
                                                  VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                                                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    struct vk_buffer *buf = xfer_test_begin_buffer(test, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    struct vk_buffer *buf = xfer_test_begin_buffer(test, VK_BUFFER_USAGE_2_TRANSFER_DST_BIT);
 
     const VkCopyImageToBufferInfo2 copy_info = {
         .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
@@ -463,7 +463,7 @@ xfer_test_draw_copy_buffer_to_image(struct xfer_test *test,
     const uint32_t region_count = xfer_test_get_buffer_image_copy(test, fmt, regions);
 
     VkCommandBuffer cmd = xfer_test_begin_cmd(test);
-    struct vk_buffer *buf = xfer_test_begin_buffer(test, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    struct vk_buffer *buf = xfer_test_begin_buffer(test, VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT);
     struct vk_image *img = xfer_test_begin_image(test, fmt, VK_SAMPLE_COUNT_1_BIT, tiling,
                                                  VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);

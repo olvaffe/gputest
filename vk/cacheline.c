@@ -20,7 +20,7 @@ cacheline_test_init_buf(struct cacheline_test *test)
     struct vk *vk = &test->vk;
 
     const VkDeviceSize size = test->dword_count * 4;
-    test->buf = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    test->buf = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_2_TRANSFER_DST_BIT);
 }
 
 static void

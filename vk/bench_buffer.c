@@ -428,8 +428,8 @@ bench_buffer_test_draw_xfer(struct bench_buffer_test *test)
     struct vk *vk = &test->vk;
     char desc[64];
 
-    const VkBufferUsageFlags usage =
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    const VkBufferUsageFlags2 usage =
+        VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_2_TRANSFER_DST_BIT;
     const uint32_t mt_mask = vk_get_buffer_mt_mask(vk, 0, test->size, usage);
 
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
@@ -469,8 +469,8 @@ bench_buffer_test_draw_compute(struct bench_buffer_test *test)
     struct vk *vk = &test->vk;
     char desc[64];
 
-    const VkBufferUsageFlags usage =
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    const VkBufferUsageFlags2 usage =
+        VK_BUFFER_USAGE_2_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT;
     const uint32_t mt_mask = vk_get_buffer_mt_mask(vk, 0, test->size, usage);
 
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {

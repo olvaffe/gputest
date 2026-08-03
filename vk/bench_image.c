@@ -92,14 +92,19 @@ bench_image_test_get_image_ptr(struct bench_image_test *test,
     if (img->info.tiling != VK_IMAGE_TILING_LINEAR || !img->is_coherent)
         return NULL;
 
-    const VkImageSubresource subres = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+    const VkImageSubresource2 subres2 = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_SUBRESOURCE_2,
+        .imageSubresource = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        },
     };
-    VkSubresourceLayout layout;
-    vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
+    VkSubresourceLayout2 layout2 = {
+        .sType = VK_STRUCTURE_TYPE_SUBRESOURCE_LAYOUT_2,
+    };
+    vk->GetImageSubresourceLayout2(vk->dev, img->img, &subres2, &layout2);
 
-    *stride = layout.rowPitch;
-    return img->mem_ptr + layout.offset;
+    *stride = layout2.subresourceLayout.rowPitch;
+    return img->mem_ptr + layout2.subresourceLayout.offset;
 }
 
 static void
@@ -745,8 +750,8 @@ bench_image_test_draw_copy_buffer(struct bench_image_test *test, VkImageTiling t
     bench_image_test_init_info(test, tiling, dst_usage, &dst_info);
     const uint32_t dst_mask = vk_get_image_mt_mask(vk, &dst_info);
 
-    const VkBufferUsageFlags src_usage =
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    const VkBufferUsageFlags2 src_usage =
+        VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_2_TRANSFER_DST_BIT;
     const VkDeviceSize src_size = (VkDeviceSize)test->width * test->height * test->elem_size;
     const uint32_t src_mask = vk_get_buffer_mt_mask(vk, 0, src_size, src_usage);
 

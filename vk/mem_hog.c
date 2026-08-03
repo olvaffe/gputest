@@ -64,7 +64,7 @@ mem_hog_test_init_second(struct mem_hog_test *test)
 {
     vk_init(&test->second.vk, NULL);
     test->second.buf =
-        vk_create_buffer(&test->second.vk, 0, test->size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+        vk_create_buffer(&test->second.vk, 0, test->size, VK_BUFFER_USAGE_2_TRANSFER_DST_BIT);
 }
 
 static void
@@ -100,7 +100,7 @@ mem_hog_test_init_buffers(struct mem_hog_test *test)
         vk_die("failed to alloc bufs");
 
     for (uint32_t i = 0; i < test->count; i++)
-        test->bufs[i] = vk_create_buffer(vk, 0, test->size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+        test->bufs[i] = vk_create_buffer(vk, 0, test->size, VK_BUFFER_USAGE_2_TRANSFER_DST_BIT);
 }
 
 static void

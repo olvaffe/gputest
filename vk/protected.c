@@ -132,19 +132,17 @@ protected_test_init_buffers(struct protected_test *test)
         vk_die("no protected mt");
 
     const VkDeviceSize vb_size = sizeof(protected_test_vertices);
-    test->vb = vk_create_buffer(vk, 0, vb_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    test->vb = vk_create_buffer(vk, 0, vb_size, VK_BUFFER_USAGE_2_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, protected_test_vertices, vb_size);
 
-    if (test->protected)
-        vk_die("VUID-VkBufferCreateInfo-flags-09641 violation");
-
     const VkDeviceSize ib_size = sizeof(protected_test_indices);
-    test->ib = vk_create_buffer_with_mt(
-        vk, test->protected ? VK_BUFFER_CREATE_PROTECTED_BIT : 0, ib_size,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-        test->protected ? protected_mt : vk->buf_mt_index);
+    const VkBufferCreateFlags ib_flags = test->protected ? VK_BUFFER_CREATE_PROTECTED_BIT : 0;
+    const VkBufferUsageFlags2 ib_usage =
+        VK_BUFFER_USAGE_2_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_INDEX_BUFFER_BIT;
+    test->ib = vk_create_buffer_with_mt(vk, ib_flags, ib_size, ib_usage,
+                                        test->protected ? protected_mt : vk->buf_mt_index);
 
-    test->staging = vk_create_buffer(vk, 0, ib_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    test->staging = vk_create_buffer(vk, 0, ib_size, VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT);
     memcpy(test->staging->mem_ptr, protected_test_indices, ib_size);
 }
 
@@ -262,7 +260,7 @@ protected_test_draw_triangle(struct protected_test *test, VkCommandBuffer cmd)
 
     vk_bind_pipeline(vk, test->pipeline, cmd);
     vk->CmdBindVertexBuffers(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 });
-    vk->CmdBindIndexBuffer(cmd, test->ib->buf, 0, VK_INDEX_TYPE_UINT16);
+    vk->CmdBindIndexBuffer2(cmd, test->ib->buf, 0, test->ib->info.size, VK_INDEX_TYPE_UINT16);
 
     vk->CmdDrawIndexed(cmd, ARRAY_SIZE(protected_test_indices), 1, 0, 0, 0);
 

@@ -155,12 +155,17 @@ compile_test_compile_compute_pipeline(struct compile_test *test, struct spv_prog
         .mapEntryCount = 0,
 #endif
     };
+    const VkShaderModuleCreateInfo module_info = {
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .codeSize = prog->size,
+        .pCode = prog->spirv,
+    };
     const VkComputePipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
         .stage = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .pNext = &module_info,
             .stage = stage,
-            .module = vk_create_shader_module(vk, prog->spirv, prog->size),
             .pName = prog->reflection.entrypoint,
             .pSpecializationInfo = &spec_info,
 	},
@@ -171,7 +176,6 @@ compile_test_compile_compute_pipeline(struct compile_test *test, struct spv_prog
         vk->CreateComputePipelines(vk->dev, VK_NULL_HANDLE, 1, &pipeline_info, NULL, &pipeline);
     vk_check(vk, "failed to create pipeline");
 
-    vk->DestroyShaderModule(vk->dev, pipeline_info.stage.module, NULL);
     vk->DestroyPipelineLayout(vk->dev, pipeline_info.layout, NULL);
 
     vk->DestroyPipeline(vk->dev, pipeline, NULL);

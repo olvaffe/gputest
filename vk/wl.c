@@ -215,7 +215,7 @@ wl_test_dispatch_redraw(void *data)
             const uint32_t pitch = test->width * u_drm_format_to_cpp(test->drm_format);
             struct vk_allocator_bo *bo = img->data;
             struct vk_allocator_transfer *xfer = vk_allocator_bo_map_transfer(
-                alloc, bo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, 0, 0,
+                alloc, bo, VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT, 0, 0,
                 test->width, test->height);
 
             wl_test_paint_rgba_pattern(test, xfer->staging->mem_ptr, pitch);
@@ -243,7 +243,7 @@ wl_test_dispatch_redraw(void *data)
                 }
 
                 struct vk_allocator_transfer *xfer = vk_allocator_bo_map_transfer(
-                    alloc, bo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, aspect, 0, 0, width, height);
+                    alloc, bo, VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT, aspect, 0, 0, width, height);
 
                 wl_test_paint_yuv_pattern(test, xfer->staging->mem_ptr, pitch, plane);
 

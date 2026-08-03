@@ -96,8 +96,8 @@ subgroup_test_init_buffers(struct subgroup_test *test)
     struct vk *vk = &test->vk;
 
     const VkDeviceSize size = sizeof(test->vals);
-    test->src = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    test->dst = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    test->src = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
+    test->dst = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
 
     memcpy(test->src->mem_ptr, test->vals, size);
 }

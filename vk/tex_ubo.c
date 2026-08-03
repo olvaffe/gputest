@@ -123,7 +123,7 @@ tex_ubo_test_init_ubo(struct tex_ubo_test *test)
     struct vk *vk = &test->vk;
 
     test->ubo = vk_create_buffer(vk, 0, sizeof(tex_ubo_test_color_scales),
-                                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+                                 VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT);
     memcpy(test->ubo->mem_ptr, tex_ubo_test_color_scales, sizeof(tex_ubo_test_color_scales));
 }
 
@@ -144,8 +144,8 @@ tex_ubo_test_init_vb(struct tex_ubo_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->vb =
-        vk_create_buffer(vk, 0, sizeof(tex_ubo_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    test->vb = vk_create_buffer(vk, 0, sizeof(tex_ubo_test_vertices),
+                                VK_BUFFER_USAGE_2_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, tex_ubo_test_vertices, sizeof(tex_ubo_test_vertices));
 }
 

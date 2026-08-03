@@ -10,7 +10,7 @@ struct buf_align_test {
 
     VkDeviceSize mem_size;
     VkDeviceSize buf_size;
-    VkBufferUsageFlags buf_usage;
+    VkBufferUsageFlags2 buf_usage;
     VkDeviceSize force_alignment;
 
     VkDeviceMemory mem;
@@ -266,7 +266,7 @@ main(void)
     struct buf_align_test test = {
         .mem_size = 4096,
         .buf_size = 4,
-        .buf_usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .buf_usage = VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_2_TRANSFER_DST_BIT,
         //.force_alignment = 64,
     };
 

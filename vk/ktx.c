@@ -266,7 +266,8 @@ ktx_test_init_staging_buffer(struct ktx_test *test)
     struct vk *vk = &test->vk;
     ktxTexture *tex = test->tex;
 
-    test->staging_buf = vk_create_buffer(vk, 0, tex->dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    test->staging_buf =
+        vk_create_buffer(vk, 0, tex->dataSize, VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT);
     memcpy(test->staging_buf->mem_ptr, tex->pData, tex->dataSize);
 }
 

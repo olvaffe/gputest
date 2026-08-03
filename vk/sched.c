@@ -159,7 +159,7 @@ sched_test_init_buffer(struct sched_test *test)
     struct vk *vk = &test->vk;
 
     const VkDeviceSize buf_size = test->group_count * test->local_size * test->type_size;
-    test->dst = vk_create_buffer(vk, 0, buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    test->dst = vk_create_buffer(vk, 0, buf_size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
 }
 
 static void

@@ -128,11 +128,11 @@ conv1d_test_init_buffers(struct conv1d_test *test)
     const VkDeviceSize src_buf_size =
         (test->buf_width + test->kernel_size - 1) * test->type_size * test->type_width;
     const VkDeviceSize dst_buf_size = test->buf_width * test->type_size * test->type_width;
-    test->src = vk_create_buffer(vk, 0, src_buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    test->dst = vk_create_buffer(vk, 0, dst_buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    test->src = vk_create_buffer(vk, 0, src_buf_size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
+    test->dst = vk_create_buffer(vk, 0, dst_buf_size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
 
     const VkDeviceSize weight_buf_size = test->kernel_size * test->type_size * test->type_width;
-    test->weight = vk_create_buffer(vk, 0, weight_buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    test->weight = vk_create_buffer(vk, 0, weight_buf_size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
 }
 
 static void

@@ -145,9 +145,9 @@ conv2d_test_init_buffers(struct conv2d_test *test)
     const VkDeviceSize dst_buf_size = dst_pixel_count * vec_size;
     const VkDeviceSize weight_buf_size = weight_mat_count * mat_size;
 
-    test->src = vk_create_buffer(vk, 0, src_buf_size, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-    test->dst = vk_create_buffer(vk, 0, dst_buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    test->weight = vk_create_buffer(vk, 0, weight_buf_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    test->src = vk_create_buffer(vk, 0, src_buf_size, VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT);
+    test->dst = vk_create_buffer(vk, 0, dst_buf_size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
+    test->weight = vk_create_buffer(vk, 0, weight_buf_size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
 
     const VkBufferViewCreateInfo view_info = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,

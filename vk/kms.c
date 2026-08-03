@@ -374,14 +374,19 @@ kms_test_init_bo(struct kms_test *test)
             vk->result = vk->GetMemoryFdKHR(vk->dev, &fd_info, &test->bo.fds[i]);
             vk_check(vk, "failed to export dma-buf");
 
-            const VkImageSubresource subres = {
-                .aspectMask = VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT << i,
+            const VkImageSubresource2 subres2 = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_SUBRESOURCE_2,
+                .imageSubresource = {
+                    .aspectMask = VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT << i,
+                },
             };
-            VkSubresourceLayout layout;
-            vk->GetImageSubresourceLayout(vk->dev, test->img, &subres, &layout);
+            VkSubresourceLayout2 layout2 = {
+                .sType = VK_STRUCTURE_TYPE_SUBRESOURCE_LAYOUT_2,
+            };
+            vk->GetImageSubresourceLayout2(vk->dev, test->img, &subres2, &layout2);
 
-            test->bo.offsets[i] = layout.offset;
-            test->bo.strides[i] = layout.rowPitch;
+            test->bo.offsets[i] = layout2.subresourceLayout.offset;
+            test->bo.strides[i] = layout2.subresourceLayout.rowPitch;
         }
 
         return;

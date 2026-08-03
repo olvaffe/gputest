@@ -37,15 +37,21 @@ image_test_draw(struct image_test *test)
     struct vk_image *img = vk_create_image(vk, test->format, test->width, test->height,
                                            VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_LINEAR, usage);
 
-    const VkImageSubresource subres = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+    const VkImageSubresource2 subres2 = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_SUBRESOURCE_2,
+        .imageSubresource = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        },
     };
-    VkSubresourceLayout layout;
-    vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
+    VkSubresourceLayout2 layout2 = {
+        .sType = VK_STRUCTURE_TYPE_SUBRESOURCE_LAYOUT_2,
+    };
+    vk->GetImageSubresourceLayout2(vk->dev, img->img, &subres2, &layout2);
 
     vk_log("image %dx%d format %d usage 0x%x: offset %d size %d rowPitch %d mem %d", test->width,
-           test->height, test->format, usage, (int)layout.offset, (int)layout.size,
-           (int)layout.rowPitch, (int)img->mem_size);
+           test->height, test->format, usage, (int)layout2.subresourceLayout.offset,
+           (int)layout2.subresourceLayout.size, (int)layout2.subresourceLayout.rowPitch,
+           (int)img->mem_size);
 
     vk_destroy_image(vk, img);
 }

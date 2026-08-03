@@ -98,7 +98,7 @@ ibo_test_init_ibo(struct ibo_test *test)
 
     const uint32_t elem_count = (test->point_count + 1) / 2;
     const VkDeviceSize buf_size = sizeof(uint32_t) * elem_count;
-    test->ibo = vk_create_buffer(vk, 0, buf_size, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
+    test->ibo = vk_create_buffer(vk, 0, buf_size, VK_BUFFER_USAGE_2_STORAGE_TEXEL_BUFFER_BIT);
 
     const VkBufferViewCreateInfo view_info = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,

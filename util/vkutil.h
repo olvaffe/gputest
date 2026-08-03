@@ -115,6 +115,7 @@ struct vk {
 
 struct vk_buffer {
     VkBufferCreateInfo info;
+    VkBufferUsageFlags2CreateInfo usage_info;
     VkBuffer buf;
 
     VkDeviceMemory mem;
@@ -145,7 +146,10 @@ struct vk_image {
 
 struct vk_pipeline {
     VkPipelineShaderStageCreateInfo stages[5];
+    VkShaderModuleCreateInfo shader_infos[5];
     uint32_t stage_count;
+
+    VkPipelineCreateFlags2CreateInfo flags2_info;
 
     /* vertex input state */
     VkVertexInputBindingDescription vi_binding;
@@ -686,13 +690,17 @@ static inline uint32_t
 vk_get_buffer_mt_mask(struct vk *vk,
                       VkBufferCreateFlags flags,
                       VkDeviceSize size,
-                      VkBufferUsageFlags usage)
+                      VkBufferUsageFlags2 usage)
 {
+    const VkBufferUsageFlags2CreateInfo usage_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO,
+        .usage = usage,
+    };
     const struct VkBufferCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = &usage_info,
         .flags = flags,
         .size = size,
-        .usage = usage,
     };
     VkBuffer buf;
     vk->result = vk->CreateBuffer(vk->dev, &info, NULL, &buf);
@@ -710,18 +718,22 @@ static inline struct vk_buffer *
 vk_create_buffer_with_mt(struct vk *vk,
                          VkBufferCreateFlags flags,
                          VkDeviceSize size,
-                         VkBufferUsageFlags usage,
+                         VkBufferUsageFlags2 usage,
                          uint32_t mt_idx)
 {
     struct vk_buffer *buf = (struct vk_buffer *)calloc(1, sizeof(*buf));
     if (!buf)
         vk_die("failed to alloc buf");
 
+    buf->usage_info = (VkBufferUsageFlags2CreateInfo){
+        .sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO,
+        .usage = usage,
+    };
     buf->info = (VkBufferCreateInfo){
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = &buf->usage_info,
         .flags = flags,
         .size = size,
-        .usage = usage,
     };
 
     vk->result = vk->CreateBuffer(vk->dev, &buf->info, NULL, &buf->buf);
@@ -758,7 +770,7 @@ static inline struct vk_buffer *
 vk_create_buffer(struct vk *vk,
                  VkBufferCreateFlags flags,
                  VkDeviceSize size,
-                 VkBufferUsageFlags usage)
+                 VkBufferUsageFlags2 usage)
 {
     return vk_create_buffer_with_mt(vk, flags, size, usage, vk->buf_mt_index);
 }
@@ -976,30 +988,45 @@ vk_create_image_from_ppm(struct vk *vk, const void *ppm_data, size_t ppm_size, b
         .dst_plane_count = (uint32_t)(planar ? 2 : 1),
     };
     if (planar) {
-        const VkImageSubresource y_subres = {
-            .aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT,
+        const VkImageSubresource2 y_subres2 = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_SUBRESOURCE_2,
+            .imageSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT,
+            },
         };
-        const VkImageSubresource uv_subres = {
-            .aspectMask = VK_IMAGE_ASPECT_PLANE_1_BIT,
+        const VkImageSubresource2 uv_subres2 = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_SUBRESOURCE_2,
+            .imageSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_PLANE_1_BIT,
+            },
         };
-        VkSubresourceLayout y_layout;
-        VkSubresourceLayout uv_layout;
-        vk->GetImageSubresourceLayout(vk->dev, img->img, &y_subres, &y_layout);
-        vk->GetImageSubresourceLayout(vk->dev, img->img, &uv_subres, &uv_layout);
+        VkSubresourceLayout2 y_layout2 = {
+            .sType = VK_STRUCTURE_TYPE_SUBRESOURCE_LAYOUT_2,
+        };
+        VkSubresourceLayout2 uv_layout2 = {
+            .sType = VK_STRUCTURE_TYPE_SUBRESOURCE_LAYOUT_2,
+        };
+        vk->GetImageSubresourceLayout2(vk->dev, img->img, &y_subres2, &y_layout2);
+        vk->GetImageSubresourceLayout2(vk->dev, img->img, &uv_subres2, &uv_layout2);
 
-        conv.dst_plane_ptrs[0] = (uint8_t *)img->mem_ptr + y_layout.offset;
-        conv.dst_plane_strides[0] = y_layout.rowPitch;
-        conv.dst_plane_ptrs[1] = (uint8_t *)img->mem_ptr + uv_layout.offset;
-        conv.dst_plane_strides[1] = uv_layout.rowPitch;
+        conv.dst_plane_ptrs[0] = (uint8_t *)img->mem_ptr + y_layout2.subresourceLayout.offset;
+        conv.dst_plane_strides[0] = y_layout2.subresourceLayout.rowPitch;
+        conv.dst_plane_ptrs[1] = (uint8_t *)img->mem_ptr + uv_layout2.subresourceLayout.offset;
+        conv.dst_plane_strides[1] = uv_layout2.subresourceLayout.rowPitch;
     } else {
-        const VkImageSubresource subres = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        const VkImageSubresource2 subres2 = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_SUBRESOURCE_2,
+            .imageSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            },
         };
-        VkSubresourceLayout layout;
-        vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
+        VkSubresourceLayout2 layout2 = {
+            .sType = VK_STRUCTURE_TYPE_SUBRESOURCE_LAYOUT_2,
+        };
+        vk->GetImageSubresourceLayout2(vk->dev, img->img, &subres2, &layout2);
 
-        conv.dst_plane_ptrs[0] = (uint8_t *)img->mem_ptr + layout.offset;
-        conv.dst_plane_strides[0] = layout.rowPitch;
+        conv.dst_plane_ptrs[0] = (uint8_t *)img->mem_ptr + layout2.subresourceLayout.offset;
+        conv.dst_plane_strides[0] = layout2.subresourceLayout.rowPitch;
     }
 
     u_convert_format(&conv);
@@ -1289,15 +1316,20 @@ vk_dump_image(struct vk *vk,
     if (img->info.samples != VK_SAMPLE_COUNT_1_BIT)
         vk_log("dumping msaa image");
 
-    const VkImageSubresource subres = {
-        .aspectMask = aspect,
+    const VkImageSubresource2 subres2 = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_SUBRESOURCE_2,
+        .imageSubresource = {
+            .aspectMask = aspect,
+        },
     };
-    VkSubresourceLayout layout;
-    vk->GetImageSubresourceLayout(vk->dev, img->img, &subres, &layout);
+    VkSubresourceLayout2 layout2 = {
+        .sType = VK_STRUCTURE_TYPE_SUBRESOURCE_LAYOUT_2,
+    };
+    vk->GetImageSubresourceLayout2(vk->dev, img->img, &subres2, &layout2);
 
-    vk_write_ppm(filename, (const uint8_t *)img->mem_ptr + layout.offset, img->info.format,
-                 img->info.extent.width * img->info.samples, img->info.extent.height,
-                 layout.rowPitch);
+    vk_write_ppm(filename, (const uint8_t *)img->mem_ptr + layout2.subresourceLayout.offset,
+                 img->info.format, img->info.extent.width * img->info.samples,
+                 img->info.extent.height, layout2.subresourceLayout.rowPitch);
 }
 
 static inline void
@@ -1352,22 +1384,6 @@ vk_create_pipeline(struct vk *vk)
     return pipeline;
 }
 
-static inline VkShaderModule
-vk_create_shader_module(struct vk *vk, const uint32_t *code, size_t size)
-{
-    const VkShaderModuleCreateInfo mod_info = {
-        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = size,
-        .pCode = code,
-    };
-
-    VkShaderModule mod;
-    vk->result = vk->CreateShaderModule(vk->dev, &mod_info, NULL, &mod);
-    vk_check(vk, "failed to create shader module");
-
-    return mod;
-}
-
 static inline void
 vk_add_pipeline_shader(struct vk *vk,
                        struct vk_pipeline *pipeline,
@@ -1375,10 +1391,16 @@ vk_add_pipeline_shader(struct vk *vk,
                        const uint32_t *code,
                        size_t size)
 {
-    pipeline->stages[pipeline->stage_count++] = (VkPipelineShaderStageCreateInfo){
+    const uint32_t idx = pipeline->stage_count++;
+    pipeline->shader_infos[idx] = (VkShaderModuleCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .codeSize = size,
+        .pCode = code,
+    };
+    pipeline->stages[idx] = (VkPipelineShaderStageCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pNext = &pipeline->shader_infos[idx],
         .stage = stage,
-        .module = vk_create_shader_module(vk, code, size),
         .pName = "main",
     };
 }
@@ -1567,6 +1589,10 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
     };
 
+    pipeline->flags2_info = (VkPipelineCreateFlags2CreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
+    };
+
     pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
     };
@@ -1582,6 +1608,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     if (pipeline->stage_count == 1 && pipeline->stages[0].stage == VK_SHADER_STAGE_COMPUTE_BIT) {
         const VkComputePipelineCreateInfo compute_info = {
             .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+            .pNext = &pipeline->flags2_info,
             .stage = pipeline->stages[0],
             .layout = pipeline->pipeline_layout,
         };
@@ -1619,8 +1646,11 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pDynamicStates = dynamic_states,
     };
 
+    pipeline->flags2_info.pNext = &pipeline->rendering_info;
+
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .pNext = &pipeline->flags2_info,
         .stageCount = pipeline->stage_count,
         .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,
@@ -1634,10 +1664,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pDynamicState = &dynamic_info,
         .layout = pipeline->pipeline_layout,
     };
-    const void **pnext = &pipeline_info.pNext;
-
-    *pnext = &pipeline->rendering_info;
-    pnext = &pipeline->rendering_info.pNext;
+    const void **pnext = &pipeline->rendering_info.pNext;
 
     if (pipeline->external_format.externalFormat) {
         *pnext = &pipeline->external_format;
@@ -1665,9 +1692,6 @@ vk_bind_pipeline(struct vk *vk, const struct vk_pipeline *pipeline, VkCommandBuf
 static inline void
 vk_destroy_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 {
-    for (uint32_t i = 0; i < pipeline->stage_count; i++)
-        vk->DestroyShaderModule(vk->dev, pipeline->stages[i].module, NULL);
-
     for (uint32_t i = 0; i < pipeline->set_layout_count; i++)
         vk->DestroyDescriptorSetLayout(vk->dev, pipeline->set_layouts[i], NULL);
 

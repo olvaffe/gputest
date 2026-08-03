@@ -19,7 +19,7 @@ struct vk_allocator {
 
 struct vk_allocator_buffer_info {
     VkBufferCreateFlags flags;
-    VkBufferUsageFlags usage;
+    VkBufferUsageFlags2 usage;
 
     uint32_t mt_mask;
     bool mt_coherent;
@@ -147,9 +147,13 @@ vk_allocator_query_buffer_support(struct vk_allocator *alloc,
 {
     struct vk *vk = &alloc->vk;
 
+    const VkBufferUsageFlags2CreateInfo usage_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO,
+        .usage = info->usage,
+    };
     const VkPhysicalDeviceExternalBufferInfo external_info = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO,
-        .usage = info->usage,
+        .pNext = &usage_info,
         .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
     };
     VkExternalBufferProperties external_props = {
@@ -366,8 +370,13 @@ vk_allocator_bo_create_buffer(struct vk_allocator *alloc,
     bo->coherent = info->mt_coherent;
     bo->protected = info->flags & VK_BUFFER_CREATE_PROTECTED_BIT;
 
+    const VkBufferUsageFlags2CreateInfo usage_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO,
+        .usage = info->usage,
+    };
     const VkExternalMemoryBufferCreateInfo external_info = {
         .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO,
+        .pNext = &usage_info,
         .handleTypes = alloc->handle_type,
     };
     const VkBufferCreateInfo buf_info = {
@@ -375,7 +384,6 @@ vk_allocator_bo_create_buffer(struct vk_allocator *alloc,
         .pNext = &external_info,
         .flags = info->flags,
         .size = size,
-        .usage = info->usage,
     };
     vk->result = vk->CreateBuffer(vk->dev, &buf_info, NULL, &bo->buf);
     if (vk->result != VK_SUCCESS)
@@ -430,10 +438,17 @@ vk_allocator_bo_align_image_layout(struct vk_allocator *alloc,
     uint32_t guessed_offset_align = 0;
     uint32_t offset_bits = 0;
     for (uint32_t i = 0; i < bo->mem_plane_count; i++) {
-        const VkImageSubresource subres = {
-            .aspectMask = VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT << i,
+        const VkImageSubresource2 subres2 = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_SUBRESOURCE_2,
+            .imageSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT << i,
+            },
         };
-        vk->GetImageSubresourceLayout(vk->dev, bo->img, &subres, &img_layouts[i]);
+        VkSubresourceLayout2 layout2 = {
+            .sType = VK_STRUCTURE_TYPE_SUBRESOURCE_LAYOUT_2,
+        };
+        vk->GetImageSubresourceLayout2(vk->dev, bo->img, &subres2, &layout2);
+        img_layouts[i] = layout2.subresourceLayout;
 
         aligned_layouts[i] = (VkSubresourceLayout){
             .offset = ALIGN(img_layouts[i].offset, offset_align),
@@ -645,14 +660,19 @@ vk_allocator_bo_query_layout(struct vk_allocator *alloc,
     }
 
     for (uint32_t i = 0; i < bo->mem_plane_count; i++) {
-        const VkImageSubresource subres = {
-            .aspectMask = VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT << i,
+        const VkImageSubresource2 subres2 = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_SUBRESOURCE_2,
+            .imageSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT << i,
+            },
         };
-        VkSubresourceLayout layout;
-        vk->GetImageSubresourceLayout(vk->dev, bo->img, &subres, &layout);
+        VkSubresourceLayout2 layout2 = {
+            .sType = VK_STRUCTURE_TYPE_SUBRESOURCE_LAYOUT_2,
+        };
+        vk->GetImageSubresourceLayout2(vk->dev, bo->img, &subres2, &layout2);
 
-        offsets[i] = layout.offset;
-        pitches[i] = layout.rowPitch;
+        offsets[i] = layout2.subresourceLayout.offset;
+        pitches[i] = layout2.subresourceLayout.rowPitch;
     }
 }
 
@@ -741,7 +761,7 @@ vk_allocator_bo_unmap(struct vk_allocator *alloc, struct vk_allocator_bo *bo, ui
 static inline struct vk_allocator_transfer *
 vk_allocator_bo_map_transfer(struct vk_allocator *alloc,
                              struct vk_allocator_bo *bo,
-                             VkBufferUsageFlags usage,
+                             VkBufferUsageFlags2 usage,
                              VkImageAspectFlagBits aspect,
                              uint32_t x,
                              uint32_t y,
@@ -757,8 +777,8 @@ vk_allocator_bo_map_transfer(struct vk_allocator *alloc,
     if (!xfer)
         return NULL;
 
-    xfer->readback = usage & VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    xfer->writeback = usage & VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    xfer->readback = usage & VK_BUFFER_USAGE_2_TRANSFER_DST_BIT;
+    xfer->writeback = usage & VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT;
     xfer->copy = (VkBufferImageCopy2){
         .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
         .imageSubresource = {

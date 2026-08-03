@@ -116,12 +116,16 @@ dma_heap_test_init_dma_buf(struct dma_heap_test *test)
 static void
 dma_heap_test_init_buffer(struct dma_heap_test *test)
 {
-    const VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    const VkBufferUsageFlags2 usage = VK_BUFFER_USAGE_2_TRANSFER_DST_BIT;
     struct vk *vk = &test->vk;
 
+    const VkBufferUsageFlags2CreateInfo usage_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO,
+        .usage = usage,
+    };
     const VkPhysicalDeviceExternalBufferInfo external_info = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO,
-        .usage = usage,
+        .pNext = &usage_info,
         .handleType = test->handle_type,
     };
     VkExternalBufferProperties external_props = {

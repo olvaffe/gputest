@@ -123,7 +123,7 @@ paced_test_init_ssbo(struct paced_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->ssbo = vk_create_buffer(vk, 0, test->size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    test->ssbo = vk_create_buffer(vk, 0, test->size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
 }
 
 static void

@@ -176,12 +176,12 @@ convlayer_test_init_buffers(struct convlayer_test *test)
     const VkDeviceSize ssbo_size = weight_size * weight_count;
     test->ssbo =
         vk_create_buffer(vk, 0, ssbo_size,
-                         VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                         VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_2_TRANSFER_DST_BIT |
+                             VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
 
-    test->ubo =
-        vk_create_buffer(vk, 0, sizeof(struct convlayer_test_ubo),
-                         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    test->ubo = vk_create_buffer(
+        vk, 0, sizeof(struct convlayer_test_ubo),
+        VK_BUFFER_USAGE_2_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT);
 
     struct convlayer_test_ubo *ubo = test->ubo->mem_ptr;
     ubo->src_slice_count = test->src_slice_count;

@@ -61,7 +61,7 @@ ssbo_max_test_init_ssbo(struct ssbo_max_test *test)
     test->grid_size &= ~(test->local_size - 1);
 
     VkDeviceSize size = test->grid_size * test->grid_size * sizeof(uint32_t);
-    test->ssbo = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    test->ssbo = vk_create_buffer(vk, 0, size, VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
     memset(test->ssbo->mem_ptr, 0, size);
 }
 

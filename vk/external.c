@@ -333,7 +333,7 @@ struct external_test {
     uint32_t mt_mask;
 
     VkBufferCreateFlags buf_flags;
-    VkBufferUsageFlags buf_usage;
+    VkBufferUsageFlags2 buf_usage;
 
     VkImageCreateFlags img_flags;
     VkImageUsageFlags img_usage;
@@ -385,9 +385,9 @@ external_test_init_buffer_info(struct external_test *test)
         test->buf_flags |= VK_BUFFER_CREATE_PROTECTED_BIT;
 
     if (test->use.gpu_read)
-        test->buf_usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        test->buf_usage |= VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT;
     if (test->use.gpu_write)
-        test->buf_usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        test->buf_usage |= VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT;
 }
 
 static void
@@ -524,7 +524,7 @@ external_test_image(struct external_test *test,
             const uint32_t height =
                 (i > 0 && fmt->subsampling == 420) ? test->height / 2 : test->height;
             struct vk_allocator_transfer *xfer =
-                vk_allocator_bo_map_transfer(alloc, bo, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                vk_allocator_bo_map_transfer(alloc, bo, VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT,
                                              fmt->planes[i].aspect, 0, 0, width, height);
             if (!xfer)
                 vk_die("failed to map bo");
@@ -563,7 +563,7 @@ external_test_image(struct external_test *test,
                 (i > 0 && fmt->subsampling == 420) ? test->height / 2 : test->height;
 
             struct vk_allocator_transfer *xfer =
-                vk_allocator_bo_map_transfer(alloc, bo, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                vk_allocator_bo_map_transfer(alloc, bo, VK_BUFFER_USAGE_2_TRANSFER_DST_BIT,
                                              fmt->planes[i].aspect, 0, 0, width, height);
             if (!xfer)
                 vk_die("failed to map bo");

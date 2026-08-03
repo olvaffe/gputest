@@ -113,7 +113,7 @@ gs_test_init_vb(struct gs_test *test)
     struct vk *vk = &test->vk;
 
     test->vb =
-        vk_create_buffer(vk, 0, sizeof(gs_test_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        vk_create_buffer(vk, 0, sizeof(gs_test_vertices), VK_BUFFER_USAGE_2_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, gs_test_vertices, sizeof(gs_test_vertices));
 }
 

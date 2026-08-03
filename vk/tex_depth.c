@@ -120,7 +120,7 @@ tex_depth_test_init_vb(struct tex_depth_test *test)
     struct vk *vk = &test->vk;
 
     test->vb = vk_create_buffer(vk, 0, sizeof(tex_depth_test_vertices),
-                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+                                VK_BUFFER_USAGE_2_VERTEX_BUFFER_BIT);
     memcpy(test->vb->mem_ptr, tex_depth_test_vertices, sizeof(tex_depth_test_vertices));
 }
 
