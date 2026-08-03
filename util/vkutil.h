@@ -144,15 +144,6 @@ struct vk_image {
     VkSampler sampler;
 };
 
-struct vk_framebuffer {
-    VkRenderPass pass;
-    VkFramebuffer fb;
-
-    uint32_t width;
-    uint32_t height;
-    VkSampleCountFlagBits samples;
-};
-
 struct vk_pipeline {
     VkPipelineShaderStageCreateInfo stages[5];
     uint32_t stage_count;
@@ -178,7 +169,6 @@ struct vk_pipeline {
     VkPipelineColorBlendAttachmentState color_att;
     VkPipelineRenderingCreateInfo rendering_info;
     VkExternalFormatANDROID external_format;
-    const struct vk_framebuffer *fb;
 
     VkDescriptorSetLayout set_layouts[4];
     uint32_t set_layout_count;
@@ -1366,124 +1356,6 @@ vk_dump_buffer_raw(struct vk *vk,
     fclose(fp);
 }
 
-static inline struct vk_framebuffer *
-vk_create_framebuffer(struct vk *vk,
-                      struct vk_image *color,
-                      struct vk_image *resolve,
-                      struct vk_image *depth,
-                      VkAttachmentLoadOp load_op,
-                      VkAttachmentStoreOp store_op)
-{
-    struct vk_framebuffer *fb = (struct vk_framebuffer *)calloc(1, sizeof(*fb));
-    if (!fb)
-        vk_die("failed to alloc fb");
-
-    VkAttachmentReference color_ref = { .attachment = VK_ATTACHMENT_UNUSED };
-    VkAttachmentReference resolve_ref = { .attachment = VK_ATTACHMENT_UNUSED };
-    VkAttachmentReference depth_ref = { .attachment = VK_ATTACHMENT_UNUSED };
-    VkAttachmentDescription att_descs[3];
-    VkImageView views[3];
-    uint32_t att_count = 0;
-
-    if (color) {
-        att_descs[att_count] = (VkAttachmentDescription){
-            .format = color->info.format,
-            .samples = color->info.samples,
-            .loadOp = load_op,
-            .storeOp = store_op,
-            .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        };
-        color_ref = (VkAttachmentReference){
-            .attachment = att_count,
-            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        };
-        views[att_count] = color->render_view;
-        att_count++;
-    }
-
-    if (resolve) {
-        att_descs[att_count] = (VkAttachmentDescription){
-            .format = resolve->info.format,
-            .samples = resolve->info.samples,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .storeOp = store_op,
-            .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        };
-        resolve_ref = (VkAttachmentReference){
-            .attachment = att_count,
-            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        };
-        views[att_count] = resolve->render_view;
-        att_count++;
-    }
-
-    if (depth) {
-        att_descs[att_count] = (VkAttachmentDescription){
-            .format = depth->info.format,
-            .samples = depth->info.samples,
-            .loadOp = load_op,
-            .storeOp = store_op,
-            .stencilLoadOp = load_op,
-            .stencilStoreOp = store_op,
-            .initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        };
-        depth_ref = (VkAttachmentReference){
-            .attachment = att_count,
-            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        };
-        views[att_count] = depth->render_view;
-        att_count++;
-    }
-
-    const VkSubpassDescription subpass_desc = {
-        .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-        .colorAttachmentCount = (uint32_t)(color ? 1 : 0),
-        .pColorAttachments = color ? &color_ref : NULL,
-        .pResolveAttachments = resolve ? &resolve_ref : NULL,
-        .pDepthStencilAttachment = depth ? &depth_ref : NULL,
-    };
-    const VkRenderPassCreateInfo pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = att_count,
-        .pAttachments = att_descs,
-        .subpassCount = 1,
-        .pSubpasses = &subpass_desc,
-    };
-
-    vk->result = vk->CreateRenderPass(vk->dev, &pass_info, NULL, &fb->pass);
-    vk_check(vk, "failed to create render pass");
-
-    const VkFramebufferCreateInfo fb_info = {
-        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-        .renderPass = fb->pass,
-        .attachmentCount = att_count,
-        .pAttachments = views,
-        .width = color ? color->info.extent.width : depth->info.extent.width,
-        .height = color ? color->info.extent.height : depth->info.extent.height,
-        .layers = color ? color->info.arrayLayers : depth->info.arrayLayers,
-    };
-
-    vk->result = vk->CreateFramebuffer(vk->dev, &fb_info, NULL, &fb->fb);
-    vk_check(vk, "failed to create framebuffer");
-
-    fb->width = fb_info.width;
-    fb->height = fb_info.height;
-    fb->samples = color ? color->info.samples : depth->info.samples;
-
-    return fb;
-}
-
-static inline void
-vk_destroy_framebuffer(struct vk *vk, struct vk_framebuffer *fb)
-{
-    vk->DestroyRenderPass(vk->dev, fb->pass, NULL);
-    vk->DestroyFramebuffer(vk->dev, fb->fb, NULL);
-    free(fb);
-}
-
 static inline struct vk_pipeline *
 vk_create_pipeline(struct vk *vk)
 {
@@ -1687,7 +1559,7 @@ vk_set_pipeline_push_const(struct vk *vk,
 }
 
 static inline void
-vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_framebuffer *fb)
+vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 {
     const VkPipelineLayoutCreateInfo pipeline_layout_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1716,8 +1588,6 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline, const struct vk_f
     pipeline->external_format = (VkExternalFormatANDROID){
         .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
     };
-
-    pipeline->fb = fb;
 }
 
 static inline void
@@ -1777,14 +1647,12 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pColorBlendState = &color_info,
         .pDynamicState = &dynamic_info,
         .layout = pipeline->pipeline_layout,
-        .renderPass = pipeline->fb ? pipeline->fb->pass : VK_NULL_HANDLE,
     };
-
     const void **pnext = &pipeline_info.pNext;
-    if (!pipeline->fb) {
-        *pnext = &pipeline->rendering_info;
-        pnext = &pipeline->rendering_info.pNext;
-    }
+
+    *pnext = &pipeline->rendering_info;
+    pnext = &pipeline->rendering_info.pNext;
+
     if (pipeline->external_format.externalFormat) {
         *pnext = &pipeline->external_format;
         pnext = (const void **)&pipeline->external_format.pNext;

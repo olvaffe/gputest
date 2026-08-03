@@ -31,7 +31,6 @@ struct mem_hog_test {
     struct mem_hog_test_push_const push_const;
 
     struct vk_image *img;
-    struct vk_framebuffer *fb;
     struct vk_pipeline *pipeline;
 
     VkDeviceSize size;
@@ -127,7 +126,12 @@ mem_hog_test_init_pipeline(struct mem_hog_test *test)
 
     vk_set_pipeline_sample_count(vk, test->pipeline, VK_SAMPLE_COUNT_1_BIT);
 
-    vk_setup_pipeline(vk, test->pipeline, test->fb);
+    vk_setup_pipeline(vk, test->pipeline);
+    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .colorAttachmentCount = 1,
+        .pColorAttachmentFormats = &test->img->info.format,
+    };
     vk_compile_pipeline(vk, test->pipeline);
 }
 
@@ -140,9 +144,6 @@ mem_hog_test_init_framebuffer(struct mem_hog_test *test)
         vk_create_image(vk, test->format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
                         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vk_create_image_render_view(vk, test->img, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    test->fb = vk_create_framebuffer(vk, test->img, NULL, NULL, VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                     VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void
@@ -178,7 +179,6 @@ mem_hog_test_cleanup(struct mem_hog_test *test)
     free(test->bufs);
 
     vk_destroy_pipeline(vk, test->pipeline);
-    vk_destroy_framebuffer(vk, test->fb);
     vk_destroy_image(vk, test->img);
 
     vk_cleanup(vk);
@@ -245,16 +245,24 @@ mem_hog_test_draw_triangle(struct mem_hog_test *test, VkCommandBuffer cmd)
         .image = test->img->img,
         .subresourceRange = subres_range,
     };
-    const VkRenderPassBeginInfo pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = test->fb->pass,
-        .framebuffer = test->fb->fb,
+    const VkRenderingAttachmentInfo att_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = test->img->render_view,
+        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+    };
+    const VkRenderingInfo rendering_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {
             .extent = {
                 .width = test->width,
                 .height = test->height,
             },
         },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &att_info,
     };
 
     const VkDependencyInfo dep_info = {
@@ -264,13 +272,13 @@ mem_hog_test_draw_triangle(struct mem_hog_test *test, VkCommandBuffer cmd)
     };
     vk->CmdPipelineBarrier2(cmd, &dep_info);
 
-    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk->CmdBeginRendering(cmd, &rendering_info);
     vk_bind_pipeline(vk, test->pipeline, cmd);
     vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout,
                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(test->push_const), &test->push_const);
     vk->CmdDraw(cmd, 3, 1, 0, 0);
-    vk->CmdEndRenderPass(cmd);
+    vk->CmdEndRendering(cmd);
 }
 
 static void

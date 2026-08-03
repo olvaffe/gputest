@@ -25,7 +25,8 @@ struct renderpass_ops_test {
     VkCommandBuffer cmd;
     struct vk_image *color_img;
     struct vk_image *depth_img;
-    struct vk_framebuffer *fb;
+    VkAttachmentLoadOp load_op;
+    VkAttachmentStoreOp store_op;
     struct vk_pipeline *pipeline;
 };
 
@@ -252,17 +253,16 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
         vk->CmdPipelineBarrier2(test->cmd, &dep_info2);
     }
 
-    test->fb =
-        vk_create_framebuffer(vk, test->color_img, NULL, test->depth_img, load_op, store_op);
+    test->load_op = load_op;
+    test->store_op = store_op;
 }
 
 static void
-renderpass_ops_test_begin_pipeline(struct renderpass_ops_test *test)
+renderpass_ops_test_begin_pipeline(struct renderpass_ops_test *test,
+                                   const struct renderpass_ops_test_format *fmt)
 {
     struct vk *vk = &test->vk;
 
-    if (!test->fb)
-        vk_die("no fb");
     if (test->pipeline)
         vk_die("already has pipeline");
 
@@ -275,12 +275,22 @@ renderpass_ops_test_begin_pipeline(struct renderpass_ops_test *test)
 
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
-    vk_set_pipeline_viewport(vk, test->pipeline, test->fb->width, test->fb->height);
+    vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
-    vk_set_pipeline_sample_count(vk, test->pipeline, test->fb->samples);
+    vk_set_pipeline_sample_count(vk, test->pipeline, VK_SAMPLE_COUNT_1_BIT);
 
-    vk_setup_pipeline(vk, test->pipeline, test->fb);
+    vk_setup_pipeline(vk, test->pipeline);
+    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .colorAttachmentCount = test->color_img ? 1 : 0,
+        .pColorAttachmentFormats = test->color_img ? &test->color_img->info.format : NULL,
+        .depthAttachmentFormat =
+            test->depth_img ? test->depth_img->info.format : VK_FORMAT_UNDEFINED,
+        .stencilAttachmentFormat = (test->depth_img && fmt->stencil)
+                                       ? test->depth_img->info.format
+                                       : VK_FORMAT_UNDEFINED,
+    };
     vk_compile_pipeline(vk, test->pipeline);
 
     vk_bind_pipeline(vk, test->pipeline, test->cmd);
@@ -292,9 +302,6 @@ renderpass_ops_test_begin_renderpass(struct renderpass_ops_test *test,
                                      bool clear_att)
 {
     struct vk *vk = &test->vk;
-
-    if (!test->fb)
-        vk_die("no fb");
 
     VkClearValue clear_vals[2];
     uint32_t clear_val_count = 0;
@@ -308,21 +315,44 @@ renderpass_ops_test_begin_renderpass(struct renderpass_ops_test *test,
         };
     }
 
-    const VkRenderPassBeginInfo pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = test->fb->pass,
-        .framebuffer = test->fb->fb,
+    VkRenderingAttachmentInfo color_att = { 0 };
+    VkRenderingAttachmentInfo depth_att = { 0 };
+    if (test->color_img) {
+        color_att = (VkRenderingAttachmentInfo){
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = test->color_img->render_view,
+            .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .loadOp = test->load_op,
+            .storeOp = test->store_op,
+            .clearValue = clear_vals[0],
+        };
+    }
+    if (test->depth_img) {
+        depth_att = (VkRenderingAttachmentInfo){
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = test->depth_img->render_view,
+            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .loadOp = test->load_op,
+            .storeOp = test->store_op,
+            .clearValue = clear_vals[test->color_img ? 1 : 0],
+        };
+    }
+    const VkRenderingInfo rendering_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {
             .extent = {
                 .width = test->width,
                 .height = test->height,
             },
         },
-        .clearValueCount = clear_val_count,
-        .pClearValues = clear_vals,
+        .layerCount = 1,
+        .colorAttachmentCount = test->color_img ? 1 : 0,
+        .pColorAttachments = test->color_img ? &color_att : NULL,
+        .pDepthAttachment = test->depth_img ? &depth_att : NULL,
+        .pStencilAttachment = (test->depth_img && fmt->stencil) ? &depth_att : NULL,
     };
 
-    vk->CmdBeginRenderPass(test->cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk->CmdBeginRendering(test->cmd, &rendering_info);
 
     if (clear_att) {
         VkClearAttachment atts[2];
@@ -361,6 +391,8 @@ static void
 renderpass_ops_test_end_all(struct renderpass_ops_test *test, bool dump_color)
 {
     struct vk *vk = &test->vk;
+
+    vk->CmdEndRendering(test->cmd);
 
     if (dump_color) {
         const VkImageMemoryBarrier2 barrier = {
@@ -401,9 +433,6 @@ renderpass_ops_test_end_all(struct renderpass_ops_test *test, bool dump_color)
         vk_destroy_image(vk, test->depth_img);
         test->depth_img = NULL;
     }
-
-    vk_destroy_framebuffer(vk, test->fb);
-    test->fb = NULL;
 
     vk_destroy_pipeline(vk, test->pipeline);
     test->pipeline = NULL;
@@ -446,7 +475,7 @@ renderpass_ops_test_draw_format(struct renderpass_ops_test *test,
         VkCommandBuffer cmd = renderpass_ops_test_begin_cmd(test);
         renderpass_ops_test_begin_framebuffer(test, fmt, VK_SAMPLE_COUNT_1_BIT, tiling, load_op,
                                               store_op);
-        renderpass_ops_test_begin_pipeline(test);
+        renderpass_ops_test_begin_pipeline(test, fmt);
 
         const bool clear_att = load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         renderpass_ops_test_begin_renderpass(test, fmt, clear_att);
@@ -454,8 +483,6 @@ renderpass_ops_test_draw_format(struct renderpass_ops_test *test,
         /* draw some triangles to force binning */
         for (uint32_t i = 0; i < 4; i++)
             vk->CmdDraw(cmd, 93, 1, 0, 0);
-
-        vk->CmdEndRenderPass(cmd);
 
         const bool dump_color = fmt->color && fmt->format == test->dump_color_format &&
                                 test->color_img->info.tiling == VK_IMAGE_TILING_LINEAR && i == 0;

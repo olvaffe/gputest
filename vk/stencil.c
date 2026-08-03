@@ -21,7 +21,6 @@ struct stencil_test {
     struct vk vk;
 
     struct vk_image *zs;
-    struct vk_framebuffer *fb;
 
     struct vk_pipeline *pipeline;
 
@@ -58,12 +57,12 @@ stencil_test_init_pipeline(struct stencil_test *test)
 
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
-    vk_set_pipeline_viewport(vk, test->pipeline, test->fb->width, test->fb->height);
+    vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
-    vk_set_pipeline_sample_count(vk, test->pipeline, test->fb->samples);
+    vk_set_pipeline_sample_count(vk, test->pipeline, VK_SAMPLE_COUNT_1_BIT);
 
-    vk_setup_pipeline(vk, test->pipeline, test->fb);
+    vk_setup_pipeline(vk, test->pipeline);
     test->pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         /* depth test is silently skipped if depth_bits == 0 */
@@ -82,6 +81,11 @@ stencil_test_init_pipeline(struct stencil_test *test)
             .reference = 20,
         },
     };
+    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .depthAttachmentFormat = test->depth_format,
+        .stencilAttachmentFormat = test->depth_format,
+    };
     vk_compile_pipeline(vk, test->pipeline);
 }
 
@@ -95,9 +99,6 @@ stencil_test_init_fb(struct stencil_test *test)
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     vk_create_image_render_view(vk, test->zs, test->aspect_mask);
-
-    test->fb = vk_create_framebuffer(vk, NULL, NULL, test->zs, VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                     VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void
@@ -108,8 +109,8 @@ stencil_test_init(struct stencil_test *test)
     vk_init(vk, NULL);
 
     stencil_test_init_fb(test);
-    stencil_test_init_pipeline(test);
     stencil_test_init_buffers(test);
+    stencil_test_init_pipeline(test);
 }
 
 static void
@@ -125,7 +126,6 @@ stencil_test_cleanup(struct stencil_test *test)
     vk_destroy_pipeline(vk, test->pipeline);
 
     vk_destroy_image(vk, test->zs);
-    vk_destroy_framebuffer(vk, test->fb);
 
     vk_cleanup(vk);
 }
@@ -136,10 +136,10 @@ stencil_test_draw_triangle(struct stencil_test *test, VkCommandBuffer cmd)
     struct vk *vk = &test->vk;
 
     const VkImageMemoryBarrier2 before_barrier = {
-        .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-        .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
         .srcAccessMask = 0,
+        .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
         .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -158,31 +158,38 @@ stencil_test_draw_triangle(struct stencil_test *test, VkCommandBuffer cmd)
     };
     vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
-    const VkRenderPassBeginInfo pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = test->fb->pass,
-        .framebuffer = test->fb->fb,
-        .renderArea = {
-            .extent = {
-                .width = test->width,
-                .height = test->height,
-            },
-        },
-        .clearValueCount = 1,
-        .pClearValues = &(VkClearValue){
+    const VkRenderingAttachmentInfo ds_att_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = test->zs->render_view,
+        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue = {
             .depthStencil = {
                 .depth = 0.5f,
                 .stencil = 127,
             },
         },
     };
-    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    const VkRenderingInfo rendering_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = {
+            .extent = {
+                .width = test->width,
+                .height = test->height,
+            },
+        },
+        .layerCount = 1,
+        .pDepthAttachment = &ds_att_info,
+        .pStencilAttachment = &ds_att_info,
+    };
+    vk->CmdBeginRendering(cmd, &rendering_info);
 
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
-    vk->CmdEndRenderPass(cmd);
+    vk->CmdEndRendering(cmd);
 
     const VkImageMemoryBarrier2 after_barrier = {
         .srcStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,

@@ -86,7 +86,7 @@ subgroup_test_init_pipeline(struct subgroup_test *test)
     };
     vk_add_pipeline_set_layout_from_info(vk, test->pipeline, &set_layout_info);
 
-    vk_setup_pipeline(vk, test->pipeline, NULL);
+    vk_setup_pipeline(vk, test->pipeline);
     vk_compile_pipeline(vk, test->pipeline);
 }
 

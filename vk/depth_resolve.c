@@ -52,7 +52,7 @@ depth_resolve_test_init_pipeline(struct depth_resolve_test *test)
 
     vk_set_pipeline_sample_count(vk, test->pipeline, test->sample_count);
 
-    vk_setup_pipeline(vk, test->pipeline, NULL);
+    vk_setup_pipeline(vk, test->pipeline);
 
     test->pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,

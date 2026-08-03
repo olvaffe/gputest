@@ -55,7 +55,6 @@ struct paced_test {
     struct vk vk;
 
     struct vk_image *img;
-    struct vk_framebuffer *fb;
     struct vk_buffer *ssbo;
 
     struct vk_pipeline *gfx;
@@ -87,16 +86,21 @@ paced_test_init_pipelines(struct paced_test *test)
 
     vk_set_pipeline_topology(vk, test->gfx, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
-    vk_set_pipeline_viewport(vk, test->gfx, test->fb->width, test->fb->height);
+    vk_set_pipeline_viewport(vk, test->gfx, test->width, test->height);
     vk_set_pipeline_rasterization(vk, test->gfx, VK_POLYGON_MODE_FILL, test->discard);
 
     vk_set_pipeline_push_const(vk, test->gfx,
                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                sizeof(test->push_const));
 
-    vk_set_pipeline_sample_count(vk, test->gfx, test->fb->samples);
+    vk_set_pipeline_sample_count(vk, test->gfx, VK_SAMPLE_COUNT_1_BIT);
 
-    vk_setup_pipeline(vk, test->gfx, test->fb);
+    vk_setup_pipeline(vk, test->gfx);
+    test->gfx->rendering_info = (VkPipelineRenderingCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .colorAttachmentCount = 1,
+        .pColorAttachmentFormats = &test->format,
+    };
     vk_compile_pipeline(vk, test->gfx);
 
     test->comp = vk_create_pipeline(vk);
@@ -110,7 +114,7 @@ paced_test_init_pipelines(struct paced_test *test)
     vk_set_pipeline_push_const(vk, test->comp, VK_SHADER_STAGE_COMPUTE_BIT,
                                sizeof(test->push_const));
 
-    vk_setup_pipeline(vk, test->comp, NULL);
+    vk_setup_pipeline(vk, test->comp);
     vk_compile_pipeline(vk, test->comp);
 }
 
@@ -131,9 +135,6 @@ paced_test_init_framebuffer(struct paced_test *test)
         vk_create_image(vk, test->format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
                         VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vk_create_image_render_view(vk, test->img, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    test->fb = vk_create_framebuffer(vk, test->img, NULL, NULL, VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                     VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void
@@ -165,7 +166,6 @@ paced_test_cleanup(struct paced_test *test)
     vk_destroy_buffer(vk, test->ssbo);
 
     vk_destroy_image(vk, test->img);
-    vk_destroy_framebuffer(vk, test->fb);
 
     vk_cleanup(vk);
 }
@@ -202,10 +202,10 @@ paced_test_draw_comp(struct paced_test *test, VkCommandBuffer cmd)
     vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
     vk_bind_pipeline(vk, test->comp, cmd);
-    vk->CmdPushConstants(cmd, test->comp->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                         sizeof(test->push_const), &test->push_const);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, test->comp->pipeline_layout, 0,
                               1, &test->comp_set->set, 0, NULL);
+    vk->CmdPushConstants(cmd, test->comp->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                         sizeof(test->push_const), &test->push_const);
     vk->CmdDispatch(cmd, test->group_count, 1, 1);
 
     const VkDependencyInfo dep_info2 = {
@@ -228,27 +228,20 @@ paced_test_draw_gfx(struct paced_test *test, VkCommandBuffer cmd)
     };
     const VkImageMemoryBarrier2 pre_barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
         .srcAccessMask = 0,
+        .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
         .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .image = test->img->img,
         .subresourceRange = subres_range,
     };
-    const VkRenderPassBeginInfo pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = test->fb->pass,
-        .framebuffer = test->fb->fb,
-        .renderArea = {
-            .extent = {
-                .width = test->width,
-                .height = test->height,
-            },
-        },
-    };
     const VkImageMemoryBarrier2 post_barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
         .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
         .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_GENERAL,
@@ -263,13 +256,32 @@ paced_test_draw_gfx(struct paced_test *test, VkCommandBuffer cmd)
     };
     vk->CmdPipelineBarrier2(cmd, &dep_info3);
 
-    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    const VkRenderingAttachmentInfo att_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = test->img->render_view,
+        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+    };
+    const VkRenderingInfo rendering_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = {
+            .extent = {
+                .width = test->width,
+                .height = test->height,
+            },
+        },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &att_info,
+    };
+    vk->CmdBeginRendering(cmd, &rendering_info);
     vk_bind_pipeline(vk, test->gfx, cmd);
     vk->CmdPushConstants(cmd, test->gfx->pipeline_layout,
                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(test->push_const), &test->push_const);
     vk->CmdDraw(cmd, test->vertex_count, 1, 0, 0);
-    vk->CmdEndRenderPass(cmd);
+    vk->CmdEndRendering(cmd);
 
     const VkDependencyInfo dep_info4 = {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,

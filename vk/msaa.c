@@ -53,7 +53,6 @@ struct msaa_test {
 
     struct vk_image *rt;
     struct vk_image *resolved;
-    struct vk_framebuffer *fb;
 
     struct vk_pipeline *pipeline;
 };
@@ -74,12 +73,17 @@ msaa_test_init_pipeline(struct msaa_test *test)
     vk_set_pipeline_vertices(vk, test->pipeline, comp_counts, ARRAY_SIZE(comp_counts));
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
-    vk_set_pipeline_viewport(vk, test->pipeline, test->fb->width, test->fb->height);
+    vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
-    vk_set_pipeline_sample_count(vk, test->pipeline, test->fb->samples);
+    vk_set_pipeline_sample_count(vk, test->pipeline, VK_SAMPLE_COUNT_4_BIT);
 
-    vk_setup_pipeline(vk, test->pipeline, test->fb);
+    vk_setup_pipeline(vk, test->pipeline);
+    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .colorAttachmentCount = 1,
+        .pColorAttachmentFormats = &test->color_format,
+    };
     vk_compile_pipeline(vk, test->pipeline);
 }
 
@@ -97,9 +101,6 @@ msaa_test_init_framebuffer(struct msaa_test *test)
         vk_create_image(vk, test->color_format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
                         VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vk_create_image_render_view(vk, test->resolved, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    test->fb = vk_create_framebuffer(vk, test->rt, test->resolved, NULL,
-                                     VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void
@@ -133,7 +134,6 @@ msaa_test_cleanup(struct msaa_test *test)
 
     vk_destroy_image(vk, test->rt);
     vk_destroy_image(vk, test->resolved);
-    vk_destroy_framebuffer(vk, test->fb);
 
     vk_destroy_buffer(vk, test->vb);
 
@@ -150,10 +150,12 @@ msaa_test_draw_triangle(struct msaa_test *test, VkCommandBuffer cmd)
         .levelCount = 1,
         .layerCount = 1,
     };
-    const VkImageMemoryBarrier2 barriers1[2] = {
+    const VkImageMemoryBarrier2 barriers1[] = {
         [0] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
             .srcAccessMask = 0,
+            .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
             .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -162,7 +164,9 @@ msaa_test_draw_triangle(struct msaa_test *test, VkCommandBuffer cmd)
         },
         [1] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
             .srcAccessMask = 0,
+            .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
             .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -189,31 +193,41 @@ msaa_test_draw_triangle(struct msaa_test *test, VkCommandBuffer cmd)
     };
     vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
-    const VkRenderPassBeginInfo pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = test->fb->pass,
-        .framebuffer = test->fb->fb,
+    const VkRenderingAttachmentInfo att_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = test->rt->render_view,
+        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT,
+        .resolveImageView = test->resolved->render_view,
+        .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue = {
+            .color = {
+                .float32 = { 0.2f, 0.2f, 0.2f, 1.0f },
+            },
+        },
+    };
+    const VkRenderingInfo rendering_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {
             .extent = {
                 .width = test->width,
                 .height = test->height,
             },
         },
-        .clearValueCount = 1,
-        .pClearValues = &(VkClearValue){
-            .color = {
-                .float32 = { 0.2f, 0.2f, 0.2f, 1.0f },
-            },
-        },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &att_info,
     };
-    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk->CmdBeginRendering(cmd, &rendering_info);
 
     vk->CmdBindVertexBuffers(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 });
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
-    vk->CmdEndRenderPass(cmd);
+    vk->CmdEndRendering(cmd);
 
     const VkDependencyInfo dep_info2 = {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,

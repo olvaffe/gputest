@@ -47,7 +47,7 @@ ssbo_max_test_init_pipeline(struct ssbo_max_test *test)
     vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
                                VK_SHADER_STAGE_COMPUTE_BIT, NULL);
 
-    vk_setup_pipeline(vk, test->pipeline, NULL);
+    vk_setup_pipeline(vk, test->pipeline);
     vk_compile_pipeline(vk, test->pipeline);
 }
 

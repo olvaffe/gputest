@@ -149,7 +149,7 @@ sched_test_init_pipeline(struct sched_test *test)
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_COMPUTE_BIT,
                                sizeof(struct sched_test_push_consts));
 
-    vk_setup_pipeline(vk, test->pipeline, NULL);
+    vk_setup_pipeline(vk, test->pipeline);
     vk_compile_pipeline(vk, test->pipeline);
 }
 

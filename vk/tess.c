@@ -58,7 +58,6 @@ struct tess_test {
     struct vk_buffer *vb;
 
     struct vk_image *rt;
-    struct vk_framebuffer *fb;
 
     struct vk_pipeline *pipeline;
 };
@@ -83,13 +82,18 @@ tess_test_init_pipeline(struct tess_test *test)
     vk_set_pipeline_vertices(vk, test->pipeline, comp_counts, ARRAY_SIZE(comp_counts));
     vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_PATCH_LIST);
 
-    vk_set_pipeline_viewport(vk, test->pipeline, test->fb->width, test->fb->height);
+    vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_LINE, false);
     vk_set_pipeline_tessellation(vk, test->pipeline, 3);
 
-    vk_set_pipeline_sample_count(vk, test->pipeline, test->fb->samples);
+    vk_set_pipeline_sample_count(vk, test->pipeline, VK_SAMPLE_COUNT_1_BIT);
 
-    vk_setup_pipeline(vk, test->pipeline, test->fb);
+    vk_setup_pipeline(vk, test->pipeline);
+    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .colorAttachmentCount = 1,
+        .pColorAttachmentFormats = &test->color_format,
+    };
     vk_compile_pipeline(vk, test->pipeline);
 }
 
@@ -102,9 +106,6 @@ tess_test_init_framebuffer(struct tess_test *test)
         vk_create_image(vk, test->color_format, test->width, test->height, VK_SAMPLE_COUNT_1_BIT,
                         VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    test->fb = vk_create_framebuffer(vk, test->rt, NULL, NULL, VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                     VK_ATTACHMENT_STORE_OP_STORE);
 }
 
 static void
@@ -142,7 +143,6 @@ tess_test_cleanup(struct tess_test *test)
     vk_destroy_pipeline(vk, test->pipeline);
 
     vk_destroy_image(vk, test->rt);
-    vk_destroy_framebuffer(vk, test->fb);
 
     vk_destroy_buffer(vk, test->vb);
 
@@ -189,31 +189,38 @@ tess_test_draw_triangle(struct tess_test *test, VkCommandBuffer cmd)
     };
     vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
-    const VkRenderPassBeginInfo pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = test->fb->pass,
-        .framebuffer = test->fb->fb,
+    const VkRenderingAttachmentInfo att_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = test->rt->render_view,
+        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue = {
+            .color = {
+                .float32 = { 0.2f, 0.2f, 0.2f, 1.0f },
+            },
+        },
+    };
+    const VkRenderingInfo rendering_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {
             .extent = {
                 .width = test->width,
                 .height = test->height,
             },
         },
-        .clearValueCount = 1,
-        .pClearValues = &(VkClearValue){
-            .color = {
-                .float32 = { 0.2f, 0.2f, 0.2f, 1.0f },
-            },
-        },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &att_info,
     };
-    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk->CmdBeginRendering(cmd, &rendering_info);
 
     vk->CmdBindVertexBuffers(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 });
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
-    vk->CmdEndRenderPass(cmd);
+    vk->CmdEndRendering(cmd);
 
     const VkDependencyInfo dep_info2 = {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,

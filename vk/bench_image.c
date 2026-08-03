@@ -407,7 +407,7 @@ bench_image_test_dispatch(struct bench_image_test *test,
         };
         vk_add_pipeline_set_layout_from_info(vk, pipeline, &set_layout_info);
 
-        vk_setup_pipeline(vk, pipeline, NULL);
+        vk_setup_pipeline(vk, pipeline);
         vk_compile_pipeline(vk, pipeline);
     }
 
@@ -517,14 +517,8 @@ bench_image_test_render_pass(struct bench_image_test *test,
                              struct vk_image *src)
 {
     struct vk *vk = &test->vk;
-    struct vk_framebuffer *fb;
     struct vk_pipeline *pipeline;
     struct vk_descriptor_set *set;
-
-    {
-        fb = vk_create_framebuffer(vk, dst, NULL, NULL, VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                   VK_ATTACHMENT_STORE_OP_STORE);
-    }
 
     {
         pipeline = vk_create_pipeline(vk);
@@ -542,7 +536,12 @@ bench_image_test_render_pass(struct bench_image_test *test,
         vk_set_pipeline_rasterization(vk, pipeline, VK_POLYGON_MODE_FILL, false);
         vk_set_pipeline_sample_count(vk, pipeline, VK_SAMPLE_COUNT_1_BIT);
 
-        vk_setup_pipeline(vk, pipeline, fb);
+        vk_setup_pipeline(vk, pipeline);
+        pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+            .colorAttachmentCount = 1,
+            .pColorAttachmentFormats = &dst->info.format,
+        };
         vk_compile_pipeline(vk, pipeline);
     }
 
@@ -571,16 +570,24 @@ bench_image_test_render_pass(struct bench_image_test *test,
         .levelCount = 1,
         .layerCount = 1,
     };
-    const VkRenderPassBeginInfo pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = fb->pass,
-        .framebuffer = fb->fb,
+    const VkRenderingAttachmentInfo att_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = dst->render_view,
+        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+    };
+    const VkRenderingInfo rendering_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {
             .extent = {
                 .width = test->width,
                 .height = test->height,
             },
         },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &att_info,
     };
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
@@ -600,9 +607,9 @@ bench_image_test_render_pass(struct bench_image_test *test,
     vk_bind_pipeline(vk, pipeline, cmd);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, 0,
                               1, &set->set, 0, NULL);
-    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk->CmdBeginRendering(cmd, &rendering_info);
     vk->CmdDraw(cmd, 4, 1, 0, 0);
-    vk->CmdEndRenderPass(cmd);
+    vk->CmdEndRendering(cmd);
     vk_end_cmd(vk);
     vk_wait(vk);
 
@@ -611,10 +618,10 @@ bench_image_test_render_pass(struct bench_image_test *test,
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, 0,
                               1, &set->set, 0, NULL);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
-    vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk->CmdBeginRendering(cmd, &rendering_info);
     for (uint32_t i = 0; i < test->loop; i++)
         vk->CmdDraw(cmd, 4, 1, 0, 0);
-    vk->CmdEndRenderPass(cmd);
+    vk->CmdEndRendering(cmd);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                              VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -625,7 +632,6 @@ bench_image_test_render_pass(struct bench_image_test *test,
 
     vk_destroy_pipeline(vk, pipeline);
     vk_destroy_descriptor_set(vk, set);
-    vk_destroy_framebuffer(vk, fb);
 
     const uint64_t dur = vk_read_stopwatch(vk, test->stopwatch, 0);
     vk_reset_stopwatch(vk, test->stopwatch);
