@@ -945,9 +945,14 @@ wl_cleanup_surface(struct wl *wl)
 }
 
 static inline void
-wl_cleanup(struct wl *wl)
+wl_cleanup_globals(struct wl *wl)
 {
-    wl_cleanup_surface(wl);
+    zwp_linux_dmabuf_v1_destroy(wl->globals.dmabuf);
+
+    wl_array_release(&wl->globals.shm_formats);
+    wl_shm_destroy(wl->globals.shm);
+
+    xdg_wm_base_destroy(wl->globals.wm_base);
 
     if (wl->globals.tearing_control_manager)
         wp_tearing_control_manager_v1_destroy(wl->globals.tearing_control_manager);
@@ -957,13 +962,6 @@ wl_cleanup(struct wl *wl)
 
     if (wl->globals.commit_timing_manager)
         wp_commit_timing_manager_v1_destroy(wl->globals.commit_timing_manager);
-
-    zwp_linux_dmabuf_v1_destroy(wl->globals.dmabuf);
-
-    wl_array_release(&wl->globals.shm_formats);
-    wl_shm_destroy(wl->globals.shm);
-
-    xdg_wm_base_destroy(wl->globals.wm_base);
 
     if (wl->globals.presentation)
         wp_presentation_destroy(wl->globals.presentation);
@@ -988,6 +986,13 @@ wl_cleanup(struct wl *wl)
         free(out->model);
     }
     wl_array_release(&wl->globals.outputs);
+}
+
+static inline void
+wl_cleanup(struct wl *wl)
+{
+    wl_cleanup_surface(wl);
+    wl_cleanup_globals(wl);
 
     wl_display_flush(wl->display);
     wl_display_disconnect(wl->display);
