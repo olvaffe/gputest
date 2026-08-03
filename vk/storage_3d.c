@@ -262,12 +262,13 @@ storage_3d_test_draw_quad(struct storage_3d_test *test, VkCommandBuffer cmd)
     vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                            VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier2);
 
-    VkBufferImageCopy *copies = malloc(sizeof(*copies) * test->img->info.mipLevels);
+    VkBufferImageCopy2 *copies = malloc(sizeof(*copies) * test->img->info.mipLevels);
     if (!copies)
         vk_die("failed to alloc copies");
     VkDeviceSize buf_offset = 0;
     for (uint32_t i = 0; i < test->img->info.mipLevels; i++) {
-        copies[i] = (VkBufferImageCopy){
+        copies[i] = (VkBufferImageCopy2){
+            .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
             .bufferOffset = buf_offset,
             .imageSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -282,8 +283,15 @@ storage_3d_test_draw_quad(struct storage_3d_test *test, VkCommandBuffer cmd)
         };
         buf_offset += storage_3d_test_get_miplevel_size(test, i);
     }
-    vk->CmdCopyImageToBuffer(cmd, test->img->img, barrier2.newLayout, test->buf->buf,
-                             test->img->info.mipLevels, copies);
+    const VkCopyImageToBufferInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+        .srcImage = test->img->img,
+        .srcImageLayout = barrier2.newLayout,
+        .dstBuffer = test->buf->buf,
+        .regionCount = test->img->info.mipLevels,
+        .pRegions = copies,
+    };
+    vk->CmdCopyImageToBuffer2(cmd, &copy_info);
     free(copies);
 
     const VkBufferMemoryBarrier buf_barrier = {

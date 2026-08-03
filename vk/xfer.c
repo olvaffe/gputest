@@ -247,12 +247,20 @@ xfer_test_draw_copy_buffer(struct xfer_test *test)
         test, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
     const VkDeviceSize size = buf->info.size / 2;
-    const VkBufferCopy region = {
+    const VkBufferCopy2 region = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
         .srcOffset = 0,
         .dstOffset = size,
         .size = size,
     };
-    vk->CmdCopyBuffer(cmd, buf->buf, buf->buf, 1, &region);
+    const VkCopyBufferInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
+        .srcBuffer = buf->buf,
+        .dstBuffer = buf->buf,
+        .regionCount = 1,
+        .pRegions = &region,
+    };
+    vk->CmdCopyBuffer2(cmd, &copy_info);
 
     xfer_test_end_all(test);
 }
@@ -349,7 +357,7 @@ xfer_test_get_copy_extent(struct xfer_test *test, const struct xfer_test_format 
 static uint32_t
 xfer_test_get_buffer_image_copy(struct xfer_test *test,
                                 const struct xfer_test_format *fmt,
-                                VkBufferImageCopy regions[static 4])
+                                VkBufferImageCopy2 regions[static 4])
 {
     const VkExtent3D extent = xfer_test_get_copy_extent(test, fmt);
 
@@ -367,7 +375,8 @@ xfer_test_get_buffer_image_copy(struct xfer_test *test,
                                                  : i == 1 ? VK_IMAGE_ASPECT_PLANE_1_BIT
                                                           : VK_IMAGE_ASPECT_PLANE_2_BIT;
 
-            regions[i] = (VkBufferImageCopy){
+            regions[i] = (VkBufferImageCopy2){
+                .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
                 .imageSubresource = {
                     .aspectMask = aspect,
                     .layerCount = 1,
@@ -379,21 +388,23 @@ xfer_test_get_buffer_image_copy(struct xfer_test *test,
         region_count = fmt->plane_count;
     }
     if (fmt->depth) {
-        regions[region_count++] = (VkBufferImageCopy){
+        regions[region_count++] = (VkBufferImageCopy2){
+            .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
             .imageSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
                 .layerCount = 1,
             },
-                .imageExtent = extent,
+            .imageExtent = extent,
         };
     }
     if (fmt->stencil) {
-        regions[region_count++] = (VkBufferImageCopy){
+        regions[region_count++] = (VkBufferImageCopy2){
+            .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
             .imageSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
                 .layerCount = 1,
             },
-                .imageExtent = extent,
+            .imageExtent = extent,
         };
     }
 
@@ -410,7 +421,7 @@ xfer_test_draw_copy_image_to_buffer(struct xfer_test *test,
     if (test->verbose)
         vk_log("  copy %s image to buffer", tiling ? "linear" : "optimal");
 
-    VkBufferImageCopy regions[4];
+    VkBufferImageCopy2 regions[4];
     const uint32_t region_count = xfer_test_get_buffer_image_copy(test, fmt, regions);
 
     VkCommandBuffer cmd = xfer_test_begin_cmd(test);
@@ -419,8 +430,15 @@ xfer_test_draw_copy_image_to_buffer(struct xfer_test *test,
                                                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     struct vk_buffer *buf = xfer_test_begin_buffer(test, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
-    vk->CmdCopyImageToBuffer(cmd, img->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buf->buf,
-                             region_count, regions);
+    const VkCopyImageToBufferInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+        .srcImage = img->img,
+        .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .dstBuffer = buf->buf,
+        .regionCount = region_count,
+        .pRegions = regions,
+    };
+    vk->CmdCopyImageToBuffer2(cmd, &copy_info);
 
     xfer_test_end_all(test);
 }
@@ -435,7 +453,7 @@ xfer_test_draw_copy_buffer_to_image(struct xfer_test *test,
     if (test->verbose)
         vk_log("  copy buffer to %s image", tiling ? "linear" : "optimal");
 
-    VkBufferImageCopy regions[4];
+    VkBufferImageCopy2 regions[4];
     const uint32_t region_count = xfer_test_get_buffer_image_copy(test, fmt, regions);
 
     VkCommandBuffer cmd = xfer_test_begin_cmd(test);
@@ -444,8 +462,15 @@ xfer_test_draw_copy_buffer_to_image(struct xfer_test *test,
                                                  VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    vk->CmdCopyBufferToImage(cmd, buf->buf, img->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             region_count, regions);
+    const VkCopyBufferToImageInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+        .srcBuffer = buf->buf,
+        .dstImage = img->img,
+        .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .regionCount = region_count,
+        .pRegions = regions,
+    };
+    vk->CmdCopyBufferToImage2(cmd, &copy_info);
 
     xfer_test_end_all(test);
 }
@@ -563,7 +588,7 @@ static uint32_t
 xfer_test_get_image_copy(struct xfer_test *test,
                          const struct xfer_test_format *src_fmt,
                          const struct xfer_test_format *dst_fmt,
-                         VkImageCopy regions[static 4])
+                         VkImageCopy2 regions[static 4])
 {
     /* VUID-vkCmdCopyImage-srcImage-01548
      * If the VkFormat of each of srcImage and dstImage is not a
@@ -592,7 +617,8 @@ xfer_test_get_image_copy(struct xfer_test *test,
                                                  : i == 1 ? VK_IMAGE_ASPECT_PLANE_1_BIT
                                                           : VK_IMAGE_ASPECT_PLANE_2_BIT;
 
-            regions[i] = (VkImageCopy){
+            regions[i] = (VkImageCopy2){
+                .sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2,
                 .srcSubresource = {
                     .aspectMask = aspect,
                     .layerCount = 1,
@@ -608,7 +634,8 @@ xfer_test_get_image_copy(struct xfer_test *test,
         region_count = src_fmt->plane_count;
     }
     if (src_fmt->depth) {
-        regions[region_count++] = (VkImageCopy){
+        regions[region_count++] = (VkImageCopy2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2,
             .srcSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
                 .layerCount = 1,
@@ -617,11 +644,12 @@ xfer_test_get_image_copy(struct xfer_test *test,
                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
                 .layerCount = 1,
             },
-                .extent = extent,
+            .extent = extent,
         };
     }
     if (src_fmt->stencil) {
-        regions[region_count++] = (VkImageCopy){
+        regions[region_count++] = (VkImageCopy2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2,
             .srcSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
                 .layerCount = 1,
@@ -630,7 +658,7 @@ xfer_test_get_image_copy(struct xfer_test *test,
                 .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
                 .layerCount = 1,
             },
-                .extent = extent,
+            .extent = extent,
         };
     }
 
@@ -638,7 +666,8 @@ xfer_test_get_image_copy(struct xfer_test *test,
      * time
      */
     if (src_fmt->depth && src_fmt->stencil) {
-        regions[region_count++] = (VkImageCopy){
+        regions[region_count++] = (VkImageCopy2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2,
             .srcSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
                 .layerCount = 1,
@@ -647,7 +676,7 @@ xfer_test_get_image_copy(struct xfer_test *test,
                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
                 .layerCount = 1,
             },
-                .extent = extent,
+            .extent = extent,
         };
     }
 
@@ -663,7 +692,7 @@ xfer_test_draw_copy_image(struct xfer_test *test,
 {
     struct vk *vk = &test->vk;
 
-    VkImageCopy regions[4];
+    VkImageCopy2 regions[4];
     const uint32_t region_count = xfer_test_get_image_copy(test, src_fmt, dst_fmt, regions);
     if (!region_count)
         return;
@@ -681,8 +710,16 @@ xfer_test_draw_copy_image(struct xfer_test *test,
                                                      dst_tiling, VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    vk->CmdCopyImage(cmd, src_img->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst_img->img,
-                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, region_count, regions);
+    const VkCopyImageInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2,
+        .srcImage = src_img->img,
+        .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .dstImage = dst_img->img,
+        .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .regionCount = region_count,
+        .pRegions = regions,
+    };
+    vk->CmdCopyImage2(cmd, &copy_info);
 
     xfer_test_end_all(test);
 }
@@ -691,7 +728,7 @@ static uint32_t
 xfer_test_get_image_blit(struct xfer_test *test,
                          const struct xfer_test_format *src_fmt,
                          const struct xfer_test_format *dst_fmt,
-                         VkImageBlit regions[static 4])
+                         VkImageBlit2 regions[static 4])
 {
     /* VUID-vkCmdBlitImage-srcImage-06421
      * srcImage must not use a format that requires a sampler Y′CBCR
@@ -736,60 +773,64 @@ xfer_test_get_image_blit(struct xfer_test *test,
      * The aspectMask member of srcSubresource and dstSubresource must match
      */
     if (src_fmt->color) {
-        regions[region_count++] = (VkImageBlit){
-                .srcSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .layerCount = 1,
-                },
-                .srcOffsets[1] = src_end,
-                .dstSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .layerCount = 1,
-                },
-                .dstOffsets[1] = dst_end,
-            };
+        regions[region_count++] = (VkImageBlit2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+            .srcSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .layerCount = 1,
+            },
+            .srcOffsets[1] = src_end,
+            .dstSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .layerCount = 1,
+            },
+            .dstOffsets[1] = dst_end,
+        };
     }
     if (src_fmt->depth) {
-        regions[region_count++] = (VkImageBlit){
-                .srcSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-                    .layerCount = 1,
-                },
-                .srcOffsets[1] = src_end,
-                .dstSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-                    .layerCount = 1,
-                },
-                .dstOffsets[1] = dst_end,
-            };
+        regions[region_count++] = (VkImageBlit2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+            .srcSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                .layerCount = 1,
+            },
+            .srcOffsets[1] = src_end,
+            .dstSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                .layerCount = 1,
+            },
+            .dstOffsets[1] = dst_end,
+        };
     }
     if (src_fmt->stencil) {
-        regions[region_count++] = (VkImageBlit){
-                .srcSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
-                    .layerCount = 1,
-                },
-                .srcOffsets[1] = src_end,
-                .dstSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
-                    .layerCount = 1,
-                },
-                .dstOffsets[1] = dst_end,
-            };
+        regions[region_count++] = (VkImageBlit2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+            .srcSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
+                .layerCount = 1,
+            },
+            .srcOffsets[1] = src_end,
+            .dstSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
+                .layerCount = 1,
+            },
+            .dstOffsets[1] = dst_end,
+        };
     }
     if (src_fmt->depth && src_fmt->stencil) {
-        regions[region_count++] = (VkImageBlit){
-                .srcSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
-                    .layerCount = 1,
-                },
-                .srcOffsets[1] = src_end,
-                .dstSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
-                    .layerCount = 1,
-                },
-                .dstOffsets[1] = dst_end,
-            };
+        regions[region_count++] = (VkImageBlit2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+            .srcSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+                .layerCount = 1,
+            },
+            .srcOffsets[1] = src_end,
+            .dstSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+                .layerCount = 1,
+            },
+            .dstOffsets[1] = dst_end,
+        };
     }
 
     return region_count;
@@ -804,7 +845,7 @@ xfer_test_draw_blit_image(struct xfer_test *test,
 {
     struct vk *vk = &test->vk;
 
-    VkImageBlit regions[4];
+    VkImageBlit2 regions[4];
     const uint32_t region_count = xfer_test_get_image_blit(test, src_fmt, dst_fmt, regions);
     if (!region_count)
         return;
@@ -832,8 +873,17 @@ xfer_test_draw_blit_image(struct xfer_test *test,
                                                      dst_tiling, VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    vk->CmdBlitImage(cmd, src_img->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst_img->img,
-                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, region_count, regions, filter);
+    const VkBlitImageInfo2 blit_info = {
+        .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
+        .srcImage = src_img->img,
+        .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .dstImage = dst_img->img,
+        .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .regionCount = region_count,
+        .pRegions = regions,
+        .filter = filter,
+    };
+    vk->CmdBlitImage2(cmd, &blit_info);
 
     xfer_test_end_all(test);
 }
@@ -869,7 +919,8 @@ xfer_test_draw_resolve_image(struct xfer_test *test,
      * The aspectMask member of srcSubresource and dstSubresource must only
      * contain VK_IMAGE_ASPECT_COLOR_BIT
      */
-    const VkImageResolve region = {
+    const VkImageResolve2 region = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_RESOLVE_2,
         .srcSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             .layerCount = 1,
@@ -885,8 +936,17 @@ xfer_test_draw_resolve_image(struct xfer_test *test,
         },
     };
 
-    vk->CmdResolveImage(cmd, src_img->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst_img->img,
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    const VkResolveImageInfo2 resolve_info = {
+        .sType = VK_STRUCTURE_TYPE_RESOLVE_IMAGE_INFO_2,
+        .srcImage = src_img->img,
+        .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .dstImage = dst_img->img,
+        .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .regionCount = 1,
+        .pRegions = &region,
+    };
+
+    vk->CmdResolveImage2(cmd, &resolve_info);
 
     xfer_test_end_all(test);
 }
@@ -914,13 +974,13 @@ xfer_test_draw(struct xfer_test *test)
 
         vk_log("%s", fmt->name);
 
-        /* vkCmdCopyImageToBuffer */
+        /* vkCmdCopyImageToBuffer2 */
         if (linear & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT)
             xfer_test_draw_copy_image_to_buffer(test, fmt, VK_IMAGE_TILING_LINEAR);
         if (optimal & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT)
             xfer_test_draw_copy_image_to_buffer(test, fmt, VK_IMAGE_TILING_OPTIMAL);
 
-        /* vkCmdCopyBufferToImage */
+        /* vkCmdCopyBufferToImage2 */
         if (linear & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT)
             xfer_test_draw_copy_buffer_to_image(test, fmt, VK_IMAGE_TILING_LINEAR);
         if (optimal & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT)
@@ -938,7 +998,7 @@ xfer_test_draw(struct xfer_test *test)
         if (optimal & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT)
             xfer_test_draw_clear_depth_stencil_image(test, fmt, VK_IMAGE_TILING_OPTIMAL);
 
-        /* vkCmdCopyImage */
+        /* vkCmdCopyImage2 */
         if ((linear | optimal) & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT) {
             for (uint32_t j = 0; j < ARRAY_SIZE(xfer_test_formats); j++) {
                 const struct xfer_test_format *dst_fmt = &xfer_test_formats[j];
@@ -969,7 +1029,7 @@ xfer_test_draw(struct xfer_test *test)
             }
         }
 
-        /* vkCmdBlitImage */
+        /* vkCmdBlitImage2 */
         if ((linear | optimal) & VK_FORMAT_FEATURE_2_BLIT_SRC_BIT) {
             for (uint32_t j = 0; j < ARRAY_SIZE(xfer_test_formats); j++) {
                 const struct xfer_test_format *dst_fmt = &xfer_test_formats[j];
@@ -1020,7 +1080,7 @@ xfer_test_draw(struct xfer_test *test)
                                                    VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT |
                                                    VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT;
 
-        /* vkCmdResolveImage */
+        /* vkCmdResolveImage2 */
         if ((linear & resolve_bits) == resolve_bits)
             xfer_test_draw_resolve_image(test, fmt, VK_IMAGE_TILING_LINEAR);
         if ((optimal & resolve_bits) == resolve_bits)

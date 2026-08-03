@@ -215,7 +215,8 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
                            VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL,
                            ARRAY_SIZE(after_barriers), after_barriers);
 
-    const VkBufferImageCopy copy = {
+    const VkBufferImageCopy2 copy = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
         .imageSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
             .layerCount = 1,
@@ -226,8 +227,15 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
             .depth = 1,
         },
     };
-    vk->CmdCopyImageToBuffer(cmd, test->resolve->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                             test->buf->buf, 1, &copy);
+    const VkCopyImageToBufferInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+        .srcImage = test->resolve->img,
+        .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .dstBuffer = test->buf->buf,
+        .regionCount = 1,
+        .pRegions = &copy,
+    };
+    vk->CmdCopyImageToBuffer2(cmd, &copy_info);
 
     const VkBufferMemoryBarrier copy_barriers[1] = {
         [0] = {

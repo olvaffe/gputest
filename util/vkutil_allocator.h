@@ -54,7 +54,7 @@ struct vk_allocator_bo {
 struct vk_allocator_transfer {
     bool readback;
     bool writeback;
-    VkBufferImageCopy copy;
+    VkBufferImageCopy2 copy;
 
     struct vk_buffer *staging;
 };
@@ -746,7 +746,8 @@ vk_allocator_bo_map_transfer(struct vk_allocator *alloc,
 
     xfer->readback = usage & VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     xfer->writeback = usage & VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    xfer->copy = (VkBufferImageCopy){
+    xfer->copy = (VkBufferImageCopy2){
+        .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
         .imageSubresource = {
             .aspectMask = aspect,
             .layerCount = 1,
@@ -792,8 +793,15 @@ vk_allocator_bo_map_transfer(struct vk_allocator *alloc,
                                VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1,
                                &img_acquire);
 
-        vk->CmdCopyImageToBuffer(cmd, bo->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                 xfer->staging->buf, 1, &xfer->copy);
+        const VkCopyImageToBufferInfo2 copy_info = {
+            .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+            .srcImage = bo->img,
+            .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .dstBuffer = xfer->staging->buf,
+            .regionCount = 1,
+            .pRegions = &xfer->copy,
+        };
+        vk->CmdCopyImageToBuffer2(cmd, &copy_info);
 
         const VkBufferMemoryBarrier buf_barrier = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -871,8 +879,15 @@ vk_allocator_bo_unmap_transfer(struct vk_allocator *alloc,
         vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                                0, NULL, 1, &buf_barrier, 0, NULL);
 
-        vk->CmdCopyBufferToImage(cmd, xfer->staging->buf, bo->img,
-                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &xfer->copy);
+        const VkCopyBufferToImageInfo2 copy_info = {
+            .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+            .srcBuffer = xfer->staging->buf,
+            .dstImage = bo->img,
+            .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .regionCount = 1,
+            .pRegions = &xfer->copy,
+        };
+        vk->CmdCopyBufferToImage2(cmd, &copy_info);
 
         const VkImageMemoryBarrier img_release = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,

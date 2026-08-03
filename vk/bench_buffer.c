@@ -159,8 +159,16 @@ bench_buffer_test_copy_buffer(struct bench_buffer_test *test,
 {
     struct vk *vk = &test->vk;
 
-    const VkBufferCopy copy = {
+    const VkBufferCopy2 copy = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
         .size = test->size,
+    };
+    const VkCopyBufferInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
+        .srcBuffer = src->buf,
+        .dstBuffer = dst->buf,
+        .regionCount = 1,
+        .pRegions = &copy,
     };
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
@@ -168,14 +176,14 @@ bench_buffer_test_copy_buffer(struct bench_buffer_test *test,
     bench_buffer_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_ACCESS_TRANSFER_READ_BIT);
-    vk->CmdCopyBuffer(cmd, src->buf, dst->buf, 1, &copy);
+    vk->CmdCopyBuffer2(cmd, &copy_info);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     cmd = vk_begin_cmd(vk, false);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     for (uint32_t i = 0; i < test->loop; i++)
-        vk->CmdCopyBuffer(cmd, src->buf, dst->buf, 1, &copy);
+        vk->CmdCopyBuffer2(cmd, &copy_info);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     bench_buffer_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
@@ -428,7 +436,7 @@ bench_buffer_test_draw_xfer(struct bench_buffer_test *test)
         vk_destroy_buffer(vk, dst);
         vk_destroy_buffer(vk, src);
 
-        vk_log("%s: vkCmdCopyBuffer: %d MB/s", bench_buffer_test_describe_mt(test, i, desc),
+        vk_log("%s: vkCmdCopyBuffer2: %d MB/s", bench_buffer_test_describe_mt(test, i, desc),
                bench_buffer_test_calc_throughput_mb(test, dur));
     }
 }

@@ -112,10 +112,11 @@ clear_depth_test_copy(struct clear_depth_test *test, VkCommandBuffer cmd, VkImag
 {
     struct vk *vk = &test->vk;
 
-    VkBufferImageCopy regions[2];
+    VkBufferImageCopy2 regions[2];
     uint32_t region_count = 0;
     if (test->dump_aspect_mask & VK_IMAGE_ASPECT_DEPTH_BIT) {
-        regions[region_count++] = (VkBufferImageCopy){
+        regions[region_count++] = (VkBufferImageCopy2){
+            .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
             .imageSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
                 .layerCount = 1,
@@ -128,7 +129,8 @@ clear_depth_test_copy(struct clear_depth_test *test, VkCommandBuffer cmd, VkImag
         };
     };
     if (test->dump_aspect_mask & VK_IMAGE_ASPECT_STENCIL_BIT) {
-        regions[region_count++] = (VkBufferImageCopy){
+        regions[region_count++] = (VkBufferImageCopy2){
+            .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
             .bufferOffset = test->stencil_offset,
             .imageSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
@@ -142,7 +144,15 @@ clear_depth_test_copy(struct clear_depth_test *test, VkCommandBuffer cmd, VkImag
         };
     };
 
-    vk->CmdCopyImageToBuffer(cmd, test->img->img, layout, test->buf->buf, region_count, regions);
+    const VkCopyImageToBufferInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+        .srcImage = test->img->img,
+        .srcImageLayout = layout,
+        .dstBuffer = test->buf->buf,
+        .regionCount = region_count,
+        .pRegions = regions,
+    };
+    vk->CmdCopyImageToBuffer2(cmd, &copy_info);
 
     const VkBufferMemoryBarrier buf_barrier = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,

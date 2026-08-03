@@ -38,7 +38,6 @@ struct ktx_test {
     struct vk_image *rt_img;
     struct vk_pipeline *pipeline;
     struct vk_descriptor_set *set;
-    VkBufferImageCopy *copies;
 };
 
 static void
@@ -407,14 +406,15 @@ ktx_test_draw_prep_texture(struct ktx_test *test, VkCommandBuffer cmd)
         .subresourceRange = subres_range,
     };
 
-    VkBufferImageCopy *copies = malloc(sizeof(*copies) * tex->numLevels);
+    VkBufferImageCopy2 *copies = malloc(sizeof(*copies) * tex->numLevels);
     if (!copies)
         vk_die("failed to alloc copies");
     for (uint32_t i = 0; i < tex->numLevels; i++) {
         ktx_size_t offset;
         ktxTexture_GetImageOffset(tex, i, 0, 0, &offset);
 
-        copies[i] = (VkBufferImageCopy){
+        copies[i] = (VkBufferImageCopy2){
+            .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
             .bufferOffset = offset,
             .imageSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -425,14 +425,21 @@ ktx_test_draw_prep_texture(struct ktx_test *test, VkCommandBuffer cmd)
                 .width = u_minify(tex->baseWidth, i),
                 .height = u_minify(tex->baseHeight, i),
                 .depth = u_minify(tex->baseDepth, i),
-	    },
+            },
         };
     }
 
     vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                            0, 0, NULL, 0, NULL, 1, &barrier1);
-    vk->CmdCopyBufferToImage(cmd, test->staging_buf->buf, test->tex_img->img, barrier1.newLayout,
-                             tex->numLevels, copies);
+    const VkCopyBufferToImageInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+        .srcBuffer = test->staging_buf->buf,
+        .dstImage = test->tex_img->img,
+        .dstImageLayout = barrier1.newLayout,
+        .regionCount = tex->numLevels,
+        .pRegions = copies,
+    };
+    vk->CmdCopyBufferToImage2(cmd, &copy_info);
     vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
                            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1,
                            &barrier2);

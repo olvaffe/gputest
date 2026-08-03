@@ -262,7 +262,8 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
     VkBufferMemoryBarrier copy_barriers[2];
     uint32_t copy_barrier_count = 0;
     if (test->depth_bits) {
-        const VkBufferImageCopy copy = {
+        const VkBufferImageCopy2 copy = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
             .imageSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
                 .layerCount = 1,
@@ -272,9 +273,16 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
                 .height = test->height,
                 .depth = 1,
             },
-	};
-        vk->CmdCopyImageToBuffer(cmd, test->ds->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                 test->d_buf->buf, 1, &copy);
+        };
+        const VkCopyImageToBufferInfo2 copy_info = {
+            .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+            .srcImage = test->ds->img,
+            .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .dstBuffer = test->d_buf->buf,
+            .regionCount = 1,
+            .pRegions = &copy,
+        };
+        vk->CmdCopyImageToBuffer2(cmd, &copy_info);
 
         copy_barriers[copy_barrier_count++] = (VkBufferMemoryBarrier){
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
@@ -285,7 +293,8 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
         };
     }
     if (test->stencil_bits) {
-        const VkBufferImageCopy copy = {
+        const VkBufferImageCopy2 copy = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
             .imageSubresource = {
                 .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
                 .layerCount = 1,
@@ -295,9 +304,16 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
                 .height = test->height,
                 .depth = 1,
             },
-	};
-        vk->CmdCopyImageToBuffer(cmd, test->ds->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                 test->s_buf->buf, 1, &copy);
+        };
+        const VkCopyImageToBufferInfo2 copy_info = {
+            .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+            .srcImage = test->ds->img,
+            .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .dstBuffer = test->s_buf->buf,
+            .regionCount = 1,
+            .pRegions = &copy,
+        };
+        vk->CmdCopyImageToBuffer2(cmd, &copy_info);
 
         copy_barriers[copy_barrier_count++] = (VkBufferMemoryBarrier){
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,

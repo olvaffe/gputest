@@ -184,10 +184,18 @@ protected_test_draw_triangle(struct protected_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
-    const VkBufferCopy copy = {
+    const VkBufferCopy2 copy = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
         .size = sizeof(protected_test_indices),
     };
-    vk->CmdCopyBuffer(cmd, test->staging->buf, test->ib->buf, 1, &copy);
+    const VkCopyBufferInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
+        .srcBuffer = test->staging->buf,
+        .dstBuffer = test->ib->buf,
+        .regionCount = 1,
+        .pRegions = &copy,
+    };
+    vk->CmdCopyBuffer2(cmd, &copy_info);
 
     const VkBufferMemoryBarrier buf_barrier = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,

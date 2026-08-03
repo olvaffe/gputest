@@ -196,12 +196,20 @@ buf_align_test_draw(struct buf_align_test *test)
     };
     vk->CmdPipelineBarrier(cmd2, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
                            NULL, 1, &src_buf_barrier, 0, NULL);
-    const VkBufferCopy copy = {
+    const VkBufferCopy2 copy = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
         .srcOffset = 0,
         .dstOffset = 0,
         .size = 4,
     };
-    vk->CmdCopyBuffer(cmd2, test->src_buf, test->dst_buf, 1, &copy);
+    const VkCopyBufferInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
+        .srcBuffer = test->src_buf,
+        .dstBuffer = test->dst_buf,
+        .regionCount = 1,
+        .pRegions = &copy,
+    };
+    vk->CmdCopyBuffer2(cmd2, &copy_info);
     const VkBufferMemoryBarrier dst_buf_barrier = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
         .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -216,7 +224,7 @@ buf_align_test_draw(struct buf_align_test *test)
     vk_wait(vk);
 
     /* step 6: check dst_buf blit result */
-    vk_log("dst_buf: after vkCmdCopyBuffer");
+    vk_log("dst_buf: after vkCmdCopyBuffer2");
     vk_log("disturb = %u", *test->disturb_ptr);
     vk_log("src_buf = %u", *test->src_buf_ptr);
     vk_log("dst_buf = %u", *test->dst_buf_ptr);

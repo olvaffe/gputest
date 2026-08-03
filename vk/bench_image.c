@@ -208,7 +208,8 @@ bench_image_test_copy(struct bench_image_test *test, struct vk_image *dst, struc
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .layerCount = 1,
     };
-    const VkImageCopy copy = {
+    const VkImageCopy2 copy = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2,
         .srcSubresource = subres_layers,
         .dstSubresource = subres_layers,
         .extent = {
@@ -216,6 +217,15 @@ bench_image_test_copy(struct bench_image_test *test, struct vk_image *dst, struc
             .height = test->height,
             .depth = 1,
         },
+    };
+    const VkCopyImageInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2,
+        .srcImage = src->img,
+        .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .dstImage = dst->img,
+        .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .regionCount = 1,
+        .pRegions = &copy,
     };
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
@@ -231,16 +241,14 @@ bench_image_test_copy(struct bench_image_test *test, struct vk_image *dst, struc
     bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE,
                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
-    vk->CmdCopyImage(cmd, src->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst->img,
-                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    vk->CmdCopyImage2(cmd, &copy_info);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     cmd = vk_begin_cmd(vk, false);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     for (uint32_t i = 0; i < test->loop; i++) {
-        vk->CmdCopyImage(cmd, src->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst->img,
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+        vk->CmdCopyImage2(cmd, &copy_info);
     }
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -290,13 +298,22 @@ bench_image_test_copy_buffer(struct bench_image_test *test,
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .layerCount = 1,
     };
-    const VkBufferImageCopy copy = {
+    const VkBufferImageCopy2 copy = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
         .imageSubresource = subres_layers,
         .imageExtent = {
             .width = test->width,
             .height = test->height,
             .depth = 1,
         },
+    };
+    const VkCopyBufferToImageInfo2 copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+        .srcBuffer = src->buf,
+        .dstImage = dst->img,
+        .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .regionCount = 1,
+        .pRegions = &copy,
     };
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
@@ -306,16 +323,14 @@ bench_image_test_copy_buffer(struct bench_image_test *test,
     bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_NONE, VK_ACCESS_NONE,
                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
-    vk->CmdCopyBufferToImage(cmd, src->buf, dst->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                             &copy);
+    vk->CmdCopyBufferToImage2(cmd, &copy_info);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     cmd = vk_begin_cmd(vk, false);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     for (uint32_t i = 0; i < test->loop; i++) {
-        vk->CmdCopyBufferToImage(cmd, src->buf, dst->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                                 &copy);
+        vk->CmdCopyBufferToImage2(cmd, &copy_info);
     }
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     bench_image_test_barrier(test, cmd, dst, VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -693,7 +708,8 @@ bench_image_test_draw_copy(struct bench_image_test *test, VkImageTiling tiling)
         vk_destroy_image(vk, dst);
         vk_destroy_image(vk, src);
 
-        vk_log("%s: vkCmdCopyImage: %d MB/s", bench_image_test_describe_mt(test, tiling, i, desc),
+        vk_log("%s: vkCmdCopyImage2: %d MB/s",
+               bench_image_test_describe_mt(test, tiling, i, desc),
                bench_image_test_calc_throughput_mb(test, dur));
     }
 }
@@ -726,7 +742,7 @@ bench_image_test_draw_copy_buffer(struct bench_image_test *test, VkImageTiling t
         vk_destroy_image(vk, dst);
         vk_destroy_buffer(vk, src);
 
-        vk_log("%s: vkCmdCopyBufferToImage: %d MB/s",
+        vk_log("%s: vkCmdCopyBufferToImage2: %d MB/s",
                bench_image_test_describe_mt(test, tiling, i, desc),
                bench_image_test_calc_throughput_mb(test, dur));
     }

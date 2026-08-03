@@ -197,7 +197,8 @@ stencil_test_draw_triangle(struct stencil_test *test, VkCommandBuffer cmd)
                            VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1,
                            &after_barrier);
 
-    const VkBufferImageCopy copy_z = {
+    const VkBufferImageCopy2 copy_z = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
         .imageSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
             .layerCount = 1,
@@ -208,7 +209,8 @@ stencil_test_draw_triangle(struct stencil_test *test, VkCommandBuffer cmd)
             .depth = 1,
         },
     };
-    const VkBufferImageCopy copy_s = {
+    const VkBufferImageCopy2 copy_s = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
         .imageSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT,
             .layerCount = 1,
@@ -238,15 +240,29 @@ stencil_test_draw_triangle(struct stencil_test *test, VkCommandBuffer cmd)
     uint32_t copy_barrier_offset = 0;
     uint32_t copy_barrier_count = 0;
     if (test->depth_bits) {
-        vk->CmdCopyImageToBuffer(cmd, test->zs->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                 test->z_buf->buf, 1, &copy_z);
+        const VkCopyImageToBufferInfo2 copy_info = {
+            .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+            .srcImage = test->zs->img,
+            .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .dstBuffer = test->z_buf->buf,
+            .regionCount = 1,
+            .pRegions = &copy_z,
+        };
+        vk->CmdCopyImageToBuffer2(cmd, &copy_info);
         copy_barrier_count++;
     } else {
         copy_barrier_offset++;
     }
     if (test->stencil_bits) {
-        vk->CmdCopyImageToBuffer(cmd, test->zs->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                 test->s_buf->buf, 1, &copy_s);
+        const VkCopyImageToBufferInfo2 copy_info = {
+            .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
+            .srcImage = test->zs->img,
+            .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .dstBuffer = test->s_buf->buf,
+            .regionCount = 1,
+            .pRegions = &copy_s,
+        };
+        vk->CmdCopyImageToBuffer2(cmd, &copy_info);
         copy_barrier_count++;
     }
     vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0,
