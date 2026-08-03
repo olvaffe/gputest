@@ -819,13 +819,6 @@ wl_init_globals(struct wl *wl)
         wl_fixes_destroy_registry(wl->globals.fixes, reg);
     wl_registry_destroy(reg);
 
-    if (!wl->globals.compositor)
-        wl_die("missing required global: wl_compositor");
-    if (!wl->globals.wm_base)
-        wl_die("missing required global: xdg_wm_base");
-    if (!wl->globals.shm)
-        wl_die("missing required global: wl_shm");
-
     if (wl->params.explicit_sync && !wl->globals.syncobj_manager)
         wl_die("missing required global: wp_linux_drm_syncobj_manager_v1");
 }
@@ -888,6 +881,11 @@ wl_init_surface_dmabuf(struct wl *wl)
 static inline void
 wl_init_surface_xdg(struct wl *wl)
 {
+    if (!wl->globals.wm_base) {
+        wl->xdg_ready = true;
+        return;
+    }
+
     wl->xdg_surface = xdg_wm_base_get_xdg_surface(wl->globals.wm_base, wl->surface);
     xdg_surface_add_listener(wl->xdg_surface, &xdg_surface_listener, wl);
 
@@ -900,6 +898,9 @@ wl_init_surface_xdg(struct wl *wl)
 static inline void
 wl_init_surface(struct wl *wl)
 {
+    if (!wl->globals.compositor)
+        return;
+
     wl->surface = wl_compositor_create_surface(wl->globals.compositor);
 
     wl_init_surface_xdg(wl);
@@ -963,6 +964,9 @@ wl_init(struct wl *wl, const struct wl_init_params *params)
 static inline void
 wl_cleanup_surface(struct wl *wl)
 {
+    if (!wl->surface)
+        return;
+
     if (wl->tearing_control)
         wp_tearing_control_v1_destroy(wl->tearing_control);
     if (wl->cm_surface) {
@@ -986,8 +990,11 @@ wl_cleanup_surface(struct wl *wl)
     if (wl->dmabuf_feedback)
         zwp_linux_dmabuf_feedback_v1_destroy(wl->dmabuf_feedback);
 
-    xdg_toplevel_destroy(wl->xdg_toplevel);
-    xdg_surface_destroy(wl->xdg_surface);
+    if (wl->xdg_surface) {
+        if (wl->xdg_toplevel)
+            xdg_toplevel_destroy(wl->xdg_toplevel);
+        xdg_surface_destroy(wl->xdg_surface);
+    }
 
     wl_surface_destroy(wl->surface);
 }
@@ -1010,14 +1017,19 @@ wl_cleanup_globals(struct wl *wl)
     if (wl->globals.syncobj_manager)
         wp_linux_drm_syncobj_manager_v1_destroy(wl->globals.syncobj_manager);
 
-    xdg_wm_base_destroy(wl->globals.wm_base);
+    if (wl->globals.wm_base)
+        xdg_wm_base_destroy(wl->globals.wm_base);
 
-    wl_compositor_destroy(wl->globals.compositor);
+    if (wl->globals.compositor)
+        wl_compositor_destroy(wl->globals.compositor);
 
-    zwp_linux_dmabuf_v1_destroy(wl->globals.dmabuf);
+    if (wl->globals.dmabuf)
+        zwp_linux_dmabuf_v1_destroy(wl->globals.dmabuf);
 
-    wl_array_release(&wl->globals.shm_formats);
-    wl_shm_destroy(wl->globals.shm);
+    if (wl->globals.shm) {
+        wl_array_release(&wl->globals.shm_formats);
+        wl_shm_destroy(wl->globals.shm);
+    }
 
     if (wl->globals.color_manager)
         wp_color_manager_v1_destroy(wl->globals.color_manager);
@@ -1036,9 +1048,11 @@ wl_cleanup_globals(struct wl *wl)
     }
     wl_array_release(&wl->globals.outputs);
 
-    if (wl->globals.keyboard)
-        wl_keyboard_release(wl->globals.keyboard);
-    wl_seat_release(wl->globals.seat);
+    if (wl->globals.seat) {
+        if (wl->globals.keyboard)
+            wl_keyboard_release(wl->globals.keyboard);
+        wl_seat_release(wl->globals.seat);
+    }
 
     if (wl->globals.fixes)
         wl_fixes_destroy(wl->globals.fixes);
