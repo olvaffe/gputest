@@ -24,7 +24,7 @@
 #define LIBVULKAN_NAME "libvulkan.so.1"
 #endif
 
-#define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_3
+#define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_4
 
 #define vk_check(vk, format, ...)                                                                \
     do {                                                                                         \
@@ -89,7 +89,6 @@ struct vk {
 
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
     VkPhysicalDeviceExternalFormatResolveFeaturesANDROID external_format_resolve_features;
-    VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR global_priority_query_features;
 
     VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t buf_mt_index;
@@ -329,12 +328,9 @@ vk_init_physical_device_features(struct vk *vk)
     *pnext = &vk->vulkan_13_features;
     pnext = &vk->vulkan_13_features.pNext;
 
-    if (vk->params.api_version >= VK_API_VERSION_1_4) {
-        vk->vulkan_14_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
-
-        *pnext = &vk->vulkan_14_features;
-        pnext = &vk->vulkan_14_features.pNext;
-    }
+    vk->vulkan_14_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
+    *pnext = &vk->vulkan_14_features;
+    pnext = &vk->vulkan_14_features.pNext;
 
     vk->external_format_resolve_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FORMAT_RESOLVE_FEATURES_ANDROID;
@@ -345,13 +341,6 @@ vk_init_physical_device_features(struct vk *vk)
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
     *pnext = &vk->custom_border_color_features;
     pnext = &vk->custom_border_color_features.pNext;
-
-    if (vk->params.high_priority) {
-        vk->global_priority_query_features.sType =
-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES_KHR;
-        *pnext = &vk->global_priority_query_features;
-        pnext = &vk->global_priority_query_features.pNext;
-    }
 
     vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
 }
@@ -373,12 +362,10 @@ vk_init_physical_device_properties(struct vk *vk)
     vk->vulkan_13_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES;
     *pnext = &vk->vulkan_13_props;
     pnext = &vk->vulkan_13_props.pNext;
-    if (vk->params.api_version >= VK_API_VERSION_1_4) {
-        vk->vulkan_14_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_PROPERTIES;
 
-        *pnext = &vk->vulkan_14_props;
-        pnext = &vk->vulkan_14_props.pNext;
-    }
+    vk->vulkan_14_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_PROPERTIES;
+    *pnext = &vk->vulkan_14_props;
+    pnext = &vk->vulkan_14_props.pNext;
 
     vk->external_format_resolve_props.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FORMAT_RESOLVE_PROPERTIES_ANDROID;
@@ -478,19 +465,11 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     *pnext = &vk->vulkan_11_features;
     vk->vulkan_11_features.pNext = &vk->vulkan_12_features;
     vk->vulkan_12_features.pNext = &vk->vulkan_13_features;
-    pnext = &vk->vulkan_13_features.pNext;
-
-    if (vk->params.api_version >= VK_API_VERSION_1_4) {
-        *pnext = &vk->vulkan_14_features;
-        pnext = &vk->vulkan_14_features.pNext;
-    }
+    vk->vulkan_13_features.pNext = &vk->vulkan_14_features;
+    pnext = &vk->vulkan_14_features.pNext;
     if (vk->EXT_custom_border_color) {
         *pnext = &vk->custom_border_color_features;
         pnext = &vk->custom_border_color_features.pNext;
-    }
-    if (vk->params.high_priority) {
-        *pnext = &vk->global_priority_query_features;
-        pnext = &vk->global_priority_query_features.pNext;
     }
 
     *pnext = NULL;
@@ -523,9 +502,6 @@ vk_init_device(struct vk *vk)
 
     VkQueueGlobalPriorityKHR global_priority = VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_KHR;
     if (vk->params.high_priority) {
-        if (!vk->global_priority_query_features.globalPriorityQuery)
-            vk_die("no globalPriorityQuery");
-
         global_priority = prio_props.priorities[prio_props.priorityCount - 1];
         if (global_priority <= VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_KHR)
             vk_die("queue family 0 does not support high priority");

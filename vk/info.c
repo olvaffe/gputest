@@ -137,16 +137,11 @@ info_device_features(struct vk *vk)
     vk_log("    dynamicRendering: %d", vk->vulkan_13_features.dynamicRendering);
     vk_log("    maintenance4: %d", vk->vulkan_13_features.maintenance4);
 
-    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_4) {
-        vk_log("    globalPriorityQuery: %d", vk->vulkan_14_features.globalPriorityQuery);
-        vk_log("    maintenance5: %d", vk->vulkan_14_features.maintenance5);
-        vk_log("    maintenance6: %d", vk->vulkan_14_features.maintenance6);
-        vk_log("    pipelineProtectedAccess: %d", vk->vulkan_14_features.pipelineProtectedAccess);
-        vk_log("    hostImageCopy: %d", vk->vulkan_14_features.hostImageCopy);
-    } else {
-        vk_log("    globalPriorityQuery: %d",
-               vk->global_priority_query_features.globalPriorityQuery);
-    }
+    vk_log("    globalPriorityQuery: %d", vk->vulkan_14_features.globalPriorityQuery);
+    vk_log("    maintenance5: %d", vk->vulkan_14_features.maintenance5);
+    vk_log("    maintenance6: %d", vk->vulkan_14_features.maintenance6);
+    vk_log("    pipelineProtectedAccess: %d", vk->vulkan_14_features.pipelineProtectedAccess);
+    vk_log("    hostImageCopy: %d", vk->vulkan_14_features.hostImageCopy);
 
     vk_log("    externalFormatResolve: %d",
            vk->external_format_resolve_features.externalFormatResolve);
