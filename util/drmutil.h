@@ -654,4 +654,73 @@ drm_prime_import(struct drm *drm, int fd)
     return handle;
 }
 
+static inline uint32_t
+drm_syncobj_create(struct drm *drm)
+{
+    const uint32_t flags = 0;
+    uint32_t handle;
+    if (drmSyncobjCreate(drm->fd, flags, &handle))
+        drm_die("failed to create syncobj");
+
+    return handle;
+}
+
+static inline void
+drm_syncobj_destroy(struct drm *drm, uint32_t handle)
+{
+    if (drmSyncobjDestroy(drm->fd, handle))
+        drm_die("failed to destroy syncobj");
+}
+
+static inline int
+drm_syncobj_export(struct drm *drm, uint32_t handle)
+{
+    int fd;
+    if (drmSyncobjHandleToFD(drm->fd, handle, &fd))
+        drm_die("failed to export syncobj");
+
+    return fd;
+}
+
+static inline uint32_t
+drm_syncobj_import(struct drm *drm, int fd)
+{
+    uint32_t handle;
+    if (drmSyncobjFDToHandle(drm->fd, fd, &handle))
+        drm_die("failed to import syncobj");
+
+    return handle;
+}
+
+static inline void
+drm_syncobj_signal(struct drm *drm, uint32_t handle, uint64_t point)
+{
+    if (drmSyncobjTimelineSignal(drm->fd, &handle, &point, 1))
+        drm_die("failed to signal syncobj");
+}
+
+static inline void
+drm_syncobj_query(
+    struct drm *drm, const uint32_t *handles, uint64_t *points, uint32_t count, uint32_t flags)
+{
+    if (drmSyncobjQuery2(drm->fd, (uint32_t *)handles, points, count, flags))
+        drm_die("failed to query syncobj");
+}
+
+static inline uint32_t
+drm_syncobj_wait(struct drm *drm,
+                 const uint32_t *handles,
+                 const uint64_t *points,
+                 uint32_t count,
+                 uint32_t flags)
+{
+    const bool wait_all = flags & DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL;
+    uint32_t first_signaled = 0;
+    if (drmSyncobjTimelineWait(drm->fd, (uint32_t *)handles, (uint64_t *)points, count, INT64_MAX,
+                               flags, wait_all ? NULL : &first_signaled))
+        drm_die("failed to wait syncobj");
+
+    return first_signaled;
+}
+
 #endif /* DRMUTIL_H */
