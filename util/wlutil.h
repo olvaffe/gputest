@@ -1389,9 +1389,6 @@ wl_present_swapchain_image(struct wl *wl,
     assert(img >= swapchain->images && img - swapchain->images < swapchain->image_count);
     assert(wl->xdg_ready);
 
-    wl_surface_attach(wl->surface, img->buffer, 0, 0);
-    wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
-
     if (wl->params.explicit_sync) {
         wp_linux_drm_syncobj_surface_v1_set_acquire_point(
             wl->syncobj_surface, img->acquire_timeline, (uint32_t)(img->acquire_point >> 32),
@@ -1412,6 +1409,9 @@ wl_present_swapchain_image(struct wl *wl,
         /* set the barrier bit which auto-clear on deadline latch */
         wp_fifo_v1_set_barrier(wl->fifo);
     }
+
+    wl_surface_attach(wl->surface, img->buffer, 0, 0);
+    wl_surface_damage_buffer(wl->surface, 0, 0, swapchain->width, swapchain->height);
 
     if (wl->globals.presentation) {
         struct wp_presentation_feedback *feedback =
