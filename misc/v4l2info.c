@@ -151,7 +151,7 @@ v4l2_dump_current_states(struct v4l2 *v4l2)
     v4l2_log("  controls:");
     for (uint32_t i = 0; i < ctrl_count; i++) {
         const struct v4l2_query_ext_ctrl *ctrl = &ctrls[i];
-        if ((ctrl->flags & V4L2_CTRL_FLAG_WRITE_ONLY) || ctrl->type == V4L2_CTRL_TYPE_BUTTON)
+        if (ctrl->flags & (V4L2_CTRL_FLAG_WRITE_ONLY | V4L2_CTRL_FLAG_HAS_PAYLOAD))
             continue;
 
         const int64_t val = v4l2_vidioc_g_ext_ctrls(v4l2, ctrl->id);

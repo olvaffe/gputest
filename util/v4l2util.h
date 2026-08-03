@@ -115,6 +115,7 @@ v4l2_ctrl_type_to_str(enum v4l2_ctrl_type val)
     CASE(U16);
     CASE(U32);
     CASE(AREA);
+    CASE(RECT);
     CASE(HDR10_CLL_INFO);
     CASE(HDR10_MASTERING_DISPLAY);
     CASE(H264_SPS);
@@ -159,6 +160,7 @@ v4l2_ctrl_flag_to_str(uint32_t val, char *str, size_t size)
         DESC(EXECUTE_ON_WRITE),
         DESC(MODIFY_LAYOUT),
         DESC(DYNAMIC_ARRAY),
+        DESC(HAS_WHICH_MIN_MAX),
 #undef DESC
     };
     /* clang-format on */
@@ -205,6 +207,8 @@ v4l2_buf_cap_to_str(uint32_t val, char *str, size_t size)
         DESC(ORPHANED_BUFS),
         DESC(M2M_HOLD_CAPTURE_BUF),
         DESC(MMAP_CACHE_HINTS),
+        DESC(MAX_NUM_BUFFERS),
+        DESC(REMOVE_BUFS),
 #undef DESC
     };
     /* clang-format on */
@@ -554,6 +558,7 @@ v4l2_vidioc_g_ext_ctrls(struct v4l2 *v4l2, uint32_t id)
         .id = id,
     };
     struct v4l2_ext_controls ctrls = {
+        .which = V4L2_CTRL_WHICH_CUR_VAL,
         .count = 1,
         .controls = &ctrl,
     };
