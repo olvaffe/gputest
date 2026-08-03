@@ -103,7 +103,7 @@ ssbo_max_test_dispatch_ssbo(struct ssbo_max_test *test, VkCommandBuffer cmd)
         .size = VK_WHOLE_SIZE,
     };
 
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
 
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                               test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);

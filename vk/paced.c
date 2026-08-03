@@ -194,7 +194,7 @@ paced_test_draw_comp(struct paced_test *test, VkCommandBuffer cmd)
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 1, &pre_barrier, 0,
                            NULL);
 
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, test->comp->pipeline);
+    vk_bind_pipeline(vk, test->comp, cmd);
     vk->CmdPushConstants(cmd, test->comp->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(test->push_const), &test->push_const);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, test->comp->pipeline_layout, 0,
@@ -250,7 +250,7 @@ paced_test_draw_gfx(struct paced_test *test, VkCommandBuffer cmd)
                            &pre_barrier);
 
     vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->gfx->pipeline);
+    vk_bind_pipeline(vk, test->gfx, cmd);
     vk->CmdPushConstants(cmd, test->gfx->pipeline_layout,
                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(test->push_const), &test->push_const);

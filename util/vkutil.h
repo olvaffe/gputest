@@ -1745,16 +1745,22 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 
     const VkPipelineViewportStateCreateInfo vp_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        .viewportCount = 1,
-        .pViewports = &pipeline->viewport,
-        .scissorCount = 1,
-        .pScissors = &pipeline->scissor,
     };
 
     const VkPipelineColorBlendStateCreateInfo color_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .attachmentCount = 1,
         .pAttachments = &pipeline->color_att,
+    };
+
+    const VkDynamicState dynamic_states[] = {
+        VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
+        VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT,
+    };
+    const VkPipelineDynamicStateCreateInfo dynamic_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+        .dynamicStateCount = ARRAY_SIZE(dynamic_states),
+        .pDynamicStates = dynamic_states,
     };
 
     VkGraphicsPipelineCreateInfo pipeline_info = {
@@ -1769,6 +1775,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pMultisampleState = &pipeline->msaa_info,
         .pDepthStencilState = &pipeline->depth_info,
         .pColorBlendState = &color_info,
+        .pDynamicState = &dynamic_info,
         .layout = pipeline->pipeline_layout,
         .renderPass = pipeline->fb ? pipeline->fb->pass : VK_NULL_HANDLE,
     };
@@ -1786,6 +1793,19 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     vk->result = vk->CreateGraphicsPipelines(vk->dev, VK_NULL_HANDLE, 1, &pipeline_info, NULL,
                                              &pipeline->pipeline);
     vk_check(vk, "failed to create graphics pipeline");
+}
+
+static inline void
+vk_bind_pipeline(struct vk *vk, const struct vk_pipeline *pipeline, VkCommandBuffer cmd)
+{
+    if (pipeline->stage_count == 1 && pipeline->stages[0].stage == VK_SHADER_STAGE_COMPUTE_BIT) {
+        vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
+        return;
+    }
+
+    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
+    vk->CmdSetViewportWithCount(cmd, 1, &pipeline->viewport);
+    vk->CmdSetScissorWithCount(cmd, 1, &pipeline->scissor);
 }
 
 static inline void

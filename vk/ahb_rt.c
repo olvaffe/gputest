@@ -465,7 +465,7 @@ ahb_rt_test_draw_triangle(struct ahb_rt_test *test, VkCommandBuffer cmd)
         .pColorAttachments = &att_info,
     };
     vk->CmdBeginRendering(cmd, &rendering_info);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
     vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(ahb_rt_test_matrices[0]), ahb_rt_test_matrices[test->is_ycbcr]);
     vk->CmdDraw(cmd, 3, 1, 0, 0);

@@ -202,7 +202,7 @@ tex_test_draw_triangle(struct tex_test *test, VkCommandBuffer cmd)
     vk->CmdBeginRenderPass(cmd, &pass_info, VK_SUBPASS_CONTENTS_INLINE);
 
     vk->CmdBindVertexBuffers(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 });
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
 
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                               test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);

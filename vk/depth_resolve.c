@@ -191,7 +191,7 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
 	},
     };
     vk->CmdBeginRendering(cmd, &rendering_info);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
     vk->CmdDraw(cmd, 4, 1, 0, 0);
     vk->CmdEndRendering(cmd);
 

@@ -273,7 +273,7 @@ renderpass_ops_test_begin_pipeline(struct renderpass_ops_test *test)
     vk_setup_pipeline(vk, test->pipeline, test->fb);
     vk_compile_pipeline(vk, test->pipeline);
 
-    vk->CmdBindPipeline(test->cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, test->cmd);
 }
 
 static void

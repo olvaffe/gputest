@@ -153,7 +153,7 @@ pipeline_stats_test_draw_triangle(struct pipeline_stats_test *test, VkCommandBuf
     };
     vk->CmdBeginQuery(cmd, test->query->pool, 0, 0);
     vk->CmdBeginRendering(cmd, &rendering_info);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
     vk->CmdDraw(cmd, 3, 1, 0, 0);
     vk->CmdEndRendering(cmd);
     vk->CmdEndQuery(cmd, test->query->pool, 0);

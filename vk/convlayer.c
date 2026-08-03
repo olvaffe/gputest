@@ -229,7 +229,7 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const VkImageMemoryBarrier barriers[] = {
         [0] = {

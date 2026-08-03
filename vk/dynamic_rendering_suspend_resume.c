@@ -161,7 +161,7 @@ dynamic_rendering_suspend_resume_test_draw_triangle_1(
 
     dynamic_rendering_suspend_resume_test_draw_begin_rendering(test, cmd,
                                                                VK_RENDERING_SUSPENDING_BIT);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const float red[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
     vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
@@ -178,7 +178,7 @@ dynamic_rendering_suspend_resume_test_draw_triangle_2(
 
     dynamic_rendering_suspend_resume_test_draw_begin_rendering(
         test, cmd, VK_RENDERING_SUSPENDING_BIT | VK_RENDERING_RESUMING_BIT);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const float green[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
     vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
@@ -210,7 +210,7 @@ dynamic_rendering_suspend_resume_test_draw_triangle_3(
 
     dynamic_rendering_suspend_resume_test_draw_begin_rendering(test, cmd,
                                                                VK_RENDERING_RESUMING_BIT);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const float blue[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
     vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,

@@ -208,7 +208,7 @@ sched_test_dispatch_once(struct sched_test *test)
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                               test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
 

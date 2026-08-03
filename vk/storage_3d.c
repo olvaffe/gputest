@@ -237,7 +237,7 @@ storage_3d_test_draw_quad(struct storage_3d_test *test, VkCommandBuffer cmd)
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1,
                            &barrier1);
 
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
 
     for (uint32_t i = 0; i < test->img->info.mipLevels; i++) {
         vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,

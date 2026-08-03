@@ -286,7 +286,7 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test,
     bench_buffer_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                               VK_ACCESS_SHADER_READ_BIT);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
+    vk_bind_pipeline(vk, pipeline, cmd);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
                               1, &set->set, 0, NULL);
     vk->CmdDispatch(cmd, group_count, group_count, 1);
@@ -294,7 +294,7 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test,
     vk_wait(vk);
 
     cmd = vk_begin_cmd(vk, false);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
+    vk_bind_pipeline(vk, pipeline, cmd);
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
                               1, &set->set, 0, NULL);
     vk_write_stopwatch(vk, test->stopwatch, cmd);

@@ -358,7 +358,7 @@ ktx_test_draw_quad(struct ktx_test *test, VkCommandBuffer cmd)
         .pColorAttachments = &att_info,
     };
     vk->CmdBeginRendering(cmd, &rendering_info);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const struct ktx_test_push_const push = {
         .view_type = test->tex_img->sample_view_type,

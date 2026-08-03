@@ -149,7 +149,7 @@ dynamic_rendering_test_draw_triangle(struct dynamic_rendering_test *test, VkComm
         .pColorAttachments = &att_info,
     };
     vk->CmdBeginRendering(cmd, &rendering_info);
-    vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, test->pipeline->pipeline);
+    vk_bind_pipeline(vk, test->pipeline, cmd);
     vk->CmdDraw(cmd, 3, 1, 0, 0);
     vk->CmdEndRendering(cmd);
 
