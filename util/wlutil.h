@@ -45,12 +45,10 @@ struct wl_output_info {
 
     enum wp_color_manager_v1_primaries cm_primaries;
     enum wp_color_manager_v1_transfer_function cm_tf;
-
-    struct wl_list node;
 };
 
 struct wl_globals {
-    struct wl_list outputs;
+    struct wl_array outputs;
 
     struct wp_color_manager_v1 *color_manager;
 
@@ -691,14 +689,12 @@ wl_registry_event_global(
         }
         version = WL_OUTPUT_RELEASE_SINCE_VERSION;
 
-        struct wl_output_info *out = calloc(1, sizeof(*out));
-        if (!out)
-            wl_die("failed to alloc output info");
+        struct wl_output_info *out = wl_array_add(&wl->globals.outputs, sizeof(*out));
+        memset(out, 0, sizeof(*out));
         out->scale = 1;
 
         out->output = wl_registry_bind(reg, name, &wl_output_interface, version);
         wl_output_add_listener(out->output, &wl_output_listener, out);
-        wl_list_insert(&wl->globals.outputs, &out->node);
     } else if (!strcmp(interface, wp_color_manager_v1_interface.name)) {
         wl->globals.color_manager =
             wl_registry_bind(reg, name, &wp_color_manager_v1_interface, 1);
@@ -797,7 +793,7 @@ wl_init_outputs(struct wl *wl)
 {
     if (wl->globals.color_manager) {
         struct wl_output_info *out;
-        wl_list_for_each(out, &wl->globals.outputs, node) {
+        wl_array_for_each(out, &wl->globals.outputs) {
             out->cm_output =
                 wp_color_manager_v1_get_output(wl->globals.color_manager, out->output);
             out->cm_desc = wp_color_management_output_v1_get_image_description(out->cm_output);
@@ -918,7 +914,7 @@ static inline void
 wl_init(struct wl *wl, const struct wl_init_params *params)
 {
     memset(wl, 0, sizeof(*wl));
-    wl_list_init(&wl->globals.outputs);
+    wl_array_init(&wl->globals.outputs);
 
     if (params)
         wl->params = *params;
@@ -985,14 +981,15 @@ wl_cleanup(struct wl *wl)
 
     wl_compositor_destroy(wl->globals.compositor);
 
-    wl_keyboard_destroy(wl->globals.keyboard);
+    if (wl->globals.keyboard)
+        wl_keyboard_destroy(wl->globals.keyboard);
     wl_seat_destroy(wl->globals.seat);
 
     if (wl->globals.color_manager)
         wp_color_manager_v1_destroy(wl->globals.color_manager);
 
-    struct wl_output_info *out, *out_tmp;
-    wl_list_for_each_safe(out, out_tmp, &wl->globals.outputs, node) {
+    struct wl_output_info *out;
+    wl_array_for_each(out, &wl->globals.outputs) {
         if (out->cm_output) {
             wp_image_description_v1_destroy(out->cm_desc);
             wp_color_management_output_v1_destroy(out->cm_output);
@@ -1000,8 +997,8 @@ wl_cleanup(struct wl *wl)
         wl_output_release(out->output);
         free(out->make);
         free(out->model);
-        free(out);
     }
+    wl_array_release(&wl->globals.outputs);
 
     wl_display_flush(wl->display);
     wl_display_disconnect(wl->display);
@@ -1059,8 +1056,7 @@ static inline void
 wl_info_outputs(const struct wl *wl)
 {
     const struct wl_output_info *out;
-
-    wl_list_for_each(out, &wl->globals.outputs, node) {
+    wl_array_for_each(out, &wl->globals.outputs) {
         const char *primaries;
         switch (out->cm_primaries) {
         case WP_COLOR_MANAGER_V1_PRIMARIES_SRGB:
