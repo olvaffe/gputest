@@ -173,6 +173,7 @@ v4l2_dump_current_states(struct v4l2 *v4l2)
 
         bool is_capture = false;
         bool is_mplane = false;
+        bool is_meta = false;
         switch (type) {
         case V4L2_BUF_TYPE_VIDEO_CAPTURE:
             is_capture = true;
@@ -186,6 +187,9 @@ v4l2_dump_current_states(struct v4l2 *v4l2)
         case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
             is_mplane = true;
             break;
+        case V4L2_BUF_TYPE_META_CAPTURE:
+            is_meta = true;
+            break;
         default:
             v4l2_die("unexpected buf type");
             break;
@@ -193,7 +197,12 @@ v4l2_dump_current_states(struct v4l2 *v4l2)
 
         struct v4l2_format fmt;
         v4l2_vidioc_g_fmt(v4l2, type, &fmt);
-        if (is_mplane) {
+        if (is_meta) {
+            const struct v4l2_meta_format *meta = &fmt.fmt.meta;
+            v4l2_log("    format: '%.*s', %dx%d", 4, (const char *)&meta->dataformat, meta->width,
+                     meta->height);
+            continue;
+        } else if (is_mplane) {
             const struct v4l2_pix_format_mplane *mp = &fmt.fmt.pix_mp;
             v4l2_log("    format: '%.*s', %dx%d, field %d, colorspace %s", 4,
                      (const char *)&mp->pixelformat, mp->width, mp->height, mp->field,
