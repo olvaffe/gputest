@@ -86,7 +86,7 @@ desc_buf_test_init_descriptor_set(struct desc_buf_test *test)
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,
             .pTexelBufferView = &test->src_tbo_view,
-        },
+	},
         [3] = {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstSet = test->set->set,
@@ -94,7 +94,7 @@ desc_buf_test_init_descriptor_set(struct desc_buf_test *test)
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
             .pTexelBufferView = &test->src_ibo_view,
-        },
+	},
         [4] = {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstSet = test->set->set,
@@ -114,7 +114,7 @@ desc_buf_test_init_descriptor_set(struct desc_buf_test *test)
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
             .pTexelBufferView = &test->dst_ibo_view,
-        },
+	},
     };
     vk->UpdateDescriptorSets(vk->dev, ARRAY_SIZE(write_infos), write_infos, 0, NULL);
 }

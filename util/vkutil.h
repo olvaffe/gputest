@@ -2095,8 +2095,8 @@ vk_write_stopwatch(struct vk *vk, struct vk_stopwatch *stopwatch, VkCommandBuffe
     if (!stopwatch->query_count)
         vk->CmdResetQueryPool(cmd, stopwatch->query->pool, 0, stopwatch->query_max);
 
-    vk->CmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, stopwatch->query->pool,
-                          stopwatch->query_count++);
+    vk->CmdWriteTimestamp2(cmd, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, stopwatch->query->pool,
+                           stopwatch->query_count++);
 }
 
 static inline uint64_t
@@ -2184,25 +2184,25 @@ vk_end_cmd(struct vk *vk)
     vk->result = vk->EndCommandBuffer(cmd);
     vk_check(vk, "failed to end command buffer");
 
-    const VkTimelineSemaphoreSubmitInfo timeline_info = {
-        .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-        .signalSemaphoreValueCount = 1,
-        .pSignalSemaphoreValues = sem_val,
+    const VkCommandBufferSubmitInfo cmd_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .commandBuffer = cmd,
     };
-    const VkProtectedSubmitInfo protected_info = {
-        .sType = VK_STRUCTURE_TYPE_PROTECTED_SUBMIT_INFO,
-        .pNext = &timeline_info,
-        .protectedSubmit = protected_submit,
+    const VkSemaphoreSubmitInfo signal_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .semaphore = vk->submit.sem,
+        .value = *sem_val,
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
     };
-    const VkSubmitInfo submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext = &protected_info,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &cmd,
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &vk->submit.sem,
+    const VkSubmitInfo2 submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .flags = protected_submit ? (VkSubmitFlags)VK_SUBMIT_PROTECTED_BIT : 0,
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &cmd_info,
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos = &signal_info,
     };
-    vk->result = vk->QueueSubmit(vk->queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk->result = vk->QueueSubmit2(vk->queue, 1, &submit_info, VK_NULL_HANDLE);
     vk_check(vk, "failed to submit command buffer");
 }
 

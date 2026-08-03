@@ -146,23 +146,32 @@ buf_align_test_draw(struct buf_align_test *test)
 
     /* step 2: build a command to write 1 to disturb */
     VkCommandBuffer cmd1 = vk_begin_cmd(vk, false);
-    const VkBufferMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+    const VkBufferMemoryBarrier2 barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+        .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
         .buffer = test->disturb,
         .offset = 0,
         .size = 4,
     };
     vk->CmdFillBuffer(cmd1, test->disturb, 0, 4, 1);
-    vk->CmdSetEvent(cmd1, test->gpu_done->event, VK_PIPELINE_STAGE_TRANSFER_BIT);
-    vk->CmdWaitEvents(cmd1, 1, &test->cpu_done->event, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                      VK_PIPELINE_STAGE_HOST_BIT, 0, NULL, 1, &barrier, 0, NULL);
+    const VkDependencyInfo set_dep = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+    };
+    vk->CmdSetEvent2(cmd1, test->gpu_done->event, &set_dep);
+    const VkDependencyInfo wait_dep = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &barrier,
+    };
+    vk->CmdWaitEvents2(cmd1, 1, &test->cpu_done->event, &wait_dep);
     vk_end_cmd(vk);
     while (vk->GetEventStatus(vk->dev, test->gpu_done->event) != VK_EVENT_SET)
         u_sleep(1);
 
-    vk_log("disturb: after CmdFillBuffer but before VkBufferMemoryBarrier");
+    vk_log("disturb: after CmdFillBuffer but before VkBufferMemoryBarrier2");
     vk_log("disturb = %u", *test->disturb_ptr);
     vk_log("src_buf = %u", *test->src_buf_ptr);
     vk_log("dst_buf = %u", *test->dst_buf_ptr);
@@ -179,23 +188,29 @@ buf_align_test_draw(struct buf_align_test *test)
     vk->SetEvent(vk->dev, test->cpu_done->event);
     vk_wait(vk);
 
-    vk_log("disturb: after VkBufferMemoryBarrier");
+    vk_log("disturb: after VkBufferMemoryBarrier2");
     vk_log("disturb = %u", *test->disturb_ptr);
     vk_log("src_buf = %u", *test->src_buf_ptr);
     vk_log("dst_buf = %u", *test->dst_buf_ptr);
 
     /* step 5: build a command to blit src_buf to dst_buf */
     VkCommandBuffer cmd2 = vk_begin_cmd(vk, false);
-    const VkBufferMemoryBarrier src_buf_barrier = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+    const VkBufferMemoryBarrier2 src_buf_barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+        .srcAccessMask = VK_ACCESS_2_HOST_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
         .buffer = test->src_buf,
         .offset = 0,
         .size = 4,
     };
-    vk->CmdPipelineBarrier(cmd2, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-                           NULL, 1, &src_buf_barrier, 0, NULL);
+    const VkDependencyInfo dep_info1 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &src_buf_barrier,
+    };
+    vk->CmdPipelineBarrier2(cmd2, &dep_info1);
     const VkBufferCopy2 copy = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
         .srcOffset = 0,
@@ -210,16 +225,22 @@ buf_align_test_draw(struct buf_align_test *test)
         .pRegions = &copy,
     };
     vk->CmdCopyBuffer2(cmd2, &copy_info);
-    const VkBufferMemoryBarrier dst_buf_barrier = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+    const VkBufferMemoryBarrier2 dst_buf_barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+        .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
         .buffer = test->dst_buf,
         .offset = 0,
         .size = 4,
     };
-    vk->CmdPipelineBarrier(cmd2, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0,
-                           NULL, 1, &dst_buf_barrier, 0, NULL);
+    const VkDependencyInfo dep_info2 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &dst_buf_barrier,
+    };
+    vk->CmdPipelineBarrier2(cmd2, &dep_info2);
     vk_end_cmd(vk);
     vk_wait(vk);
 

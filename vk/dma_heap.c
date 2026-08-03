@@ -213,20 +213,20 @@ dma_heap_test_draw(struct dma_heap_test *test)
 
     rdoc_start(rdoc);
 
-    const VkBufferMemoryBarrier barriers[] = {
+    const VkBufferMemoryBarrier2 barriers[] = {
         [0] = {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_NONE,
-            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcAccessMask = VK_ACCESS_2_NONE,
+            .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT,
             .dstQueueFamilyIndex = vk->queue_family_index,
             .buffer = test->buf,
             .size = VK_WHOLE_SIZE,
         },
         [1] = {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_NONE,
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_NONE,
             .srcQueueFamilyIndex = vk->queue_family_index,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT,
             .buffer = test->buf,
@@ -236,11 +236,19 @@ dma_heap_test_draw(struct dma_heap_test *test)
 
     for (uint32_t val = 0; val < 10; val++) {
         VkCommandBuffer cmd = vk_begin_cmd(vk, false);
-        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_NONE, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-                               NULL, 1, &barriers[0], 0, NULL);
+        const VkDependencyInfo dep_info1 = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .bufferMemoryBarrierCount = 1,
+            .pBufferMemoryBarriers = &barriers[0],
+        };
+        vk->CmdPipelineBarrier2(cmd, &dep_info1);
         vk->CmdFillBuffer(cmd, test->buf, 0, VK_WHOLE_SIZE, val);
-        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_NONE, 0, 0,
-                               NULL, 1, &barriers[1], 0, NULL);
+        const VkDependencyInfo dep_info2 = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .bufferMemoryBarrierCount = 1,
+            .pBufferMemoryBarriers = &barriers[1],
+        };
+        vk->CmdPipelineBarrier2(cmd, &dep_info2);
         vk_end_cmd(vk);
         vk_wait(vk);
 

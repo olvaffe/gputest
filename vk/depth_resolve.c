@@ -130,12 +130,14 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
     const VkImageLayout ds_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     const VkImageLayout resolve_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-    const VkImageMemoryBarrier before_barriers[2] = {
+    const VkImageMemoryBarrier2 before_barriers[2] = {
         [0] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
             .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                             VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
+            .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                             VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = ds_layout,
             .image = test->ds->img,
@@ -146,10 +148,12 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
             },
         },
         [1] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
             .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
+                             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = resolve_layout,
             .image = test->resolve->img,
@@ -160,10 +164,12 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
             },
         },
     };
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           0, 0, NULL, 0, NULL, ARRAY_SIZE(before_barriers), before_barriers);
+    const VkDependencyInfo dep_info1 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = ARRAY_SIZE(before_barriers),
+        .pImageMemoryBarriers = before_barriers,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
     const VkRenderingInfo rendering_info = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -195,12 +201,12 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
     vk->CmdDraw(cmd, 4, 1, 0, 0);
     vk->CmdEndRendering(cmd);
 
-    const VkImageMemoryBarrier after_barriers[1] = {
+    const VkImageMemoryBarrier2 after_barriers[1] = {
         [0] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
+                             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
             .oldLayout = resolve_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             .image = test->resolve->img,
@@ -211,9 +217,12 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
             },
         },
     };
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL,
-                           ARRAY_SIZE(after_barriers), after_barriers);
+    const VkDependencyInfo dep_info2 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = ARRAY_SIZE(after_barriers),
+        .pImageMemoryBarriers = after_barriers,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info2);
 
     const VkBufferImageCopy2 copy = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
@@ -237,17 +246,21 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
     };
     vk->CmdCopyImageToBuffer2(cmd, &copy_info);
 
-    const VkBufferMemoryBarrier copy_barriers[1] = {
+    const VkBufferMemoryBarrier2 copy_barriers[1] = {
         [0] = {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
             .buffer = test->buf->buf,
             .size = VK_WHOLE_SIZE,
         },
     };
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0,
-                           NULL, ARRAY_SIZE(copy_barriers), copy_barriers, 0, NULL);
+    const VkDependencyInfo dep_info3 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = ARRAY_SIZE(copy_barriers),
+        .pBufferMemoryBarriers = copy_barriers,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info3);
 }
 
 static void

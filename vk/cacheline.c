@@ -72,10 +72,12 @@ cacheline_test_draw(struct cacheline_test *test)
     /* step 2: build a command to write dword 1 and 2 */
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
-    const VkBufferMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+    const VkBufferMemoryBarrier2 barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+        .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
         .buffer = test->buf->buf,
         .offset = 4,
         .size = 8,
@@ -83,10 +85,16 @@ cacheline_test_draw(struct cacheline_test *test)
     const VkEvent events[] = { test->gpu_done->event, test->cpu_done->event };
 
     vk->CmdFillBuffer(cmd, test->buf->buf, 4, 8, 1);
-    vk->CmdSetEvent(cmd, test->gpu_done->event, VK_PIPELINE_STAGE_TRANSFER_BIT);
-    vk->CmdWaitEvents(cmd, ARRAY_SIZE(events), events,
-                      VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_HOST_BIT,
-                      VK_PIPELINE_STAGE_HOST_BIT, 0, NULL, 1, &barrier, 0, NULL);
+    const VkDependencyInfo set_dep = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+    };
+    vk->CmdSetEvent2(cmd, test->gpu_done->event, &set_dep);
+    const VkDependencyInfo wait_dep = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &barrier,
+    };
+    vk->CmdWaitEvents2(cmd, ARRAY_SIZE(events), events, &wait_dep);
 
     /* step 2: submit */
     vk_end_cmd(vk);
@@ -94,7 +102,7 @@ cacheline_test_draw(struct cacheline_test *test)
     while (vk->GetEventStatus(vk->dev, test->gpu_done->event) != VK_EVENT_SET)
         u_sleep(1);
 
-    vk_log("after CmdFillBuffer but before VkBufferMemoryBarrier");
+    vk_log("after CmdFillBuffer but before VkBufferMemoryBarrier2");
     for (uint32_t i = 0; i < 4; i++)
         vk_log("dword[%d] = %d", i, dwords[i]);
 
@@ -111,7 +119,7 @@ cacheline_test_draw(struct cacheline_test *test)
     vk->SetEvent(vk->dev, test->cpu_done->event);
     vk_wait(vk);
 
-    vk_log("after VkBufferMemoryBarrier");
+    vk_log("after VkBufferMemoryBarrier2");
     for (uint32_t i = 0; i < 4; i++)
         vk_log("dword[%d] = %d", i, dwords[i]);
 }

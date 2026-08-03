@@ -163,7 +163,7 @@ compile_test_compile_compute_pipeline(struct compile_test *test, struct spv_prog
             .module = vk_create_shader_module(vk, prog->spirv, prog->size),
             .pName = prog->reflection.entrypoint,
             .pSpecializationInfo = &spec_info,
-        },
+	},
         .layout = compile_test_create_pipeline_layout(test, prog),
     };
     VkPipeline pipeline;

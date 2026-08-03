@@ -185,16 +185,18 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
         const VkImageLayout color_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         const VkImageUsageFlags color_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         const VkImageAspectFlags color_aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
-        const VkAccessFlags color_access_mask =
-            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        const VkAccessFlags2 color_access_mask =
+            VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 
         test->color_img =
             vk_create_image(vk, fmt->color ? fmt->format : test->force_color_format, test->width,
                             test->height, samples, tiling, color_usage);
         vk_create_image_render_view(vk, test->color_img, color_aspect_mask);
 
-        const VkImageMemoryBarrier color_barrier = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        const VkImageMemoryBarrier2 color_barrier = {
+        .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .srcAccessMask = 0,
             .dstAccessMask = color_access_mask,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -206,9 +208,12 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
                 .layerCount = 1,
             },
         };
-        vk->CmdPipelineBarrier(test->cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1,
-                               &color_barrier);
+        const VkDependencyInfo dep_info1 = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &color_barrier,
+        };
+        vk->CmdPipelineBarrier2(test->cmd, &dep_info1);
     }
 
     if (fmt->depth || fmt->stencil) {
@@ -217,15 +222,17 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
         const VkImageAspectFlags depth_aspect_mask =
             (fmt->depth ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
             (fmt->stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0);
-        const VkAccessFlags depth_access_mask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        const VkAccessFlags2 depth_access_mask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                                 VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
         test->depth_img = vk_create_image(vk, fmt->format, test->width, test->height, samples,
                                           tiling, depth_usage);
         vk_create_image_render_view(vk, test->depth_img, depth_aspect_mask);
 
-        const VkImageMemoryBarrier depth_barrier = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        const VkImageMemoryBarrier2 depth_barrier = {
+        .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .srcAccessMask = 0,
             .dstAccessMask = depth_access_mask,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -237,9 +244,12 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
                 .layerCount = 1,
             },
         };
-        vk->CmdPipelineBarrier(test->cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1,
-                               &depth_barrier);
+        const VkDependencyInfo dep_info2 = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &depth_barrier,
+        };
+        vk->CmdPipelineBarrier2(test->cmd, &dep_info2);
     }
 
     test->fb =
@@ -353,10 +363,10 @@ renderpass_ops_test_end_all(struct renderpass_ops_test *test, bool dump_color)
     struct vk *vk = &test->vk;
 
     if (dump_color) {
-        const VkImageMemoryBarrier barrier = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+        const VkImageMemoryBarrier2 barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
             .image = test->color_img->img,
@@ -366,8 +376,12 @@ renderpass_ops_test_end_all(struct renderpass_ops_test *test, bool dump_color)
                 .layerCount = 1,
             },
         };
-        vk->CmdPipelineBarrier(test->cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                               VK_PIPELINE_STAGE_HOST_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+        const VkDependencyInfo dep_info3 = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &barrier,
+        };
+        vk->CmdPipelineBarrier2(test->cmd, &dep_info3);
     }
 
     vk_end_cmd(vk);

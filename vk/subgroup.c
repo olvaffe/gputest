@@ -141,27 +141,39 @@ subgroup_test_dispatch(struct subgroup_test *test)
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                               test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
 
-    const VkBufferMemoryBarrier before_barrier = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+    const VkBufferMemoryBarrier2 before_barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+        .srcAccessMask = VK_ACCESS_2_HOST_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
         .buffer = test->src->buf,
         .size = VK_WHOLE_SIZE,
     };
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           0, 0, NULL, 1, &before_barrier, 0, NULL);
+    const VkDependencyInfo dep_info1 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &before_barrier,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
     vk->CmdDispatch(cmd, 1, 1, 1);
 
-    const VkBufferMemoryBarrier after_barrier = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+    const VkBufferMemoryBarrier2 after_barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+        .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
         .buffer = test->dst->buf,
         .size = VK_WHOLE_SIZE,
     };
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
-                           0, 0, NULL, 1, &after_barrier, 0, NULL);
+    const VkDependencyInfo dep_info2 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &after_barrier,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info2);
 
     vk_end_cmd(vk);
     vk_wait(vk);

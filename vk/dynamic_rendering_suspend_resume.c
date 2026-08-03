@@ -145,19 +145,24 @@ dynamic_rendering_suspend_resume_test_draw_triangle_1(
         .levelCount = 1,
         .layerCount = 1,
     };
-    const VkImageMemoryBarrier before_barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+    const VkImageMemoryBarrier2 before_barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
         .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .image = test->rt->img,
         .subresourceRange = subres_range,
     };
 
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1,
-                           &before_barrier);
+    const VkDependencyInfo dep_info1 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &before_barrier,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
     dynamic_rendering_suspend_resume_test_draw_begin_rendering(test, cmd,
                                                                VK_RENDERING_SUSPENDING_BIT);
@@ -198,10 +203,12 @@ dynamic_rendering_suspend_resume_test_draw_triangle_3(
         .levelCount = 1,
         .layerCount = 1,
     };
-    const VkImageMemoryBarrier after_barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+    const VkImageMemoryBarrier2 after_barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+        .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_GENERAL,
         .image = test->rt->img,
@@ -218,8 +225,12 @@ dynamic_rendering_suspend_resume_test_draw_triangle_3(
     vk->CmdDraw(cmd, 3, 1, 2, 0);
     vk->CmdEndRendering(cmd);
 
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_HOST_BIT, 0, 0, NULL, 0, NULL, 1, &after_barrier);
+    const VkDependencyInfo dep_info2 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &after_barrier,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info2);
 }
 
 static void
@@ -254,12 +265,19 @@ dynamic_rendering_suspend_resume_test_draw(struct dynamic_rendering_suspend_resu
         vk_check(vk, "failed to end command buffer");
     }
 
-    const VkSubmitInfo submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .commandBufferCount = ARRAY_SIZE(cmds),
-        .pCommandBuffers = cmds,
+    VkCommandBufferSubmitInfo cmd_infos[ARRAY_SIZE(cmds)];
+    for (uint32_t i = 0; i < ARRAY_SIZE(cmds); i++) {
+        cmd_infos[i] = (VkCommandBufferSubmitInfo){
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+            .commandBuffer = cmds[i],
+        };
+    }
+    const VkSubmitInfo2 submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .commandBufferInfoCount = ARRAY_SIZE(cmd_infos),
+        .pCommandBufferInfos = cmd_infos,
     };
-    vk->result = vk->QueueSubmit(vk->queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk->result = vk->QueueSubmit2(vk->queue, 1, &submit_info, VK_NULL_HANDLE);
     vk_check(vk, "failed to submit command buffer");
 
     vk_wait(vk);

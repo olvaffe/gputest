@@ -40,21 +40,21 @@ timeline_test_draw(struct timeline_test *test)
 {
     struct vk *vk = &test->vk;
 
-    const VkTimelineSemaphoreSubmitInfo sem_info = {
-        .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-        .signalSemaphoreValueCount = 1,
-        .pSignalSemaphoreValues = &test->value,
+    const VkSemaphoreSubmitInfo signal_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .semaphore = test->sem->sem,
+        .value = test->value,
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
     };
-    const VkSubmitInfo submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext = &sem_info,
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &test->sem->sem,
+    const VkSubmitInfo2 submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos = &signal_info,
     };
 
     vk_log("before submit: %d", (int)vk_get_semaphore_counter_value(vk, test->sem));
 
-    vk->result = vk->QueueSubmit(vk->queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk->result = vk->QueueSubmit2(vk->queue, 1, &submit_info, VK_NULL_HANDLE);
     vk_check(vk, "failed to submit");
 
     vk_log("after submit: %d", (int)vk_get_semaphore_counter_value(vk, test->sem));

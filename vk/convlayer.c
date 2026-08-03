@@ -231,11 +231,11 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
 
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
-    const VkImageMemoryBarrier barriers[] = {
+    const VkImageMemoryBarrier2 barriers[] = {
         [0] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
             .image = test->dst->img,
@@ -246,9 +246,9 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
             },
         },
         [1] = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
             .image = test->src->img,
@@ -259,9 +259,12 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
             },
         }
     };
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL,
-                           ARRAY_SIZE(barriers), barriers);
+    const VkDependencyInfo dep_info = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = ARRAY_SIZE(barriers),
+        .pImageMemoryBarriers = barriers,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info);
 
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                               test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);

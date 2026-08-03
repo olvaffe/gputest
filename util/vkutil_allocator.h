@@ -774,10 +774,12 @@ vk_allocator_bo_map_transfer(struct vk_allocator *alloc,
         /* assume the foreign queue has transitioned the image to
          * VK_IMAGE_LAYOUT_GENERAL
          */
-        const VkImageMemoryBarrier img_acquire = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        const VkImageMemoryBarrier2 img_acquire = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT,
@@ -789,9 +791,12 @@ vk_allocator_bo_map_transfer(struct vk_allocator *alloc,
                 .layerCount = xfer->copy.imageSubresource.layerCount,
             },
         };
-        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1,
-                               &img_acquire);
+        const VkDependencyInfo img_acquire_dep = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &img_acquire,
+        };
+        vk->CmdPipelineBarrier2(cmd, &img_acquire_dep);
 
         const VkCopyImageToBufferInfo2 copy_info = {
             .sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2,
@@ -803,16 +808,22 @@ vk_allocator_bo_map_transfer(struct vk_allocator *alloc,
         };
         vk->CmdCopyImageToBuffer2(cmd, &copy_info);
 
-        const VkBufferMemoryBarrier buf_barrier = {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        const VkBufferMemoryBarrier2 buf_barrier = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
             .dstAccessMask =
-                VK_ACCESS_HOST_READ_BIT | (xfer->writeback ? VK_ACCESS_HOST_WRITE_BIT : 0),
+                VK_ACCESS_2_HOST_READ_BIT | (xfer->writeback ? VK_ACCESS_2_HOST_WRITE_BIT : 0),
             .buffer = xfer->staging->buf,
             .size = VK_WHOLE_SIZE,
         };
-        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0,
-                               0, NULL, 1, &buf_barrier, 0, NULL);
+        const VkDependencyInfo buf_dep = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .bufferMemoryBarrierCount = 1,
+            .pBufferMemoryBarriers = &buf_barrier,
+        };
+        vk->CmdPipelineBarrier2(cmd, &buf_dep);
 
         vk_end_cmd(vk);
         vk_wait(vk);
@@ -832,10 +843,12 @@ vk_allocator_bo_unmap_transfer(struct vk_allocator *alloc,
         VkCommandBuffer cmd = vk_begin_cmd(vk, bo->protected);
 
         if (xfer->readback) {
-            const VkImageMemoryBarrier img_barrier = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_NONE,
-                .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            const VkImageMemoryBarrier2 img_barrier = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                .srcAccessMask = VK_ACCESS_2_NONE,
+                .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
                 .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 .image = bo->img,
@@ -845,14 +858,19 @@ vk_allocator_bo_unmap_transfer(struct vk_allocator *alloc,
                     .layerCount = xfer->copy.imageSubresource.layerCount,
                 },
             };
-            vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                   VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1,
-                                   &img_barrier);
+            const VkDependencyInfo img_dep = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &img_barrier,
+            };
+            vk->CmdPipelineBarrier2(cmd, &img_dep);
         } else {
-            const VkImageMemoryBarrier img_acquire = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            const VkImageMemoryBarrier2 img_acquire = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
                 .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
                 .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT,
@@ -864,20 +882,29 @@ vk_allocator_bo_unmap_transfer(struct vk_allocator *alloc,
                     .layerCount = xfer->copy.imageSubresource.layerCount,
                 },
             };
-            vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                                   VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1,
-                                   &img_acquire);
+            const VkDependencyInfo img_acq_dep = {
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .imageMemoryBarrierCount = 1,
+                .pImageMemoryBarriers = &img_acquire,
+            };
+            vk->CmdPipelineBarrier2(cmd, &img_acq_dep);
         }
 
-        const VkBufferMemoryBarrier buf_barrier = {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        const VkBufferMemoryBarrier2 buf_barrier = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+            .srcAccessMask = VK_ACCESS_2_HOST_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
             .buffer = xfer->staging->buf,
             .size = VK_WHOLE_SIZE,
         };
-        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-                               0, NULL, 1, &buf_barrier, 0, NULL);
+        const VkDependencyInfo buf_dep = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .bufferMemoryBarrierCount = 1,
+            .pBufferMemoryBarriers = &buf_barrier,
+        };
+        vk->CmdPipelineBarrier2(cmd, &buf_dep);
 
         const VkCopyBufferToImageInfo2 copy_info = {
             .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
@@ -889,10 +916,12 @@ vk_allocator_bo_unmap_transfer(struct vk_allocator *alloc,
         };
         vk->CmdCopyBufferToImage2(cmd, &copy_info);
 
-        const VkImageMemoryBarrier img_release = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+        const VkImageMemoryBarrier2 img_release = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
             .srcQueueFamilyIndex = vk->queue_family_index,
@@ -904,9 +933,12 @@ vk_allocator_bo_unmap_transfer(struct vk_allocator *alloc,
                 .layerCount = xfer->copy.imageSubresource.layerCount,
             },
         };
-        vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1,
-                               &img_release);
+        const VkDependencyInfo img_rel_dep = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &img_release,
+        };
+        vk->CmdPipelineBarrier2(cmd, &img_rel_dep);
 
         vk_end_cmd(vk);
         vk_wait(vk);

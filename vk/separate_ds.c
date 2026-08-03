@@ -146,13 +146,13 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
 {
     struct vk *vk = &test->vk;
 
-    VkImageMemoryBarrier before_barriers[2];
+    VkImageMemoryBarrier2 before_barriers[2];
     uint32_t before_barrier_count = 0;
     if (test->depth_bits) {
-        before_barriers[before_barrier_count++] = (VkImageMemoryBarrier){
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        before_barriers[before_barrier_count++] = (VkImageMemoryBarrier2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = test->depth_layout,
             .image = test->ds->img,
@@ -164,10 +164,10 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
         };
     }
     if (test->stencil_bits) {
-        before_barriers[before_barrier_count++] = (VkImageMemoryBarrier){
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        before_barriers[before_barrier_count++] = (VkImageMemoryBarrier2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = test->stencil_layout,
             .image = test->ds->img,
@@ -179,9 +179,12 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
         };
     }
 
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, 0, 0, NULL, 0, NULL,
-                           before_barrier_count, before_barriers);
+    const VkDependencyInfo dep_info1 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = before_barrier_count,
+        .pImageMemoryBarriers = before_barriers,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
     const VkRenderingInfo rendering_info = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -222,13 +225,13 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
     vk->CmdDraw(cmd, 3, 1, 0, 0);
     vk->CmdEndRendering(cmd);
 
-    VkImageMemoryBarrier after_barriers[2];
+    VkImageMemoryBarrier2 after_barriers[2];
     uint32_t after_barrier_count = 0;
     if (test->depth_bits) {
-        after_barriers[after_barrier_count++] = (VkImageMemoryBarrier){
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        after_barriers[after_barrier_count++] = (VkImageMemoryBarrier2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
             .oldLayout = test->depth_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             .image = test->ds->img,
@@ -240,10 +243,10 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
 	};
     }
     if (test->stencil_bits) {
-        after_barriers[after_barrier_count++] = (VkImageMemoryBarrier){
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        after_barriers[after_barrier_count++] = (VkImageMemoryBarrier2){
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
             .oldLayout = test->stencil_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             .image = test->ds->img,
@@ -255,11 +258,14 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
 	};
     }
 
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL,
-                           after_barrier_count, after_barriers);
+    const VkDependencyInfo dep_info2 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = after_barrier_count,
+        .pImageMemoryBarriers = after_barriers,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info2);
 
-    VkBufferMemoryBarrier copy_barriers[2];
+    VkBufferMemoryBarrier2 copy_barriers[2];
     uint32_t copy_barrier_count = 0;
     if (test->depth_bits) {
         const VkBufferImageCopy2 copy = {
@@ -284,10 +290,10 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
         };
         vk->CmdCopyImageToBuffer2(cmd, &copy_info);
 
-        copy_barriers[copy_barrier_count++] = (VkBufferMemoryBarrier){
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+        copy_barriers[copy_barrier_count++] = (VkBufferMemoryBarrier2){
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
             .buffer = test->d_buf->buf,
             .size = VK_WHOLE_SIZE,
         };
@@ -315,17 +321,21 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
         };
         vk->CmdCopyImageToBuffer2(cmd, &copy_info);
 
-        copy_barriers[copy_barrier_count++] = (VkBufferMemoryBarrier){
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+        copy_barriers[copy_barrier_count++] = (VkBufferMemoryBarrier2){
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
             .buffer = test->s_buf->buf,
             .size = VK_WHOLE_SIZE,
         };
     }
 
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0,
-                           NULL, copy_barrier_count, copy_barriers, 0, NULL);
+    const VkDependencyInfo dep_info3 = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = copy_barrier_count,
+        .pBufferMemoryBarriers = copy_barriers,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info3);
 }
 
 static void

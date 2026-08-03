@@ -95,10 +95,12 @@ ssbo_max_test_dispatch_ssbo(struct ssbo_max_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
-    const VkBufferMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+    const VkBufferMemoryBarrier2 barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        .srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
+        .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
         .buffer = test->ssbo->buf,
         .size = VK_WHOLE_SIZE,
     };
@@ -111,8 +113,12 @@ ssbo_max_test_dispatch_ssbo(struct ssbo_max_test *test, VkCommandBuffer cmd)
     const uint32_t count = test->grid_size / test->local_size;
     vk->CmdDispatch(cmd, count, count, 1);
 
-    vk->CmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
-                           0, 0, NULL, 1, &barrier, 0, NULL);
+    const VkDependencyInfo dep_info = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &barrier,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info);
 }
 
 static void
