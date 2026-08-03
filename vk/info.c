@@ -132,12 +132,10 @@ info_device_features(struct vk *vk)
     vk_log("    descriptorIndexing: %d", vk->vulkan_12_features.descriptorIndexing);
     vk_log("    timelineSemaphore: %d", vk->vulkan_12_features.timelineSemaphore);
 
-    if (vk->props.properties.apiVersion >= VK_API_VERSION_1_3) {
-        vk_log("    textureCompressionASTC_HDR: %d",
-               vk->vulkan_13_features.textureCompressionASTC_HDR);
-        vk_log("    dynamicRendering: %d", vk->vulkan_13_features.dynamicRendering);
-        vk_log("    maintenance4: %d", vk->vulkan_13_features.maintenance4);
-    }
+    vk_log("    textureCompressionASTC_HDR: %d",
+           vk->vulkan_13_features.textureCompressionASTC_HDR);
+    vk_log("    dynamicRendering: %d", vk->vulkan_13_features.dynamicRendering);
+    vk_log("    maintenance4: %d", vk->vulkan_13_features.maintenance4);
 
     if (vk->props.properties.apiVersion >= VK_API_VERSION_1_4) {
         vk_log("    globalPriorityQuery: %d", vk->vulkan_14_features.globalPriorityQuery);

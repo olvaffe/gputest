@@ -77,7 +77,6 @@ dynamic_rendering_suspend_resume_test_init(struct dynamic_rendering_suspend_resu
 {
     struct vk *vk = &test->vk;
     const struct vk_init_params params = {
-        .api_version = VK_API_VERSION_1_3,
         .enable_all_features = true,
     };
 

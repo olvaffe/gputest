@@ -339,7 +339,6 @@ ahb_rt_test_init(struct ahb_rt_test *test)
         VK_ANDROID_EXTERNAL_FORMAT_RESOLVE_EXTENSION_NAME,
     };
     const struct vk_init_params params = {
-        .api_version = VK_API_VERSION_1_3,
         .enable_all_features = true,
         .dev_exts = dev_exts,
         .dev_ext_count = ARRAY_SIZE(dev_exts),

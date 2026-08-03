@@ -24,7 +24,7 @@
 #define LIBVULKAN_NAME "libvulkan.so.1"
 #endif
 
-#define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_2
+#define VKUTIL_MIN_API_VERSION VK_API_VERSION_1_3
 
 #define vk_check(vk, format, ...)                                                                \
     do {                                                                                         \
@@ -335,12 +335,10 @@ vk_init_physical_device_features(struct vk *vk)
     *pnext = &vk->vulkan_12_features;
     pnext = &vk->vulkan_12_features.pNext;
 
-    if (vk->params.api_version >= VK_API_VERSION_1_3) {
-        vk->vulkan_13_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    vk->vulkan_13_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    *pnext = &vk->vulkan_13_features;
+    pnext = &vk->vulkan_13_features.pNext;
 
-        *pnext = &vk->vulkan_13_features;
-        pnext = &vk->vulkan_13_features.pNext;
-    }
     if (vk->params.api_version >= VK_API_VERSION_1_4) {
         vk->vulkan_14_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
 
@@ -382,12 +380,9 @@ vk_init_physical_device_properties(struct vk *vk)
     *pnext = &vk->vulkan_12_props;
     pnext = &vk->vulkan_12_props.pNext;
 
-    if (vk->params.api_version >= VK_API_VERSION_1_3) {
-        vk->vulkan_13_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES;
-
-        *pnext = &vk->vulkan_13_props;
-        pnext = &vk->vulkan_13_props.pNext;
-    }
+    vk->vulkan_13_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES;
+    *pnext = &vk->vulkan_13_props;
+    pnext = &vk->vulkan_13_props.pNext;
     if (vk->params.api_version >= VK_API_VERSION_1_4) {
         vk->vulkan_14_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_PROPERTIES;
 
@@ -492,12 +487,9 @@ vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *featur
     void **pnext = &features->pNext;
     *pnext = &vk->vulkan_11_features;
     vk->vulkan_11_features.pNext = &vk->vulkan_12_features;
-    pnext = &vk->vulkan_12_features.pNext;
+    vk->vulkan_12_features.pNext = &vk->vulkan_13_features;
+    pnext = &vk->vulkan_13_features.pNext;
 
-    if (vk->params.api_version >= VK_API_VERSION_1_3) {
-        *pnext = &vk->vulkan_13_features;
-        pnext = &vk->vulkan_13_features.pNext;
-    }
     if (vk->params.api_version >= VK_API_VERSION_1_4) {
         *pnext = &vk->vulkan_14_features;
         pnext = &vk->vulkan_14_features.pNext;

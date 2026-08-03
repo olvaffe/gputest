@@ -156,7 +156,6 @@ dma_heap_test_init(struct dma_heap_test *test)
         VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME,
     };
     const struct vk_init_params params = {
-        .api_version = VK_API_VERSION_1_3,
         .dev_exts = dev_exts,
         .dev_ext_count = ARRAY_SIZE(dev_exts),
     };

@@ -109,7 +109,6 @@ separate_ds_test_init(struct separate_ds_test *test)
 {
     struct vk *vk = &test->vk;
     const struct vk_init_params params = {
-        .api_version = VK_API_VERSION_1_3,
         .enable_all_features = true,
     };
 
