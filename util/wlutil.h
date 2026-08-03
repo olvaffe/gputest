@@ -817,7 +817,6 @@ wl_init_surface_dmabuf(struct wl *wl)
         zwp_linux_dmabuf_v1_get_surface_feedback(wl->globals.dmabuf, wl->surface);
     zwp_linux_dmabuf_feedback_v1_add_listener(wl->dmabuf_feedback,
                                               &zwp_linux_dmabuf_feedback_v1_listener, wl);
-    wl_display_roundtrip(wl->display);
 }
 
 static inline void
@@ -857,44 +856,27 @@ wl_init_surface_cm(struct wl *wl)
 }
 
 static inline void
-wl_init_surface_tearing(struct wl *wl)
-{
-    if (!wl->globals.tearing_control_manager)
-        return;
-
-    wl->tearing_control = wp_tearing_control_manager_v1_get_tearing_control(
-        wl->globals.tearing_control_manager, wl->surface);
-    wp_tearing_control_v1_set_presentation_hint(wl->tearing_control,
-                                                WP_TEARING_CONTROL_V1_PRESENTATION_HINT_VSYNC);
-}
-
-static inline void
-wl_init_surface_fifo(struct wl *wl)
-{
-    if (!wl->globals.fifo_manager)
-        return;
-
-    wl->fifo = wp_fifo_manager_v1_get_fifo(wl->globals.fifo_manager, wl->surface);
-}
-
-static inline void
-wl_init_surface_commit_timing(struct wl *wl)
-{
-    if (!wl->globals.commit_timing_manager)
-        return;
-
-    wl->commit_timer =
-        wp_commit_timing_manager_v1_get_timer(wl->globals.commit_timing_manager, wl->surface);
-}
-
-static inline void
 wl_init_surface(struct wl *wl)
 {
     wl->surface = wl_compositor_create_surface(wl->globals.compositor);
 
-    wl_init_surface_commit_timing(wl);
-    wl_init_surface_fifo(wl);
-    wl_init_surface_tearing(wl);
+    if (wl->globals.commit_timing_manager) {
+        wl->commit_timer =
+            wp_commit_timing_manager_v1_get_timer(wl->globals.commit_timing_manager, wl->surface);
+    }
+
+    if (wl->globals.fifo_manager) {
+        wl->fifo = wp_fifo_manager_v1_get_fifo(wl->globals.fifo_manager, wl->surface);
+    }
+
+    if (wl->globals.tearing_control_manager) {
+        wl->tearing_control = wp_tearing_control_manager_v1_get_tearing_control(
+            wl->globals.tearing_control_manager, wl->surface);
+
+        wp_tearing_control_v1_set_presentation_hint(
+            wl->tearing_control, WP_TEARING_CONTROL_V1_PRESENTATION_HINT_VSYNC);
+    }
+
     wl_init_surface_cm(wl);
     wl_init_surface_xdg(wl);
     wl_init_surface_dmabuf(wl);
