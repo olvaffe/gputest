@@ -165,11 +165,15 @@ wl_test_wait_explicit_sync(struct wl_test *test)
     assert(swapchain->image_count <= ARRAY_SIZE(handles));
     for (uint32_t i = 0; i < swapchain->image_count; i++) {
         const struct wl_swapchain_image *img = &swapchain->images[i];
+        if (!img->busy)
+            return;
+
         handles[i] = img->release_handle;
         points[i] = img->release_point;
     }
 
-    const uint32_t idx = drm_syncobj_wait(drm, handles, points, swapchain->image_count, 0);
+    const uint32_t idx = drm_syncobj_wait(drm, handles, points, swapchain->image_count,
+                                          DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT);
     struct wl_swapchain_image *img = &swapchain->images[idx];
     img->busy = false;
 }
