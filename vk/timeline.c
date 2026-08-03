@@ -24,7 +24,7 @@ timeline_test_init(struct timeline_test *test)
 
     vk_init(vk, &params);
 
-    test->sem = vk_create_semaphore(vk, VK_SEMAPHORE_TYPE_TIMELINE);
+    test->sem = vk_create_semaphore(vk, VK_SEMAPHORE_TYPE_TIMELINE, 0);
 }
 
 static void

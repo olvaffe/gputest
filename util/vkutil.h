@@ -195,6 +195,8 @@ struct vk_descriptor_set {
 
 struct vk_semaphore {
     VkSemaphore sem;
+    VkSemaphoreType type;
+    VkExternalSemaphoreHandleTypeFlagBits handle_type;
 };
 
 struct vk_event {
@@ -1908,18 +1910,33 @@ vk_destroy_descriptor_set(struct vk *vk, struct vk_descriptor_set *set)
 }
 
 static inline struct vk_semaphore *
-vk_create_semaphore(struct vk *vk, VkSemaphoreType type)
+vk_create_semaphore(struct vk *vk,
+                    VkSemaphoreType type,
+                    VkExternalSemaphoreHandleTypeFlags handle_type)
 {
     struct vk_semaphore *sem = (struct vk_semaphore *)calloc(1, sizeof(*sem));
     if (!sem)
         vk_die("failed to alloc semaphore");
 
-    if (type == VK_SEMAPHORE_TYPE_TIMELINE &&
-        !(vk->vulkan_12_features.timelineSemaphore && vk->params.enable_all_features))
-        vk_die("no support for timeline semaphore");
+    if (type == VK_SEMAPHORE_TYPE_TIMELINE) {
+        if (!(vk->vulkan_12_features.timelineSemaphore && vk->params.enable_all_features))
+            vk_die("no support for timeline semaphore");
+        if (handle_type == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT)
+            vk_die("timeline sync fd is invalid");
+    }
+    if (handle_type & (handle_type - 1))
+        vk_die("must be a single handle type");
 
+    sem->type = type;
+    sem->handle_type = (VkExternalSemaphoreHandleTypeFlagBits)handle_type;
+
+    const VkExportSemaphoreCreateInfo export_info = {
+        .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO,
+        .handleTypes = handle_type,
+    };
     const VkSemaphoreTypeCreateInfo type_info = {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+        .pNext = handle_type ? &export_info : NULL,
         .semaphoreType = type,
         .initialValue = 0,
     };
@@ -1939,6 +1956,41 @@ vk_destroy_semaphore(struct vk *vk, struct vk_semaphore *sem)
 {
     vk->DestroySemaphore(vk->dev, sem->sem, NULL);
     free(sem);
+}
+
+static inline int
+vk_export_semaphore_fd(struct vk *vk, struct vk_semaphore *sem)
+{
+    const VkSemaphoreGetFdInfoKHR info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR,
+        .semaphore = sem->sem,
+        .handleType = sem->handle_type,
+    };
+
+    int fd;
+    vk->result = vk->GetSemaphoreFdKHR(vk->dev, &info, &fd);
+    vk_check(vk, "failed to export semaphore fd");
+
+    return fd;
+}
+
+static inline void
+vk_import_semaphore_fd(struct vk *vk, struct vk_semaphore *sem, int fd)
+{
+    const VkSemaphoreImportFlags flags =
+        sem->handle_type == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT
+            ? VK_SEMAPHORE_IMPORT_TEMPORARY_BIT
+            : 0;
+    const VkImportSemaphoreFdInfoKHR info = {
+        .sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR,
+        .semaphore = sem->sem,
+        .flags = flags,
+        .handleType = sem->handle_type,
+        .fd = fd,
+    };
+
+    vk->result = vk->ImportSemaphoreFdKHR(vk->dev, &info);
+    vk_check(vk, "failed to import semaphore fd");
 }
 
 static inline uint64_t

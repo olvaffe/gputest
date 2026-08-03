@@ -281,6 +281,10 @@ PFN_DEVICE(AcquireNextImage2KHR)
 PFN_DEVICE(GetMemoryFdKHR)
 PFN_DEVICE(GetMemoryFdPropertiesKHR)
 
+/* VK_KHR_external_semaphore_fd */
+PFN_DEVICE(GetSemaphoreFdKHR)
+PFN_DEVICE(ImportSemaphoreFdKHR)
+
 /* VK_ANDROID_external_memory_android_hardware_buffer */
 PFN_DEVICE(GetAndroidHardwareBufferPropertiesANDROID)
 PFN_DEVICE(GetMemoryAndroidHardwareBufferANDROID)
