@@ -903,11 +903,19 @@ xfer_test_draw_resolve_image(struct xfer_test *test,
 
     /* check msaa support */
     const VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_4_BIT;
-    VkImageFormatProperties img_props;
-    const VkResult result = vk->GetPhysicalDeviceImageFormatProperties(
-        vk->physical_dev, fmt->format, VK_IMAGE_TYPE_2D, tiling, VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-        0, &img_props);
-    if (result != VK_SUCCESS || !(img_props.sampleCounts & samples))
+    const VkPhysicalDeviceImageFormatInfo2 fmt_info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
+        .format = fmt->format,
+        .type = VK_IMAGE_TYPE_2D,
+        .tiling = tiling,
+        .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+    };
+    VkImageFormatProperties2 fmt_props = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2,
+    };
+    const VkResult result =
+        vk->GetPhysicalDeviceImageFormatProperties2(vk->physical_dev, &fmt_info, &fmt_props);
+    if (result != VK_SUCCESS || !(fmt_props.imageFormatProperties.sampleCounts & samples))
         return;
 
     if (test->verbose)

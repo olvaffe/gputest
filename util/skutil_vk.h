@@ -16,7 +16,11 @@ class gputest_vulkan_memory_allocator : public skgpu::VulkanMemoryAllocator {
   public:
     gputest_vulkan_memory_allocator(struct vk *vk) : vk(vk)
     {
-        vk->GetPhysicalDeviceMemoryProperties(vk->physical_dev, &mem_props);
+        VkPhysicalDeviceMemoryProperties2 props2 = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2,
+        };
+        vk->GetPhysicalDeviceMemoryProperties2(vk->physical_dev, &props2);
+        mem_props = props2.memoryProperties;
     }
 
     uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const

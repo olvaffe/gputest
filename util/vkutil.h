@@ -295,7 +295,11 @@ vk_init_instance(struct vk *vk)
 static inline void
 vk_init_physical_device_memory_properties(struct vk *vk)
 {
-    vk->GetPhysicalDeviceMemoryProperties(vk->physical_dev, &vk->mem_props);
+    VkPhysicalDeviceMemoryProperties2 props2 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2,
+    };
+    vk->GetPhysicalDeviceMemoryProperties2(vk->physical_dev, &props2);
+    vk->mem_props = props2.memoryProperties;
 
     const VkMemoryPropertyFlags mt_flags =
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -815,23 +819,34 @@ vk_validate_image_info(struct vk *vk, const VkImageCreateInfo *info)
             vk_die("image usage 0x%x is not supported", info->usage);
     }
 
-    VkImageFormatProperties img_props;
-    vk->result = vk->GetPhysicalDeviceImageFormatProperties(vk->physical_dev, info->format,
-                                                            info->imageType, info->tiling,
-                                                            info->usage, info->flags, &img_props);
+    const VkPhysicalDeviceImageFormatInfo2 fmt_info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
+        .format = info->format,
+        .type = info->imageType,
+        .tiling = info->tiling,
+        .usage = info->usage,
+        .flags = info->flags,
+    };
+    VkImageFormatProperties2 fmt_props2 = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2,
+    };
+    vk->result =
+        vk->GetPhysicalDeviceImageFormatProperties2(vk->physical_dev, &fmt_info, &fmt_props2);
     vk_check(vk, "image format/type/tiling/usage/flags is not supported");
 
-    if (info->extent.width > img_props.maxExtent.width)
+    const VkImageFormatProperties *img_props = &fmt_props2.imageFormatProperties;
+
+    if (info->extent.width > img_props->maxExtent.width)
         vk_die("image width %u is not supported", info->extent.width);
-    if (info->extent.height > img_props.maxExtent.height)
+    if (info->extent.height > img_props->maxExtent.height)
         vk_die("image height %u is not supported", info->extent.height);
-    if (info->extent.depth > img_props.maxExtent.depth)
+    if (info->extent.depth > img_props->maxExtent.depth)
         vk_die("image depth %u is not supported", info->extent.depth);
-    if (info->mipLevels > img_props.maxMipLevels)
+    if (info->mipLevels > img_props->maxMipLevels)
         vk_die("image miplevel %u is not supported", info->mipLevels);
-    if (info->arrayLayers > img_props.maxArrayLayers)
+    if (info->arrayLayers > img_props->maxArrayLayers)
         vk_die("image array layer %u is not supported", info->arrayLayers);
-    if (!(info->samples & img_props.sampleCounts))
+    if (!(info->samples & img_props->sampleCounts))
         vk_die("image sample count %u is not supported", info->samples);
 
     return features;
