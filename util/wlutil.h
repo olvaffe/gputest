@@ -1283,11 +1283,6 @@ wl_acquire_swapchain_image(struct wl *wl, struct wl_swapchain *swapchain)
 }
 
 static inline void
-wl_surface_presentation_feedback(struct wl *wl)
-{
-}
-
-static inline void
 wl_present_swapchain_image(struct wl *wl,
                            struct wl_swapchain *swapchain,
                            const struct wl_swapchain_image *img)
