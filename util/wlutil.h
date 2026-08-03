@@ -704,9 +704,11 @@ wl_registry_event_global(
         }
         version = WL_OUTPUT_RELEASE_SINCE_VERSION;
 
-        struct wl_output_info *out = wl_array_add(&wl->globals.outputs, sizeof(*out));
-        memset(out, 0, sizeof(*out));
+        struct wl_output_info *out = calloc(1, sizeof(*out));
         out->scale = 1;
+
+        struct wl_output_info **out_iter = wl_array_add(&wl->globals.outputs, sizeof(*out_iter));
+        *out_iter = out;
 
         out->output = wl_registry_bind(reg, name, &wl_output_interface, version);
         wl_output_add_listener(out->output, &wl_output_listener, out);
@@ -810,8 +812,9 @@ static inline void
 wl_init_outputs(struct wl *wl)
 {
     if (wl->globals.color_manager) {
-        struct wl_output_info *out;
-        wl_array_for_each(out, &wl->globals.outputs) {
+        struct wl_output_info **out_iter;
+        wl_array_for_each(out_iter, &wl->globals.outputs) {
+            struct wl_output_info *out = *out_iter;
             out->cm_output =
                 wp_color_manager_v1_get_output(wl->globals.color_manager, out->output);
             out->cm_desc = wp_color_management_output_v1_get_image_description(out->cm_output);
@@ -1004,8 +1007,9 @@ wl_cleanup_globals(struct wl *wl)
     if (wl->globals.color_manager)
         wp_color_manager_v1_destroy(wl->globals.color_manager);
 
-    struct wl_output_info *out;
-    wl_array_for_each(out, &wl->globals.outputs) {
+    struct wl_output_info **out_iter;
+    wl_array_for_each(out_iter, &wl->globals.outputs) {
+        struct wl_output_info *out = *out_iter;
         if (out->cm_output) {
             wp_image_description_v1_destroy(out->cm_desc);
             wp_color_management_output_v1_destroy(out->cm_output);
@@ -1013,6 +1017,7 @@ wl_cleanup_globals(struct wl *wl)
         wl_output_release(out->output);
         free(out->make);
         free(out->model);
+        free(out);
     }
     wl_array_release(&wl->globals.outputs);
 }
@@ -1084,8 +1089,9 @@ wl_info_outputs(const struct wl *wl)
     wl_log("wl_output:");
 
     uint32_t idx = 0;
-    const struct wl_output_info *out;
-    wl_array_for_each(out, &wl->globals.outputs) {
+    const struct wl_output_info **out_iter;
+    wl_array_for_each(out_iter, &wl->globals.outputs) {
+        const struct wl_output_info *out = *out_iter;
         const char *primaries;
         switch (out->cm_primaries) {
         case WP_COLOR_MANAGER_V1_PRIMARIES_SRGB:
