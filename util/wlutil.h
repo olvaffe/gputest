@@ -1001,7 +1001,9 @@ wl_cleanup(struct wl *wl)
 static inline void
 wl_info_dmabuf(const struct wl *wl)
 {
-    wl_log("dmabuf: main %s target, scanout %d, tranche count %d",
+    wl_log("linux-dmabuf:");
+
+    wl_log("  main %s target, scanout %d, tranche count %d",
            wl->active.main_dev == wl->active.target_dev ? "==" : "!=", wl->active.scanout,
            wl->active.tranche_count);
 
@@ -1010,8 +1012,7 @@ wl_info_dmabuf(const struct wl *wl)
     wl_array_for_each(dmabuf_iter, &wl->active.formats) {
         const uint32_t fmt = *((uint64_t *)dmabuf_iter->data);
         uint32_t mod_count = dmabuf_iter->size / sizeof(uint64_t) - 1;
-        wl_log("dmabuf format %d: '%.*s', modifier count %d", idx++, 4, (const char *)&fmt,
-               mod_count);
+        wl_log("  %d: '%.*s', modifier count %d", idx++, 4, (const char *)&fmt, mod_count);
 
         if (false) {
             const uint64_t *mod_iter;
@@ -1027,6 +1028,8 @@ wl_info_dmabuf(const struct wl *wl)
 static inline void
 wl_info_shm(const struct wl *wl)
 {
+    wl_log("wl_shm:");
+
     const uint32_t *shm_iter;
     uint32_t idx = 0;
     wl_array_for_each(shm_iter, &wl->globals.shm_formats) {
@@ -1042,13 +1045,16 @@ wl_info_shm(const struct wl *wl)
             drm_format = *shm_iter;
             break;
         }
-        wl_log("shm format %d: '%.*s'", idx++, 4, (const char *)&drm_format);
+        wl_log("  %d: '%.*s'", idx++, 4, (const char *)&drm_format);
     }
 }
 
 static inline void
 wl_info_outputs(const struct wl *wl)
 {
+    wl_log("wl_output:");
+
+    uint32_t idx = 0;
     const struct wl_output_info *out;
     wl_array_for_each(out, &wl->globals.outputs) {
         const char *primaries;
@@ -1083,7 +1089,7 @@ wl_info_outputs(const struct wl *wl)
             break;
         }
 
-        wl_log("output %s %s: %dx%d @ %.2fHz (scale %dx), CMS %s (%s / %s)",
+        wl_log("  %d: %s %s, %dx%d @ %.2fHz (scale %dx), CMS %s (%s / %s)", idx++,
                out->make ? out->make : "unknown", out->model ? out->model : "unknown", out->width,
                out->height, out->refresh_rate / 1000.0, out->scale,
                out->cm_output ? "supported" : "unsupported", primaries, tf);
