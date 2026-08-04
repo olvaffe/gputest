@@ -41,33 +41,41 @@ static struct xfer_test_format xfer_test_formats[] = {
 #define FMT(fmt)                                                                                 \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
-    },
-#define FMT_COLOR(fmt)                                                                           \
-    {                                                                                            \
-        FMT_COMMON(fmt),                                                                         \
         .color = true,                                                                           \
+        .plane_count = 1,                                                                        \
     },
-#define FMT_DEPTH(fmt)                                                                           \
+#define FMT_D(fmt)                                                                               \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
         .depth = true,                                                                           \
+        .plane_count = 1,                                                                        \
     },
-#define FMT_STENCIL(fmt)                                                                         \
+#define FMT_S(fmt)                                                                               \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
         .stencil = true,                                                                         \
+        .plane_count = 1,                                                                        \
     },
 #define FMT_DS(fmt)                                                                              \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
         .depth = true,                                                                           \
         .stencil = true,                                                                         \
+        .plane_count = 1,                                                                        \
     },
 #define FMT_COMPRESSED(fmt)                                                                      \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
         .color = true,                                                                           \
         .compressed = true,                                                                      \
+        .plane_count = 1,                                                                        \
+    },
+#define FMT_YCBCR(fmt)                                                                           \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+        .color = true,                                                                           \
+        .ycbcr = true,                                                                           \
+        .plane_count = 1,                                                                        \
     },
 #define FMT_2PLANE(fmt)                                                                          \
     {                                                                                            \
