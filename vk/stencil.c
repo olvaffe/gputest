@@ -81,7 +81,7 @@ stencil_test_init_pipeline(struct stencil_test *test)
 }
 
 static void
-stencil_test_init_fb(struct stencil_test *test)
+stencil_test_init_rt(struct stencil_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -125,7 +125,7 @@ stencil_test_init(struct stencil_test *test)
 
     vk_init(vk, NULL);
 
-    stencil_test_init_fb(test);
+    stencil_test_init_rt(test);
     stencil_test_init_buffers(test);
     stencil_test_init_pipeline(test);
 }

@@ -130,7 +130,7 @@ mem_hog_test_init_pipeline(struct mem_hog_test *test)
 }
 
 static void
-mem_hog_test_init_framebuffer(struct mem_hog_test *test)
+mem_hog_test_init_rt(struct mem_hog_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -167,7 +167,7 @@ mem_hog_test_init(struct mem_hog_test *test)
 
     vk_init(vk, NULL);
 
-    mem_hog_test_init_framebuffer(test);
+    mem_hog_test_init_rt(test);
     mem_hog_test_init_pipeline(test);
 
     mem_hog_test_init_buffers(test);

@@ -48,7 +48,7 @@ pipeline_stats_test_init_pipeline(struct pipeline_stats_test *test)
 }
 
 static void
-pipeline_stats_test_init_framebuffer(struct pipeline_stats_test *test)
+pipeline_stats_test_init_rt(struct pipeline_stats_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -93,7 +93,7 @@ pipeline_stats_test_init(struct pipeline_stats_test *test)
 
     vk_init(vk, &params);
 
-    pipeline_stats_test_init_framebuffer(test);
+    pipeline_stats_test_init_rt(test);
     pipeline_stats_test_init_pipeline(test);
     test->query = vk_create_query(vk, VK_QUERY_TYPE_PIPELINE_STATISTICS, 1);
 }

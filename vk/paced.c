@@ -123,7 +123,7 @@ paced_test_init_ssbo(struct paced_test *test)
 }
 
 static void
-paced_test_init_framebuffer(struct paced_test *test)
+paced_test_init_rt(struct paced_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -163,7 +163,7 @@ paced_test_init(struct paced_test *test)
     };
     vk_init(vk, &params);
 
-    paced_test_init_framebuffer(test);
+    paced_test_init_rt(test);
     paced_test_init_ssbo(test);
     paced_test_init_pipelines(test);
     paced_test_init_descriptor_set(test);

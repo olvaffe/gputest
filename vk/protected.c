@@ -83,7 +83,7 @@ protected_test_init_pipeline(struct protected_test *test)
 }
 
 static void
-protected_test_init_framebuffer(struct protected_test *test)
+protected_test_init_rt(struct protected_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -175,7 +175,7 @@ protected_test_init(struct protected_test *test)
     vk_init(vk, &params);
 
     protected_test_init_buffers(test);
-    protected_test_init_framebuffer(test);
+    protected_test_init_rt(test);
     protected_test_init_pipeline(test);
 }
 

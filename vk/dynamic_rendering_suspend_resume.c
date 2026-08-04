@@ -54,8 +54,7 @@ dynamic_rendering_suspend_resume_test_init_pipeline(
 }
 
 static void
-dynamic_rendering_suspend_resume_test_init_framebuffer(
-    struct dynamic_rendering_suspend_resume_test *test)
+dynamic_rendering_suspend_resume_test_init_rt(struct dynamic_rendering_suspend_resume_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -71,7 +70,7 @@ dynamic_rendering_suspend_resume_test_init(struct dynamic_rendering_suspend_resu
     struct vk *vk = &test->vk;
     vk_init(vk, NULL);
 
-    dynamic_rendering_suspend_resume_test_init_framebuffer(test);
+    dynamic_rendering_suspend_resume_test_init_rt(test);
     dynamic_rendering_suspend_resume_test_init_pipeline(test);
 }
 

@@ -90,7 +90,7 @@ gs_test_init_pipeline(struct gs_test *test)
 }
 
 static void
-gs_test_init_framebuffer(struct gs_test *test)
+gs_test_init_rt(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -147,7 +147,7 @@ gs_test_init(struct gs_test *test)
 
     gs_test_init_vb(test);
 
-    gs_test_init_framebuffer(test);
+    gs_test_init_rt(test);
     gs_test_init_pipeline(test);
 }
 

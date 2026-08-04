@@ -88,13 +88,14 @@ tri_test_init_pipeline(struct tri_test *test)
     test->pipeline->scissor.offset.y += tri_border;
     test->pipeline->scissor.extent.width -= tri_border * 2;
     test->pipeline->scissor.extent.height -= tri_border * 2;
+
     test->pipeline->color_att_format = test->color_format;
 
     vk_compile_pipeline(vk, test->pipeline);
 }
 
 static void
-tri_test_init_framebuffer(struct tri_test *test)
+tri_test_init_rt(struct tri_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -150,9 +151,9 @@ tri_test_init(struct tri_test *test)
     struct vk *vk = &test->vk;
 
     vk_init(vk, NULL);
-    tri_test_init_vb(test);
 
-    tri_test_init_framebuffer(test);
+    tri_test_init_vb(test);
+    tri_test_init_rt(test);
     tri_test_init_pipeline(test);
 }
 
@@ -162,9 +163,7 @@ tri_test_cleanup(struct tri_test *test)
     struct vk *vk = &test->vk;
 
     vk_destroy_pipeline(vk, test->pipeline);
-
     vk_destroy_image(vk, test->rt);
-
     vk_destroy_buffer(vk, test->vb);
 
     vk_cleanup(vk);
@@ -190,7 +189,6 @@ tri_test_draw_pre(struct tri_test *test, VkCommandBuffer cmd)
             .layerCount = 1,
         },
     };
-
     const VkDependencyInfo dep_info = {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
         .imageMemoryBarrierCount = 1,
@@ -219,7 +217,6 @@ tri_test_draw_post(struct tri_test *test, VkCommandBuffer cmd)
             .layerCount = 1,
         },
     };
-
     const VkDependencyInfo dep_info = {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
         .imageMemoryBarrierCount = 1,
@@ -237,7 +234,6 @@ tri_test_draw_triangle(struct tri_test *test, VkCommandBuffer cmd)
 
     vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);
     vk_bind_pipeline(vk, test->pipeline, cmd);
-
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
     vk->CmdEndRendering(cmd);

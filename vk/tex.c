@@ -79,7 +79,7 @@ tex_test_init_pipeline(struct tex_test *test)
 }
 
 static void
-tex_test_init_framebuffer(struct tex_test *test)
+tex_test_init_rt(struct tex_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -145,7 +145,7 @@ tex_test_init(struct tex_test *test)
     tex_test_init_vb(test);
 
     tex_test_init_texture(test);
-    tex_test_init_framebuffer(test);
+    tex_test_init_rt(test);
     tex_test_init_pipeline(test);
     tex_test_init_descriptor_set(test);
 }

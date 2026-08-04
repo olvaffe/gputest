@@ -183,7 +183,7 @@ ktx_test_init_pipeline(struct ktx_test *test)
 }
 
 static void
-ktx_test_init_rt_image(struct ktx_test *test)
+ktx_test_init_rt(struct ktx_test *test)
 {
     struct vk *vk = &test->vk;
     ktxTexture *tex = test->tex;
@@ -300,7 +300,7 @@ ktx_test_init(struct ktx_test *test)
 
     ktx_test_init_staging_buffer(test);
     ktx_test_init_texture_image(test);
-    ktx_test_init_rt_image(test);
+    ktx_test_init_rt(test);
     ktx_test_init_pipeline(test);
     ktx_test_init_descriptor_set(test);
 }

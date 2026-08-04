@@ -83,7 +83,7 @@ tex_depth_test_init_pipeline(struct tex_depth_test *test)
 }
 
 static void
-tex_depth_test_init_framebuffer(struct tex_depth_test *test)
+tex_depth_test_init_rt(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -151,7 +151,7 @@ tex_depth_test_init(struct tex_depth_test *test)
     tex_depth_test_init_vb(test);
 
     tex_depth_test_init_depth_texture(test);
-    tex_depth_test_init_framebuffer(test);
+    tex_depth_test_init_rt(test);
     tex_depth_test_init_pipeline(test);
     tex_depth_test_init_descriptor_set(test);
 }

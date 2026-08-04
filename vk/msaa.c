@@ -84,7 +84,7 @@ msaa_test_init_pipeline(struct msaa_test *test)
 }
 
 static void
-msaa_test_init_framebuffer(struct msaa_test *test)
+msaa_test_init_rt(struct msaa_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -145,7 +145,7 @@ msaa_test_init(struct msaa_test *test)
     vk_init(vk, NULL);
     msaa_test_init_vb(test);
 
-    msaa_test_init_framebuffer(test);
+    msaa_test_init_rt(test);
     msaa_test_init_pipeline(test);
 }
 

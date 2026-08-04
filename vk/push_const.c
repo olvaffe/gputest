@@ -79,7 +79,7 @@ push_const_init_pipeline(struct push_const_test *test)
 }
 
 static void
-push_const_init_framebuffer(struct push_const_test *test)
+push_const_init_rt(struct push_const_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -138,7 +138,7 @@ push_const_init(struct push_const_test *test)
     vk_init(vk, NULL);
     push_const_test_init_ubo(test);
 
-    push_const_init_framebuffer(test);
+    push_const_init_rt(test);
     push_const_init_pipeline(test);
     push_const_test_init_descriptor_set(test);
 }

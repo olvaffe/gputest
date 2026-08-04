@@ -100,7 +100,7 @@ tex_ubo_test_init_pipeline(struct tex_ubo_test *test)
 }
 
 static void
-tex_ubo_test_init_framebuffer(struct tex_ubo_test *test)
+tex_ubo_test_init_rt(struct tex_ubo_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -177,7 +177,7 @@ tex_ubo_test_init(struct tex_ubo_test *test)
 
     tex_ubo_test_init_texture(test);
     tex_ubo_test_init_ubo(test);
-    tex_ubo_test_init_framebuffer(test);
+    tex_ubo_test_init_rt(test);
     tex_ubo_test_init_pipeline(test);
     tex_ubo_test_init_descriptor_sets(test);
 }

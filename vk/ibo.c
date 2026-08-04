@@ -74,7 +74,7 @@ ibo_test_init_pipeline(struct ibo_test *test)
 }
 
 static void
-ibo_test_init_framebuffer(struct ibo_test *test)
+ibo_test_init_rt(struct ibo_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -145,7 +145,7 @@ ibo_test_init(struct ibo_test *test)
     vk_init(vk, NULL);
 
     ibo_test_init_ibo(test);
-    ibo_test_init_framebuffer(test);
+    ibo_test_init_rt(test);
     ibo_test_init_pipeline(test);
     ibo_test_init_descriptor_set(test);
 }

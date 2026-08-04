@@ -93,7 +93,7 @@ ubo_test_init_pipeline(struct ubo_test *test)
 }
 
 static void
-ubo_test_init_framebuffer(struct ubo_test *test)
+ubo_test_init_rt(struct ubo_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -165,7 +165,7 @@ ubo_test_init(struct ubo_test *test)
     ubo_test_init_vb(test);
     ubo_test_init_ubo(test);
 
-    ubo_test_init_framebuffer(test);
+    ubo_test_init_rt(test);
     ubo_test_init_pipeline(test);
     ubo_test_init_descriptor_set(test);
 }

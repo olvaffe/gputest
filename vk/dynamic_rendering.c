@@ -48,7 +48,7 @@ dynamic_rendering_test_init_pipeline(struct dynamic_rendering_test *test)
 }
 
 static void
-dynamic_rendering_test_init_framebuffer(struct dynamic_rendering_test *test)
+dynamic_rendering_test_init_rt(struct dynamic_rendering_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -89,7 +89,7 @@ dynamic_rendering_test_init(struct dynamic_rendering_test *test)
     struct vk *vk = &test->vk;
     vk_init(vk, NULL);
 
-    dynamic_rendering_test_init_framebuffer(test);
+    dynamic_rendering_test_init_rt(test);
     dynamic_rendering_test_init_pipeline(test);
 }
 

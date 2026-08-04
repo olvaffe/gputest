@@ -92,7 +92,7 @@ tess_test_init_pipeline(struct tess_test *test)
 }
 
 static void
-tess_test_init_framebuffer(struct tess_test *test)
+tess_test_init_rt(struct tess_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -151,7 +151,7 @@ tess_test_init(struct tess_test *test)
 
     tess_test_init_vb(test);
 
-    tess_test_init_framebuffer(test);
+    tess_test_init_rt(test);
     tess_test_init_pipeline(test);
 }
 
