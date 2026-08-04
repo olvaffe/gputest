@@ -187,6 +187,9 @@ struct vk_pipeline {
     VkFormat stencil_format;
     uint64_t external_format;
 
+    uint32_t color_input_remap[4];
+    uint32_t color_input_count;
+
     VkPipelineLayout layout;
     VkPipeline pipeline;
 };
@@ -759,11 +762,11 @@ vk_get_buffer_mt_mask(struct vk *vk,
 }
 
 static inline struct vk_buffer *
-vk_create_buffer_with_mt(struct vk *vk,
-                         VkBufferCreateFlags flags,
-                         VkDeviceSize size,
-                         VkBufferUsageFlags2 usage,
-                         uint32_t mt_idx)
+vk_create_buffer_with_mt_mask(struct vk *vk,
+                              VkBufferCreateFlags flags,
+                              VkDeviceSize size,
+                              VkBufferUsageFlags2 usage,
+                              uint32_t mt_mask)
 {
     struct vk_buffer *buf = (struct vk_buffer *)calloc(1, sizeof(*buf));
     if (!buf)
@@ -792,9 +795,13 @@ vk_create_buffer_with_mt(struct vk *vk,
     };
     vk->GetBufferMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
     const VkMemoryRequirements *reqs = &reqs2.memoryRequirements;
-    if (!(reqs->memoryTypeBits & (1u << mt_idx)))
+
+    mt_mask &= reqs->memoryTypeBits;
+    if (!mt_mask)
         vk_die("failed to meet buf memory reqs: 0x%x", reqs->memoryTypeBits);
 
+    const uint32_t mt_idx =
+        mt_mask & (1u << vk->buf_mt_index) ? vk->buf_mt_index : (uint32_t)(ffs(mt_mask) - 1);
     buf->mem = vk_alloc_memory(vk, reqs->size, mt_idx);
     buf->mem_size = reqs->size;
 
@@ -828,7 +835,7 @@ vk_create_buffer(struct vk *vk,
                  VkDeviceSize size,
                  VkBufferUsageFlags2 usage)
 {
-    return vk_create_buffer_with_mt(vk, flags, size, usage, vk->buf_mt_index);
+    return vk_create_buffer_with_mt_mask(vk, flags, size, usage, 1 << vk->buf_mt_index);
 }
 
 static inline void
@@ -928,7 +935,7 @@ vk_get_image_mt_mask(struct vk *vk, const VkImageCreateInfo *info)
 }
 
 static inline void
-vk_init_image(struct vk *vk, struct vk_image *img, uint32_t mt_idx)
+vk_init_image(struct vk *vk, struct vk_image *img, uint32_t mt_mask)
 {
     img->features = vk_validate_image_info(vk, &img->info);
 
@@ -945,13 +952,12 @@ vk_init_image(struct vk *vk, struct vk_image *img, uint32_t mt_idx)
     vk->GetImageMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
     const VkMemoryRequirements *reqs = &reqs2.memoryRequirements;
 
-    if (mt_idx == VK_MAX_MEMORY_TYPES) {
-        if (reqs->memoryTypeBits & (1u << vk->buf_mt_index))
-            mt_idx = vk->buf_mt_index;
-        else
-            mt_idx = ffs(reqs->memoryTypeBits) - 1;
-    }
+    mt_mask &= reqs->memoryTypeBits;
+    if (!mt_mask)
+        vk_die("failed to meet img memory reqs: 0x%x", reqs->memoryTypeBits);
 
+    const uint32_t mt_idx =
+        mt_mask & (1u << vk->buf_mt_index) ? vk->buf_mt_index : (uint32_t)(ffs(mt_mask) - 1);
     img->mem = vk_alloc_memory(vk, reqs->size, mt_idx);
     img->mem_size = reqs->size;
 
@@ -978,14 +984,14 @@ vk_init_image(struct vk *vk, struct vk_image *img, uint32_t mt_idx)
 }
 
 static inline struct vk_image *
-vk_create_image_with_mt(struct vk *vk, const VkImageCreateInfo *info, uint32_t mt_idx)
+vk_create_image_with_mt_mask(struct vk *vk, const VkImageCreateInfo *info, uint32_t mt_mask)
 {
     struct vk_image *img = (struct vk_image *)calloc(1, sizeof(*img));
     if (!img)
         vk_die("failed to alloc img");
 
     img->info = *info;
-    vk_init_image(vk, img, mt_idx);
+    vk_init_image(vk, img, mt_mask);
 
     return img;
 }
@@ -993,7 +999,7 @@ vk_create_image_with_mt(struct vk *vk, const VkImageCreateInfo *info, uint32_t m
 static inline struct vk_image *
 vk_create_image_from_info(struct vk *vk, const VkImageCreateInfo *info)
 {
-    return vk_create_image_with_mt(vk, info, VK_MAX_MEMORY_TYPES);
+    return vk_create_image_with_mt_mask(vk, info, ~0u);
 }
 
 static inline struct vk_image *
@@ -1714,10 +1720,17 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .depthAttachmentFormat = pipeline->depth_format,
         .stencilAttachmentFormat = pipeline->stencil_format,
     };
+    const VkRenderingInputAttachmentIndexInfo input_att_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO,
+        .pNext = &rendering_info,
+        .colorAttachmentCount = pipeline->color_input_count,
+        .pColorAttachmentInputIndices = pipeline->color_input_remap,
+    };
 
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext = &rendering_info,
+        .pNext = pipeline->color_input_count ? (const void *)&input_att_info
+                                             : (const void *)&rendering_info,
         .stageCount = pipeline->stage_count,
         .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,

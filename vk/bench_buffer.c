@@ -441,7 +441,7 @@ bench_buffer_test_draw_xfer(struct bench_buffer_test *test)
         if (!(mt_mask & (1 << i)))
             continue;
 
-        struct vk_buffer *buf = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
+        struct vk_buffer *buf = vk_create_buffer_with_mt_mask(vk, 0, test->size, usage, 1 << i);
 
         const uint64_t dur = bench_buffer_test_fill_buffer(test, buf, 0x7f7f7f7f);
 
@@ -455,8 +455,8 @@ bench_buffer_test_draw_xfer(struct bench_buffer_test *test)
         if (!(mt_mask & (1 << i)))
             continue;
 
-        struct vk_buffer *dst = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
-        struct vk_buffer *src = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
+        struct vk_buffer *dst = vk_create_buffer_with_mt_mask(vk, 0, test->size, usage, 1 << i);
+        struct vk_buffer *src = vk_create_buffer_with_mt_mask(vk, 0, test->size, usage, 1 << i);
 
         const uint64_t dur = bench_buffer_test_copy_buffer(test, dst, src, 0x7f7f7f7f);
 
@@ -482,8 +482,8 @@ bench_buffer_test_draw_compute(struct bench_buffer_test *test)
         if (!(mt_mask & (1 << i)))
             continue;
 
-        struct vk_buffer *dst = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
-        struct vk_buffer *src = vk_create_buffer_with_mt(vk, 0, test->size, usage, i);
+        struct vk_buffer *dst = vk_create_buffer_with_mt_mask(vk, 0, test->size, usage, 1 << i);
+        struct vk_buffer *src = vk_create_buffer_with_mt_mask(vk, 0, test->size, usage, 1 << i);
 
         const uint64_t dur = bench_buffer_test_dispatch(test, dst, src, 0x7f7f7f7f);
 

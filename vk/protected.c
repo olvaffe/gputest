@@ -161,8 +161,9 @@ protected_test_init_buffers(struct protected_test *test)
     const VkBufferCreateFlags ib_flags = test->protected ? VK_BUFFER_CREATE_PROTECTED_BIT : 0;
     const VkBufferUsageFlags2 ib_usage =
         VK_BUFFER_USAGE_2_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_INDEX_BUFFER_BIT;
-    test->ib = vk_create_buffer_with_mt(vk, ib_flags, ib_size, ib_usage,
-                                        test->protected ? protected_mt : vk->buf_mt_index);
+    test->ib =
+        vk_create_buffer_with_mt_mask(vk, ib_flags, ib_size, ib_usage,
+                                      1 << (test->protected ? protected_mt : vk->buf_mt_index));
 
     test->staging = vk_create_buffer(vk, 0, ib_size, VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT);
     memcpy(test->staging->mem_ptr, protected_test_indices, ib_size);

@@ -700,7 +700,7 @@ bench_image_test_draw_clear(struct bench_image_test *test, VkImageTiling tiling)
         if (!(mt_mask & (1 << i)))
             continue;
 
-        struct vk_image *img = vk_create_image_with_mt(vk, &info, i);
+        struct vk_image *img = vk_create_image_with_mt_mask(vk, &info, 1 << i);
 
         const uint64_t dur = bench_image_test_clear(test, img);
 
@@ -729,8 +729,8 @@ bench_image_test_draw_copy(struct bench_image_test *test, VkImageTiling tiling)
         if (!(mt_mask & (1 << i)))
             continue;
 
-        struct vk_image *dst = vk_create_image_with_mt(vk, &info, i);
-        struct vk_image *src = vk_create_image_with_mt(vk, &info, i);
+        struct vk_image *dst = vk_create_image_with_mt_mask(vk, &info, 1 << i);
+        struct vk_image *src = vk_create_image_with_mt_mask(vk, &info, 1 << i);
 
         const uint64_t dur = bench_image_test_copy(test, dst, src);
 
@@ -763,8 +763,8 @@ bench_image_test_draw_copy_buffer(struct bench_image_test *test, VkImageTiling t
         if (!((dst_mask & src_mask) & (1 << i)))
             continue;
 
-        struct vk_image *dst = vk_create_image_with_mt(vk, &dst_info, i);
-        struct vk_buffer *src = vk_create_buffer_with_mt(vk, 0, src_size, src_usage, i);
+        struct vk_image *dst = vk_create_image_with_mt_mask(vk, &dst_info, 1 << i);
+        struct vk_buffer *src = vk_create_buffer_with_mt_mask(vk, 0, src_size, src_usage, 1 << i);
 
         const uint64_t dur = bench_image_test_copy_buffer(test, dst, src);
 
@@ -793,8 +793,8 @@ bench_image_test_draw_compute(struct bench_image_test *test, VkImageTiling tilin
         if (!(mt_mask & (1 << i)))
             continue;
 
-        struct vk_image *dst = vk_create_image_with_mt(vk, &info, i);
-        struct vk_image *src = vk_create_image_with_mt(vk, &info, i);
+        struct vk_image *dst = vk_create_image_with_mt_mask(vk, &info, 1 << i);
+        struct vk_image *src = vk_create_image_with_mt_mask(vk, &info, 1 << i);
         vk_create_image_render_view(vk, dst, VK_IMAGE_ASPECT_COLOR_BIT);
         vk_create_image_render_view(vk, src, VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -830,8 +830,8 @@ bench_image_test_draw_quad(struct bench_image_test *test, VkImageTiling tiling)
         if (!(mt_mask & (1 << i)))
             continue;
 
-        struct vk_image *dst = vk_create_image_with_mt(vk, &dst_info, i);
-        struct vk_image *src = vk_create_image_with_mt(vk, &src_info, i);
+        struct vk_image *dst = vk_create_image_with_mt_mask(vk, &dst_info, 1 << i);
+        struct vk_image *src = vk_create_image_with_mt_mask(vk, &src_info, 1 << i);
 
         vk_create_image_render_view(vk, dst, VK_IMAGE_ASPECT_COLOR_BIT);
         vk_create_image_sample_view(vk, src, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT);
