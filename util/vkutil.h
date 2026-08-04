@@ -491,8 +491,8 @@ vk_init_device(struct vk *vk)
 
     vk->queue_family_index = 0;
 
-    VkQueueFamilyGlobalPriorityPropertiesKHR prio_props = {
-        .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES_KHR,
+    VkQueueFamilyGlobalPriorityProperties prio_props = {
+        .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES,
     };
     VkQueueFamilyProperties2 queue_props = {
         .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2,
@@ -508,18 +508,18 @@ vk_init_device(struct vk *vk)
     if (!queue_props.queueFamilyProperties.timestampValidBits)
         vk_die("queue family 0 does not support timestamps");
 
-    VkQueueGlobalPriorityKHR global_priority = VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_KHR;
+    VkQueueGlobalPriority global_priority = VK_QUEUE_GLOBAL_PRIORITY_MEDIUM;
     if (vk->params.high_priority) {
         global_priority = prio_props.priorities[prio_props.priorityCount - 1];
-        if (global_priority <= VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_KHR)
+        if (global_priority <= VK_QUEUE_GLOBAL_PRIORITY_MEDIUM)
             vk_die("queue family 0 does not support high priority");
     }
 
     const VkDeviceQueueCreateFlags queue_flags =
         vk->params.protected_memory ? VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT : 0;
     const float queue_priority = 1.0f;
-    const VkDeviceQueueGlobalPriorityCreateInfoKHR global_prio_info = {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_KHR,
+    const VkDeviceQueueGlobalPriorityCreateInfo global_prio_info = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO,
         .globalPriority = global_priority,
     };
     const VkDeviceQueueCreateInfo queue_create_info = {
