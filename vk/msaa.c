@@ -76,7 +76,6 @@ msaa_test_init_pipeline(struct msaa_test *test)
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
     test->pipeline->sample_count = VK_SAMPLE_COUNT_4_BIT;
 

@@ -36,7 +36,7 @@ compile_test_cleanup(struct compile_test *test)
 }
 
 static VkPipelineLayout
-compile_test_create_pipeline_layout(struct compile_test *test, struct spv_program *prog)
+compile_test_create_layout(struct compile_test *test, struct spv_program *prog)
 {
     const VkShaderStageFlags stage = VK_SHADER_STAGE_COMPUTE_BIT;
     struct vk *vk = &test->vk;
@@ -107,20 +107,20 @@ compile_test_create_pipeline_layout(struct compile_test *test, struct spv_progra
         free(bindings);
     }
 
-    const VkPipelineLayoutCreateInfo pipeline_layout_info = {
+    const VkPipelineLayoutCreateInfo layout_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = prog->reflection.set_count,
         .pSetLayouts = set_layouts,
     };
-    VkPipelineLayout pipeline_layout;
-    vk->result = vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL, &pipeline_layout);
+    VkPipelineLayout layout;
+    vk->result = vk->CreatePipelineLayout(vk->dev, &layout_info, NULL, &layout);
     vk_check(vk, "failed to create pipeline layout");
 
     for (uint32_t i = 0; i < prog->reflection.set_count; i++)
         vk->DestroyDescriptorSetLayout(vk->dev, set_layouts[i], NULL);
     free(set_layouts);
 
-    return pipeline_layout;
+    return layout;
 }
 
 static void
@@ -169,7 +169,7 @@ compile_test_compile_compute_pipeline(struct compile_test *test, struct spv_prog
             .pName = prog->reflection.entrypoint,
             .pSpecializationInfo = &spec_info,
 	},
-        .layout = compile_test_create_pipeline_layout(test, prog),
+        .layout = compile_test_create_layout(test, prog),
     };
     VkPipeline pipeline;
     vk->result =

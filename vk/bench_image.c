@@ -461,7 +461,7 @@ bench_image_test_dispatch(struct bench_image_test *test,
     const VkBindDescriptorSetsInfo comp_bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .layout = pipeline->pipeline_layout,
+        .layout = pipeline->layout,
         .descriptorSetCount = 1,
         .pDescriptorSets = &set->set,
     };
@@ -543,7 +543,6 @@ bench_image_test_render_pass(struct bench_image_test *test,
 
         pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
         vk_set_pipeline_viewport(vk, pipeline, test->width, test->height);
-        vk_set_pipeline_rasterization(vk, pipeline, VK_POLYGON_MODE_FILL, false);
 
         pipeline->color_att_format = dst->info.format;
         vk_compile_pipeline(vk, pipeline);
@@ -597,7 +596,7 @@ bench_image_test_render_pass(struct bench_image_test *test,
     const VkBindDescriptorSetsInfo gfx_bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
-        .layout = pipeline->pipeline_layout,
+        .layout = pipeline->layout,
         .descriptorSetCount = 1,
         .pDescriptorSets = &set->set,
     };

@@ -78,7 +78,6 @@ tex_depth_test_init_pipeline(struct tex_depth_test *test)
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
     test->pipeline->color_att_format = test->color_format;
     vk_compile_pipeline(vk, test->pipeline);
 }
@@ -245,7 +244,7 @@ tex_depth_test_draw_triangle(struct tex_depth_test *test, VkCommandBuffer cmd)
     const VkBindDescriptorSetsInfo bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .descriptorSetCount = 1,
         .pDescriptorSets = &test->set->set,
     };

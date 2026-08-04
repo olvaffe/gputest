@@ -89,11 +89,12 @@ paced_test_init_pipelines(struct paced_test *test)
     test->gfx->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->gfx, test->width, test->height);
-    vk_set_pipeline_rasterization(vk, test->gfx, VK_POLYGON_MODE_FILL, test->discard);
+    test->gfx->rasterizer_discard = test->discard;
 
-    vk_set_pipeline_push_const(vk, test->gfx,
-                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                               sizeof(test->push_const));
+    test->gfx->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(test->push_const),
+    };
     test->gfx->color_att_format = test->format;
     vk_compile_pipeline(vk, test->gfx);
 
@@ -105,8 +106,10 @@ paced_test_init_pipelines(struct paced_test *test)
     vk_add_pipeline_set_layout(vk, test->comp, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
                                VK_SHADER_STAGE_COMPUTE_BIT, NULL);
 
-    vk_set_pipeline_push_const(vk, test->comp, VK_SHADER_STAGE_COMPUTE_BIT,
-                               sizeof(test->push_const));
+    test->comp->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .size = sizeof(test->push_const),
+    };
 
     vk_compile_pipeline(vk, test->comp);
 }
@@ -218,14 +221,14 @@ paced_test_draw_comp(struct paced_test *test, VkCommandBuffer cmd)
     const VkBindDescriptorSetsInfo bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .layout = test->comp->pipeline_layout,
+        .layout = test->comp->layout,
         .descriptorSetCount = 1,
         .pDescriptorSets = &test->comp_set->set,
     };
     vk->CmdBindDescriptorSets2(cmd, &bind_info);
     const VkPushConstantsInfo comp_push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->comp->pipeline_layout,
+        .layout = test->comp->layout,
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
         .size = sizeof(test->push_const),
         .pValues = &test->push_const,
@@ -285,7 +288,7 @@ paced_test_draw_gfx(struct paced_test *test, VkCommandBuffer cmd)
     vk_bind_pipeline(vk, test->gfx, cmd);
     const VkPushConstantsInfo gfx_push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->gfx->pipeline_layout,
+        .layout = test->gfx->layout,
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(test->push_const),
         .pValues = &test->push_const,

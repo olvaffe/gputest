@@ -78,7 +78,6 @@ protected_test_init_pipeline(struct protected_test *test)
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
     test->pipeline->color_att_format = test->color_format;
     vk_compile_pipeline(vk, test->pipeline);
 }

@@ -155,6 +155,10 @@ struct vk_pipeline {
     VkShaderModuleCreateInfo mods[5];
     uint32_t stage_count;
 
+    VkDescriptorSetLayout set_layouts[4];
+    uint32_t set_layout_count;
+    VkPushConstantRange push_const;
+
     /* vertex input state */
     VkVertexInputBindingDescription vi_binding;
     VkVertexInputAttributeDescription vi_attrs[16];
@@ -178,11 +182,7 @@ struct vk_pipeline {
     VkFormat stencil_att_format;
     uint64_t external_format;
 
-    VkDescriptorSetLayout set_layouts[4];
-    uint32_t set_layout_count;
-    VkPushConstantRange push_const;
-    VkPipelineLayout pipeline_layout;
-
+    VkPipelineLayout layout;
     VkPipeline pipeline;
 };
 
@@ -1486,6 +1486,42 @@ vk_add_pipeline_shader(struct vk *vk,
 }
 
 static inline void
+vk_add_pipeline_set_layout_from_info(struct vk *vk,
+                                     struct vk_pipeline *pipeline,
+                                     const VkDescriptorSetLayoutCreateInfo *create_info)
+{
+    assert(pipeline->set_layout_count < ARRAY_SIZE(pipeline->set_layouts));
+
+    vk->result = vk->CreateDescriptorSetLayout(
+        vk->dev, create_info, NULL, &pipeline->set_layouts[pipeline->set_layout_count++]);
+    vk_check(vk, "failed to create descriptor set layout");
+}
+
+static inline void
+vk_add_pipeline_set_layout(struct vk *vk,
+                           struct vk_pipeline *pipeline,
+                           VkDescriptorType type,
+                           uint32_t desc_count,
+                           VkShaderStageFlags stages,
+                           const VkSampler *immutable_samplers)
+{
+    const VkDescriptorSetLayoutBinding binding = {
+        .binding = 0,
+        .descriptorType = type,
+        .descriptorCount = desc_count,
+        .stageFlags = stages,
+        .pImmutableSamplers = immutable_samplers,
+    };
+    const VkDescriptorSetLayoutCreateInfo set_layout_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 1,
+        .pBindings = &binding,
+    };
+
+    vk_add_pipeline_set_layout_from_info(vk, pipeline, &set_layout_info);
+}
+
+static inline void
 vk_set_pipeline_vertices(struct vk *vk,
                          struct vk_pipeline *pipeline,
                          const uint32_t *comp_counts,
@@ -1552,65 +1588,7 @@ vk_set_pipeline_viewport(struct vk *vk,
 }
 
 static inline void
-vk_set_pipeline_rasterization(struct vk *vk,
-                              struct vk_pipeline *pipeline,
-                              VkPolygonMode poly_mode,
-                              bool discard)
-{
-    pipeline->poly_mode = poly_mode;
-    pipeline->rasterizer_discard = discard;
-}
-
-static inline void
-vk_add_pipeline_set_layout_from_info(struct vk *vk,
-                                     struct vk_pipeline *pipeline,
-                                     const VkDescriptorSetLayoutCreateInfo *create_info)
-{
-    assert(pipeline->set_layout_count < ARRAY_SIZE(pipeline->set_layouts));
-
-    vk->result = vk->CreateDescriptorSetLayout(
-        vk->dev, create_info, NULL, &pipeline->set_layouts[pipeline->set_layout_count++]);
-    vk_check(vk, "failed to create descriptor set layout");
-}
-
-static inline void
-vk_add_pipeline_set_layout(struct vk *vk,
-                           struct vk_pipeline *pipeline,
-                           VkDescriptorType type,
-                           uint32_t desc_count,
-                           VkShaderStageFlags stages,
-                           const VkSampler *immutable_samplers)
-{
-    const VkDescriptorSetLayoutBinding binding = {
-        .binding = 0,
-        .descriptorType = type,
-        .descriptorCount = desc_count,
-        .stageFlags = stages,
-        .pImmutableSamplers = immutable_samplers,
-    };
-    const VkDescriptorSetLayoutCreateInfo set_layout_info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 1,
-        .pBindings = &binding,
-    };
-
-    vk_add_pipeline_set_layout_from_info(vk, pipeline, &set_layout_info);
-}
-
-static inline void
-vk_set_pipeline_push_const(struct vk *vk,
-                           struct vk_pipeline *pipeline,
-                           VkShaderStageFlags stages,
-                           uint32_t size)
-{
-    pipeline->push_const = (VkPushConstantRange){
-        .stageFlags = stages,
-        .size = size,
-    };
-}
-
-static inline void
-vk_setup_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline)
+vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 {
     const VkPipelineLayoutCreateInfo pipeline_layout_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1619,15 +1597,9 @@ vk_setup_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline)
         .pushConstantRangeCount = (uint32_t)(pipeline->push_const.size ? 1 : 0),
         .pPushConstantRanges = &pipeline->push_const,
     };
-    vk->result = vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL,
-                                          &pipeline->pipeline_layout);
+    vk->result =
+        vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL, &pipeline->layout);
     vk_check(vk, "failed to create pipeline layout");
-}
-
-static inline void
-vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
-{
-    vk_setup_pipeline_layout(vk, pipeline);
 
     if (pipeline->stage_count == 1 && pipeline->stages[0].stage == VK_SHADER_STAGE_COMPUTE_BIT) {
         const VkPipelineCreateFlags2CreateInfo flags2_info = {
@@ -1638,7 +1610,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
             .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
             .pNext = &flags2_info,
             .stage = pipeline->stages[0],
-            .layout = pipeline->pipeline_layout,
+            .layout = pipeline->layout,
         };
         vk->result = vk->CreateComputePipelines(vk->dev, VK_NULL_HANDLE, 1, &compute_info, NULL,
                                                 &pipeline->pipeline);
@@ -1738,7 +1710,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pDepthStencilState = &pipeline->depth_info,
         .pColorBlendState = &blend_info,
         .pDynamicState = &dynamic_info,
-        .layout = pipeline->pipeline_layout,
+        .layout = pipeline->layout,
     };
 
     vk->result = vk->CreateGraphicsPipelines(vk->dev, VK_NULL_HANDLE, 1, &pipeline_info, NULL,
@@ -1773,7 +1745,7 @@ vk_destroy_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     for (uint32_t i = 0; i < pipeline->set_layout_count; i++)
         vk->DestroyDescriptorSetLayout(vk->dev, pipeline->set_layouts[i], NULL);
 
-    vk->DestroyPipelineLayout(vk->dev, pipeline->pipeline_layout, NULL);
+    vk->DestroyPipelineLayout(vk->dev, pipeline->layout, NULL);
 
     vk->DestroyPipeline(vk->dev, pipeline->pipeline, NULL);
 

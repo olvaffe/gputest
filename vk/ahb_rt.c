@@ -78,10 +78,11 @@ ahb_rt_test_init_pipeline(struct ahb_rt_test *test)
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
-    vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
-                               sizeof(ahb_rt_test_matrices[0]));
+    test->pipeline->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(ahb_rt_test_matrices[0]),
+    };
     test->pipeline->color_att_format = test->ahb_fmt_props.format;
     if (test->ahb_fmt_props.format == VK_FORMAT_UNDEFINED) {
         if (test->rt) {
@@ -472,7 +473,7 @@ ahb_rt_test_draw_triangle(struct ahb_rt_test *test, VkCommandBuffer cmd)
     vk_bind_pipeline(vk, test->pipeline, cmd);
     const VkPushConstantsInfo push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(ahb_rt_test_matrices[0]),
         .pValues = ahb_rt_test_matrices[test->is_ycbcr],

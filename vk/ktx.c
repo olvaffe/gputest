@@ -165,14 +165,15 @@ ktx_test_init_pipeline(struct ktx_test *test)
 
     vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,
                                VK_SHADER_STAGE_FRAGMENT_BIT, NULL);
-    vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
-                               sizeof(struct ktx_test_push_const));
+    test->pipeline->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(struct ktx_test_push_const),
+    };
 
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->rt_img->info.extent.width,
                              test->rt_img->info.extent.height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
     test->pipeline->sample_count = test->rt_img->info.samples;
 
@@ -370,7 +371,7 @@ ktx_test_draw_quad(struct ktx_test *test, VkCommandBuffer cmd)
     };
     const VkPushConstantsInfo push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(push),
         .pValues = &push,
@@ -379,7 +380,7 @@ ktx_test_draw_quad(struct ktx_test *test, VkCommandBuffer cmd)
     const VkBindDescriptorSetsInfo bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .descriptorSetCount = 1,
         .pDescriptorSets = &test->set->set,
     };

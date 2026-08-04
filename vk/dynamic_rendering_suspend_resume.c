@@ -43,9 +43,10 @@ dynamic_rendering_suspend_resume_test_init_pipeline(
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
-    vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
-                               sizeof(float[4]));
+    test->pipeline->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(float[4]),
+    };
 
     test->pipeline->color_att_format = test->color_format;
 
@@ -159,7 +160,7 @@ dynamic_rendering_suspend_resume_test_draw_triangle_1(
     const float red[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
     const VkPushConstantsInfo red_push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(red),
         .pValues = red,
@@ -182,7 +183,7 @@ dynamic_rendering_suspend_resume_test_draw_triangle_2(
     const float green[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
     const VkPushConstantsInfo green_push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(green),
         .pValues = green,
@@ -222,7 +223,7 @@ dynamic_rendering_suspend_resume_test_draw_triangle_3(
     const float blue[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
     const VkPushConstantsInfo blue_push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(blue),
         .pValues = blue,

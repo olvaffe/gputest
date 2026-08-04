@@ -113,8 +113,10 @@ conv1d_test_init_pipeline(struct conv1d_test *test)
     };
     vk_add_pipeline_set_layout_from_info(vk, test->pipeline, &set_layout_info);
 
-    vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_COMPUTE_BIT,
-                               sizeof(struct conv1d_test_push_consts));
+    test->pipeline->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .size = sizeof(struct conv1d_test_push_consts),
+    };
 
     vk_compile_pipeline(vk, test->pipeline);
 }
@@ -172,7 +174,7 @@ conv1d_test_dispatch(struct conv1d_test *test, bool warmup)
     const VkBindDescriptorSetsInfo bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .descriptorSetCount = 1,
         .pDescriptorSets = &test->set->set,
     };
@@ -183,7 +185,7 @@ conv1d_test_dispatch(struct conv1d_test *test, bool warmup)
     };
     const VkPushConstantsInfo push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
         .size = sizeof(consts),
         .pValues = &consts,

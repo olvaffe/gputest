@@ -120,11 +120,11 @@ mem_hog_test_init_pipeline(struct mem_hog_test *test)
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
-    vk_set_pipeline_push_const(vk, test->pipeline,
-                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                               sizeof(test->push_const));
+    test->pipeline->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(test->push_const),
+    };
     test->pipeline->color_att_format = test->img->info.format;
     vk_compile_pipeline(vk, test->pipeline);
 }
@@ -270,7 +270,7 @@ mem_hog_test_draw_triangle(struct mem_hog_test *test, VkCommandBuffer cmd)
     vk_bind_pipeline(vk, test->pipeline, cmd);
     const VkPushConstantsInfo push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(test->push_const),
         .pValues = &test->push_const,

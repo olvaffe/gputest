@@ -67,12 +67,13 @@ push_const_init_pipeline(struct push_const_test *test)
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
     vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
                                VK_SHADER_STAGE_FRAGMENT_BIT, NULL);
-    vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
-                               sizeof(push_const_test_color));
+    test->pipeline->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(push_const_test_color),
+    };
     test->pipeline->color_att_format = test->color_format;
     vk_compile_pipeline(vk, test->pipeline);
 }
@@ -225,7 +226,7 @@ push_const_draw_triangle(struct push_const_test *test, VkCommandBuffer cmd)
     vk_bind_pipeline(vk, test->pipeline, cmd);
     const VkPushConstantsInfo push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(push_const_test_color),
         .pValues = push_const_test_color,
@@ -235,7 +236,7 @@ push_const_draw_triangle(struct push_const_test *test, VkCommandBuffer cmd)
     const VkBindDescriptorSetsInfo bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .descriptorSetCount = 1,
         .pDescriptorSets = &test->set->set,
     };

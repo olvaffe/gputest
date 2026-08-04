@@ -85,7 +85,7 @@ tess_test_init_pipeline(struct tess_test *test)
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_LINE, false);
+    test->pipeline->poly_mode = VK_POLYGON_MODE_LINE;
     test->pipeline->patch_control_points = 3;
     test->pipeline->color_att_format = test->color_format;
     vk_compile_pipeline(vk, test->pipeline);

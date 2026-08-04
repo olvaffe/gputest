@@ -52,8 +52,10 @@ loop_test_init_pipeline(struct loop_test *test)
     vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
                                VK_SHADER_STAGE_COMPUTE_BIT, NULL);
 
-    vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_COMPUTE_BIT,
-                               sizeof(struct loop_test_push_consts));
+    test->pipeline->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .size = sizeof(struct loop_test_push_consts),
+    };
 
     vk_compile_pipeline(vk, test->pipeline);
 }
@@ -102,7 +104,7 @@ loop_test_dispatch(struct loop_test *test)
     const VkBindDescriptorSetsInfo bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .descriptorSetCount = 1,
         .pDescriptorSets = &test->set->set,
     };
@@ -113,7 +115,7 @@ loop_test_dispatch(struct loop_test *test)
     };
     const VkPushConstantsInfo push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
         .size = sizeof(consts),
         .pValues = &consts,

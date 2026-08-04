@@ -140,7 +140,10 @@ convlayer_test_init_pipeline(struct convlayer_test *test)
     vk_add_pipeline_set_layout_from_info(vk, test->pipeline, &set_layout_info);
 
     /* unused */
-    vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, 8);
+    test->pipeline->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = 8,
+    };
 
     vk_compile_pipeline(vk, test->pipeline);
 }
@@ -265,7 +268,7 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
     const VkBindDescriptorSetsInfo bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .layout = test->pipeline->pipeline_layout,
+        .layout = test->pipeline->layout,
         .descriptorSetCount = 1,
         .pDescriptorSets = &test->set->set,
     };

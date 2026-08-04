@@ -87,8 +87,10 @@ storage_3d_test_init_pipeline(struct storage_3d_test *test)
 
     vk_add_pipeline_set_layout(vk, test->pipeline, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1,
                                VK_SHADER_STAGE_COMPUTE_BIT, NULL);
-    vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_COMPUTE_BIT,
-                               sizeof(struct storage_3d_test_push_const));
+    test->pipeline->push_const = (VkPushConstantRange){
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .size = sizeof(struct storage_3d_test_push_const),
+    };
 
     vk_compile_pipeline(vk, test->pipeline);
 }
@@ -249,7 +251,7 @@ storage_3d_test_draw_quad(struct storage_3d_test *test, VkCommandBuffer cmd)
         const VkBindDescriptorSetsInfo bind_info = {
             .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-            .layout = test->pipeline->pipeline_layout,
+            .layout = test->pipeline->layout,
             .descriptorSetCount = 1,
             .pDescriptorSets = &test->sets[i]->set,
         };
@@ -260,7 +262,7 @@ storage_3d_test_draw_quad(struct storage_3d_test *test, VkCommandBuffer cmd)
         };
         const VkPushConstantsInfo push_info = {
             .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
-            .layout = test->pipeline->pipeline_layout,
+            .layout = test->pipeline->layout,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
             .size = sizeof(push),
             .pValues = &push,

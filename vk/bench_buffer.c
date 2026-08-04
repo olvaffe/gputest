@@ -290,7 +290,7 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test,
     const VkBindDescriptorSetsInfo bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .layout = pipeline->pipeline_layout,
+        .layout = pipeline->layout,
         .descriptorSetCount = 1,
         .pDescriptorSets = &set->set,
     };

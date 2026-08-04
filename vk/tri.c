@@ -88,7 +88,6 @@ tri_test_init_pipeline(struct tri_test *test)
     test->pipeline->scissor.offset.y += tri_border;
     test->pipeline->scissor.extent.width -= tri_border * 2;
     test->pipeline->scissor.extent.height -= tri_border * 2;
-    vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
     test->pipeline->color_att_format = test->color_format;
 
     vk_compile_pipeline(vk, test->pipeline);
