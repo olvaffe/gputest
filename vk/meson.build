@@ -19,6 +19,7 @@ tests = [
   'dynamic_rendering_suspend_resume',
   'external',
   'formats',
+  'gbuf',
   'gs',
   'ibo',
   'image',
