@@ -116,7 +116,7 @@ ycbcr_test_init_rt(struct ycbcr_test *test)
 }
 
 static void
-ycbcr_test_init_texture(struct ycbcr_test *test)
+ycbcr_test_init_tex(struct ycbcr_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -152,7 +152,7 @@ ycbcr_test_init(struct ycbcr_test *test)
     vk_init(vk, NULL);
     ycbcr_test_init_vb(test);
 
-    ycbcr_test_init_texture(test);
+    ycbcr_test_init_tex(test);
     ycbcr_test_init_rt(test);
     ycbcr_test_init_pipeline(test);
     ycbcr_test_init_descriptor_set(test);

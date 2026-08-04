@@ -146,7 +146,7 @@ tex_ubo_test_init_ubo(struct tex_ubo_test *test)
 }
 
 static void
-tex_ubo_test_init_texture(struct tex_ubo_test *test)
+tex_ubo_test_init_tex(struct tex_ubo_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -175,7 +175,7 @@ tex_ubo_test_init(struct tex_ubo_test *test)
     vk_init(vk, NULL);
     tex_ubo_test_init_vb(test);
 
-    tex_ubo_test_init_texture(test);
+    tex_ubo_test_init_tex(test);
     tex_ubo_test_init_ubo(test);
     tex_ubo_test_init_rt(test);
     tex_ubo_test_init_pipeline(test);

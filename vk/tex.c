@@ -115,7 +115,7 @@ tex_test_init_rt(struct tex_test *test)
 }
 
 static void
-tex_test_init_texture(struct tex_test *test)
+tex_test_init_tex(struct tex_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -142,9 +142,9 @@ tex_test_init(struct tex_test *test)
     struct vk *vk = &test->vk;
 
     vk_init(vk, NULL);
-    tex_test_init_vb(test);
 
-    tex_test_init_texture(test);
+    tex_test_init_vb(test);
+    tex_test_init_tex(test);
     tex_test_init_rt(test);
     tex_test_init_pipeline(test);
     tex_test_init_descriptor_set(test);

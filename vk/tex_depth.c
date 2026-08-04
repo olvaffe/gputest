@@ -119,7 +119,7 @@ tex_depth_test_init_rt(struct tex_depth_test *test)
 }
 
 static void
-tex_depth_test_init_depth_texture(struct tex_depth_test *test)
+tex_depth_test_init_tex(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
@@ -150,7 +150,7 @@ tex_depth_test_init(struct tex_depth_test *test)
     vk_init(vk, NULL);
     tex_depth_test_init_vb(test);
 
-    tex_depth_test_init_depth_texture(test);
+    tex_depth_test_init_tex(test);
     tex_depth_test_init_rt(test);
     tex_depth_test_init_pipeline(test);
     tex_depth_test_init_descriptor_set(test);
