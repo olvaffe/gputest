@@ -159,7 +159,7 @@ struct vk_pipeline {
     VkVertexInputBindingDescription vi_binding;
     VkVertexInputAttributeDescription vi_attrs[16];
     uint32_t vi_attr_count;
-    VkPipelineInputAssemblyStateCreateInfo ia_info;
+    VkPrimitiveTopology topology;
 
     /* pre-rasterization shader state */
     VkViewport viewport;
@@ -1527,10 +1527,7 @@ vk_set_pipeline_topology(struct vk *vk,
                          struct vk_pipeline *pipeline,
                          VkPrimitiveTopology topology)
 {
-    pipeline->ia_info = (VkPipelineInputAssemblyStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = topology,
-    };
+    pipeline->topology = topology;
 }
 
 static inline void
@@ -1697,6 +1694,10 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pVertexAttributeDescriptions = pipeline->vi_attrs,
     };
 
+    const VkPipelineInputAssemblyStateCreateInfo ia_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+    };
+
     const VkPipelineViewportStateCreateInfo vp_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
     };
@@ -1710,6 +1711,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     const VkDynamicState dynamic_states[] = {
         VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
         VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT,
+        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
     };
     const VkPipelineDynamicStateCreateInfo dynamic_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -1725,7 +1727,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .stageCount = pipeline->stage_count,
         .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,
-        .pInputAssemblyState = &pipeline->ia_info,
+        .pInputAssemblyState = &ia_info,
         .pTessellationState = &pipeline->tess_info,
         .pViewportState = &vp_info,
         .pRasterizationState = &pipeline->rast_info,
@@ -1756,6 +1758,9 @@ vk_bind_pipeline(struct vk *vk, const struct vk_pipeline *pipeline, VkCommandBuf
     }
 
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
+
+    vk->CmdSetPrimitiveTopology(cmd, pipeline->topology);
+
     vk->CmdSetViewportWithCount(cmd, 1, &pipeline->viewport);
     vk->CmdSetScissorWithCount(cmd, 1, &pipeline->scissor);
 }
