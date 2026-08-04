@@ -152,8 +152,8 @@ ycbcr_test_init(struct ycbcr_test *test)
 
     vk_init(vk, NULL);
     ycbcr_test_init_rt(test);
-    ycbcr_test_init_pipeline(test);
     ycbcr_test_init_tex(test);
+    ycbcr_test_init_pipeline(test);
     ycbcr_test_init_descriptor_set(test);
     ycbcr_test_init_vb(test);
 }
