@@ -57,6 +57,14 @@ static struct renderpass_ops_test_format renderpass_ops_test_formats[] = {
         .color = true,                                                                           \
         .plane_count = 1,                                                                        \
     },
+#define FMT_UINT(fmt)                                                                            \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+    },
+#define FMT_SINT(fmt)                                                                            \
+    {                                                                                            \
+        FMT_COMMON(fmt),                                                                         \
+    },
 #define FMT_D(fmt)                                                                               \
     {                                                                                            \
         FMT_COMMON(fmt),                                                                         \
@@ -271,7 +279,7 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
         };
     }
 
-    if (test->color_img) {
+    if (fmt->color) {
         test->color_att = (VkRenderingAttachmentInfo){
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = test->color_img->render_view,
@@ -281,7 +289,7 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
             .clearValue = clear_vals[0],
         };
     }
-    if (test->depth_img) {
+    if (fmt->depth || fmt->stencil) {
         test->depth_att = (VkRenderingAttachmentInfo){
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = test->depth_img->render_view,
@@ -300,10 +308,10 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
             },
         },
         .layerCount = 1,
-        .colorAttachmentCount = test->color_img ? 1 : 0,
-        .pColorAttachments = test->color_img ? &test->color_att : NULL,
-        .pDepthAttachment = test->depth_img ? &test->depth_att : NULL,
-        .pStencilAttachment = (test->depth_img && fmt->stencil) ? &test->depth_att : NULL,
+        .colorAttachmentCount = fmt->color ? 1 : 0,
+        .pColorAttachments = fmt->color ? &test->color_att : NULL,
+        .pDepthAttachment = fmt->depth ? &test->depth_att : NULL,
+        .pStencilAttachment = (fmt->stencil && !fmt->depth) ? &test->depth_att : NULL,
     };
 }
 
@@ -327,11 +335,11 @@ renderpass_ops_test_begin_pipeline(struct renderpass_ops_test *test,
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     test->pipeline->color_att_format =
-        test->color_img ? test->color_img->info.format : VK_FORMAT_UNDEFINED;
+        fmt->color ? test->color_img->info.format : VK_FORMAT_UNDEFINED;
     test->pipeline->depth_att_format =
-        test->depth_img ? test->depth_img->info.format : VK_FORMAT_UNDEFINED;
+        fmt->depth ? test->depth_img->info.format : VK_FORMAT_UNDEFINED;
     test->pipeline->stencil_att_format =
-        (test->depth_img && fmt->stencil) ? test->depth_img->info.format : VK_FORMAT_UNDEFINED;
+        (fmt->stencil && !fmt->depth) ? test->depth_img->info.format : VK_FORMAT_UNDEFINED;
     vk_compile_pipeline(vk, test->pipeline);
 
     vk_bind_pipeline(vk, test->pipeline, test->cmd);
@@ -401,7 +409,9 @@ renderpass_ops_test_end_all(struct renderpass_ops_test *test, bool dump_color)
     if (dump_color) {
         const VkImageMemoryBarrier2 barrier = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
             .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
             .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
@@ -524,7 +534,7 @@ main(void)
     struct renderpass_ops_test test = {
         .verbose = true,
         .dump_color_format = VK_FORMAT_B8G8R8A8_UNORM,
-        .force_color_format = VK_FORMAT_B8G8R8A8_UNORM, /* to force binning */
+        .force_color_format = VK_FORMAT_UNDEFINED, /* to force binning */
         .width = 900,
         .height = 900,
     };
