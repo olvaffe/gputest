@@ -162,15 +162,14 @@ struct vk_pipeline {
     VkPrimitiveTopology topology;
 
     /* pre-rasterization shader state */
+    uint32_t patch_control_points;
     VkViewport viewport;
     VkRect2D scissor;
     VkPolygonMode poly_mode;
     bool rasterizer_discard;
-    VkPipelineTessellationStateCreateInfo tess_info;
 
     /* fragment shader state */
-    VkPipelineMultisampleStateCreateInfo msaa_info;
-    VkSampleMask sample_mask;
+    VkSampleCountFlagBits sample_count;
     VkPipelineDepthStencilStateCreateInfo depth_info;
 
     /* fragment output state */
@@ -1453,6 +1452,10 @@ vk_create_pipeline(struct vk *vk)
     if (!pipeline)
         vk_die("failed to alloc pipeline");
 
+    pipeline->topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    pipeline->poly_mode = VK_POLYGON_MODE_FILL;
+    pipeline->sample_count = VK_SAMPLE_COUNT_1_BIT;
+
     pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
     };
@@ -1568,28 +1571,6 @@ vk_set_pipeline_rasterization(struct vk *vk,
 {
     pipeline->poly_mode = poly_mode;
     pipeline->rasterizer_discard = discard;
-}
-
-static inline void
-vk_set_pipeline_tessellation(struct vk *vk, struct vk_pipeline *pipeline, uint32_t cp_count)
-{
-    pipeline->tess_info = (VkPipelineTessellationStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
-        .patchControlPoints = cp_count,
-    };
-}
-
-static inline void
-vk_set_pipeline_sample_count(struct vk *vk,
-                             struct vk_pipeline *pipeline,
-                             VkSampleCountFlagBits sample_count)
-{
-    pipeline->sample_mask = (1u << sample_count) - 1;
-    pipeline->msaa_info = (VkPipelineMultisampleStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .rasterizationSamples = sample_count,
-        .pSampleMask = &pipeline->sample_mask,
-    };
 }
 
 static inline void
@@ -1725,6 +1706,18 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .flags = pipeline->flags2,
     };
 
+    const VkPipelineTessellationStateCreateInfo tess_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
+        .patchControlPoints = pipeline->patch_control_points,
+    };
+
+    const VkSampleMask sample_mask = (1u << pipeline->sample_count) - 1;
+    const VkPipelineMultisampleStateCreateInfo msaa_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .rasterizationSamples = pipeline->sample_count,
+        .pSampleMask = &sample_mask,
+    };
+
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = &flags2_info,
@@ -1732,10 +1725,10 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,
         .pInputAssemblyState = &ia_info,
-        .pTessellationState = &pipeline->tess_info,
+        .pTessellationState = &tess_info,
         .pViewportState = &vp_info,
         .pRasterizationState = &rast_info,
-        .pMultisampleState = &pipeline->msaa_info,
+        .pMultisampleState = &msaa_info,
         .pDepthStencilState = &pipeline->depth_info,
         .pColorBlendState = &color_info,
         .pDynamicState = &dynamic_info,

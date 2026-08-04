@@ -174,7 +174,7 @@ ktx_test_init_pipeline(struct ktx_test *test)
                              test->rt_img->info.extent.height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
 
-    vk_set_pipeline_sample_count(vk, test->pipeline, test->rt_img->info.samples);
+    test->pipeline->sample_count = test->rt_img->info.samples;
 
     test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,

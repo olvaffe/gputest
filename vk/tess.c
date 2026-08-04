@@ -86,10 +86,7 @@ tess_test_init_pipeline(struct tess_test *test)
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_LINE, false);
-    vk_set_pipeline_tessellation(vk, test->pipeline, 3);
-
-    vk_set_pipeline_sample_count(vk, test->pipeline, VK_SAMPLE_COUNT_1_BIT);
-
+    test->pipeline->patch_control_points = 3;
     test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = 1,

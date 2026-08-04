@@ -544,7 +544,6 @@ bench_image_test_render_pass(struct bench_image_test *test,
         pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
         vk_set_pipeline_viewport(vk, pipeline, test->width, test->height);
         vk_set_pipeline_rasterization(vk, pipeline, VK_POLYGON_MODE_FILL, false);
-        vk_set_pipeline_sample_count(vk, pipeline, VK_SAMPLE_COUNT_1_BIT);
 
         pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
