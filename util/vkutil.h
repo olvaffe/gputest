@@ -325,7 +325,7 @@ vk_init_physical_device_memory_properties(struct vk *vk)
 static inline void
 vk_init_physical_device_feature_fixups(struct vk *vk)
 {
-    /* most features are enabled by default */
+    /* mask potentially expensive features by default */
 
     if (vk->params.require_robustness) {
         if (!vk->features.features.robustBufferAccess ||
@@ -340,7 +340,7 @@ vk_init_physical_device_feature_fixups(struct vk *vk)
 
     if (vk->params.require_sparse) {
         if (!vk->features.features.sparseBinding)
-            vk_die("no pipeline stats");
+            vk_die("no sparse");
     } else if (!vk->params.enable_all_features) {
         vk->features.features.sparseBinding = false;
         vk->features.features.sparseResidencyBuffer = false;
