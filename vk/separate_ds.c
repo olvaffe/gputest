@@ -146,7 +146,7 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
     if (test->depth_bits) {
         before_barriers[before_barrier_count++] = (VkImageMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .srcAccessMask = 0,
+            .srcAccessMask = VK_ACCESS_2_NONE,
             .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = test->depth_layout,
@@ -161,7 +161,7 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
     if (test->stencil_bits) {
         before_barriers[before_barrier_count++] = (VkImageMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .srcAccessMask = 0,
+            .srcAccessMask = VK_ACCESS_2_NONE,
             .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = test->stencil_layout,

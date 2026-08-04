@@ -167,7 +167,7 @@ tex_depth_test_draw_triangle(struct tex_depth_test *test, VkCommandBuffer cmd)
     const VkImageMemoryBarrier2 barrier1 = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-        .srcAccessMask = 0,
+        .srcAccessMask = VK_ACCESS_2_NONE,
         .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
         .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -257,7 +257,7 @@ tex_depth_test_draw_prep_texture(struct tex_depth_test *test, VkCommandBuffer cm
     };
     const VkImageMemoryBarrier2 barrier1 = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-        .srcAccessMask = 0,
+        .srcAccessMask = VK_ACCESS_2_NONE,
         .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
