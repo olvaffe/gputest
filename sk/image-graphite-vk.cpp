@@ -36,10 +36,7 @@ image_graphite_vk_test_init(struct image_graphite_vk_test *test)
     struct vk *vk = &test->vk;
     struct sk *sk = &test->sk;
 
-    const struct vk_init_params vk_params = {
-        .enable_all_features = true,
-    };
-    vk_init(vk, &vk_params);
+    vk_init(vk, NULL);
 
     sk_init(sk, NULL);
 

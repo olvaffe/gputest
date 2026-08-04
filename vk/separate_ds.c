@@ -108,11 +108,7 @@ static void
 separate_ds_test_init(struct separate_ds_test *test)
 {
     struct vk *vk = &test->vk;
-    const struct vk_init_params params = {
-        .enable_all_features = true,
-    };
-
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
 
     if (!vk->vulkan_12_features.separateDepthStencilLayouts)
         vk_die("missing separateDepthStencilLayouts support");

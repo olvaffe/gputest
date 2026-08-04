@@ -278,10 +278,7 @@ ktx_test_init(struct ktx_test *test)
 
     ktx_test_load_file(test);
 
-    const struct vk_init_params params = {
-        .enable_all_features = true,
-    };
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
 
     ktx_test_init_staging_buffer(test);
     ktx_test_init_texture_image(test);

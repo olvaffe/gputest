@@ -70,7 +70,7 @@ pipeline_stats_test_init(struct pipeline_stats_test *test)
 {
     struct vk *vk = &test->vk;
     const struct vk_init_params params = {
-        .enable_all_features = true,
+        .require_pipeline_stats = true,
     };
 
     vk_init(vk, &params);

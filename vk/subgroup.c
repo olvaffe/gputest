@@ -107,10 +107,7 @@ subgroup_test_init(struct subgroup_test *test)
 {
     struct vk *vk = &test->vk;
 
-    const struct vk_init_params params = {
-        .enable_all_features = true,
-    };
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
 
     subgroup_test_init_buffers(test);
     subgroup_test_init_pipeline(test);

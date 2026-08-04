@@ -17,11 +17,7 @@ static void
 timeline_test_init(struct timeline_test *test)
 {
     struct vk *vk = &test->vk;
-    const struct vk_init_params params = {
-        .enable_all_features = true,
-    };
-
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
 
     test->sem = vk_create_semaphore(vk, VK_SEMAPHORE_TYPE_TIMELINE, 0);
 }

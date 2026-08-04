@@ -195,10 +195,7 @@ convlayer_test_init(struct convlayer_test *test)
 {
     struct vk *vk = &test->vk;
 
-    const struct vk_init_params params = {
-        .enable_all_features = true,
-    };
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
 
     convlayer_test_init_buffers(test);
     convlayer_test_init_images(test);

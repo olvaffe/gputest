@@ -233,7 +233,6 @@ main(void)
     struct vk vk;
 
     const struct vk_init_params params = {
-        .api_version = VK_API_VERSION_1_4,
         .enable_all_features = true,
     };
     vk_init(&vk, &params);

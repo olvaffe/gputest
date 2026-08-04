@@ -256,10 +256,7 @@ desc_buf_test_init(struct desc_buf_test *test)
 {
     struct vk *vk = &test->vk;
 
-    const struct vk_init_params params = {
-        .enable_all_features = true,
-    };
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
 
     desc_buf_test_init_buffer(test);
     desc_buf_test_init_pipeline(test);

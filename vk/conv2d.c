@@ -164,10 +164,7 @@ conv2d_test_init(struct conv2d_test *test)
 {
     struct vk *vk = &test->vk;
 
-    const struct vk_init_params params = {
-        .enable_all_features = true,
-    };
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
 
     conv2d_test_init_buffers(test);
     conv2d_test_init_pipeline(test);

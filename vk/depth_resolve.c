@@ -95,10 +95,7 @@ depth_resolve_test_init(struct depth_resolve_test *test)
 {
     struct vk *vk = &test->vk;
 
-    const struct vk_init_params params = {
-        .enable_all_features = true,
-    };
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
 
     if (!vk->vulkan_13_features.dynamicRendering)
         vk_die("missing dynamicRendering support");

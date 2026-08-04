@@ -76,11 +76,7 @@ static void
 dynamic_rendering_suspend_resume_test_init(struct dynamic_rendering_suspend_resume_test *test)
 {
     struct vk *vk = &test->vk;
-    const struct vk_init_params params = {
-        .enable_all_features = true,
-    };
-
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
 
     dynamic_rendering_suspend_resume_test_init_framebuffer(test);
     dynamic_rendering_suspend_resume_test_init_pipeline(test);
