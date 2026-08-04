@@ -89,9 +89,36 @@ msaa_test_init_rt(struct msaa_test *test)
 {
     struct vk *vk = &test->vk;
 
-    test->rt =
-        vk_create_image(vk, test->color_format, test->width, test->height, VK_SAMPLE_COUNT_4_BIT,
-                        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    uint32_t mt_mask = 0;
+    for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
+        if (vk->mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT)
+            mt_mask |= 1 << i;
+    }
+
+    const VkImageCreateInfo msaa_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = test->color_format,
+        .extent = {
+            .width = test->width,
+            .height = test->height,
+            .depth = 1,
+        },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = VK_SAMPLE_COUNT_4_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                 (mt_mask ? VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : 0),
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+
+    if (!mt_mask) {
+        vk_log("no VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT");
+        mt_mask = ~0u;
+    }
+
+    test->rt = vk_create_image_with_mt_mask(vk, &msaa_info, mt_mask);
     vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
 
     test->resolved =
@@ -107,7 +134,7 @@ msaa_test_init_rt(struct msaa_test *test)
         .resolveImageView = test->resolved->render_view,
         .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
         .clearValue = {
             .color = {
                 .float32 = { 0.2f, 0.2f, 0.2f, 1.0f },
