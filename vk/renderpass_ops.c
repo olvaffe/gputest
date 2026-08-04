@@ -195,7 +195,7 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
         vk_create_image_render_view(vk, test->color_img, color_aspect_mask);
 
         const VkImageMemoryBarrier2 color_barrier = {
-        .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+        .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
         .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .srcAccessMask = VK_ACCESS_2_NONE,
@@ -231,7 +231,7 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
         vk_create_image_render_view(vk, test->depth_img, depth_aspect_mask);
 
         const VkImageMemoryBarrier2 depth_barrier = {
-        .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+        .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
         .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .srcAccessMask = VK_ACCESS_2_NONE,

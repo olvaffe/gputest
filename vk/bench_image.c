@@ -121,9 +121,9 @@ bench_image_test_barrier(struct bench_image_test *test,
     struct vk *vk = &test->vk;
 
     if (src_stage == VK_PIPELINE_STAGE_2_NONE)
-        src_stage = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+        src_stage = VK_PIPELINE_STAGE_2_NONE;
     if (dst_stage == VK_PIPELINE_STAGE_2_NONE)
-        dst_stage = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+        dst_stage = VK_PIPELINE_STAGE_2_NONE;
 
     const VkImageMemoryBarrier2 barrier = {
         .srcStageMask = src_stage,
