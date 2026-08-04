@@ -279,6 +279,16 @@ gbuf_test_draw_triangle(struct gbuf_test *test, VkCommandBuffer cmd)
     };
     vk->CmdBindDescriptorSets2(cmd, &bind_info);
 
+    /* The spec says
+     *
+     *   Because load operations always happen first, external synchronization
+     *   with attachment access only needs to synchronize the load operations
+     *   with previous commands; not the operations within the render pass
+     *   instance.
+     *
+     * Otherwise, we would need a VK_DEPENDENCY_BY_REGION_BIT barrier with
+     * VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT.
+     */
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
     vk->CmdEndRendering(cmd);
