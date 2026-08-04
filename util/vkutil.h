@@ -1601,11 +1601,12 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL, &pipeline->layout);
     vk_check(vk, "failed to create pipeline layout");
 
+    const VkPipelineCreateFlags2CreateInfo flags2_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
+        .flags = pipeline->flags2,
+    };
+
     if (pipeline->stage_count == 1 && pipeline->stages[0].stage == VK_SHADER_STAGE_COMPUTE_BIT) {
-        const VkPipelineCreateFlags2CreateInfo flags2_info = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
-            .flags = pipeline->flags2,
-        };
         const VkComputePipelineCreateInfo compute_info = {
             .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
             .pNext = &flags2_info,
@@ -1620,7 +1621,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 
     const VkPipelineVertexInputStateCreateInfo vi_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = (uint32_t)(pipeline->vi_attr_count ? 1 : 0),
+        .vertexBindingDescriptionCount = pipeline->vi_attr_count ? 1u : 0u,
         .pVertexBindingDescriptions = &pipeline->vi_binding,
         .vertexAttributeDescriptionCount = pipeline->vi_attr_count,
         .pVertexAttributeDescriptions = pipeline->vi_attrs,
@@ -1630,6 +1631,11 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
     };
 
+    const VkPipelineTessellationStateCreateInfo tess_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
+        .patchControlPoints = pipeline->patch_control_points,
+    };
+
     const VkPipelineViewportStateCreateInfo vp_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
     };
@@ -1637,6 +1643,13 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     const VkPipelineRasterizationStateCreateInfo rast_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .polygonMode = pipeline->poly_mode,
+    };
+
+    const VkSampleMask sample_mask = (1u << pipeline->sample_count) - 1;
+    const VkPipelineMultisampleStateCreateInfo msaa_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .rasterizationSamples = pipeline->sample_count,
+        .pSampleMask = &sample_mask,
     };
 
     const VkPipelineColorBlendAttachmentState blend_att = {
@@ -1650,13 +1663,10 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     };
 
     const VkDynamicState dynamic_states[] = {
-        VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
-        VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT,
-        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
-        VK_DYNAMIC_STATE_CULL_MODE,
-        VK_DYNAMIC_STATE_FRONT_FACE,
+        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY, VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
+        VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT, VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE,
+        VK_DYNAMIC_STATE_CULL_MODE,          VK_DYNAMIC_STATE_FRONT_FACE,
         VK_DYNAMIC_STATE_LINE_WIDTH,
-        VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE,
     };
     const VkPipelineDynamicStateCreateInfo dynamic_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -1664,41 +1674,25 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pDynamicStates = dynamic_states,
     };
 
+    const uint32_t color_att_count =
+        pipeline->color_att_format != VK_FORMAT_UNDEFINED || pipeline->external_format != 0;
     const VkExternalFormatANDROID ext_fmt = {
         .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
+        .pNext = (void *)&flags2_info,
         .externalFormat = pipeline->external_format,
     };
-
     const VkPipelineRenderingCreateInfo rendering_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .pNext = pipeline->external_format ? &ext_fmt : NULL,
-        .colorAttachmentCount = pipeline->color_att_format != VK_FORMAT_UNDEFINED ? 1u : 0u,
+        .pNext = pipeline->external_format ? (const void *)&ext_fmt : (const void *)&flags2_info,
+        .colorAttachmentCount = color_att_count,
         .pColorAttachmentFormats = &pipeline->color_att_format,
         .depthAttachmentFormat = pipeline->depth_att_format,
         .stencilAttachmentFormat = pipeline->stencil_att_format,
     };
 
-    const VkPipelineCreateFlags2CreateInfo flags2_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
-        .pNext = &rendering_info,
-        .flags = pipeline->flags2,
-    };
-
-    const VkPipelineTessellationStateCreateInfo tess_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
-        .patchControlPoints = pipeline->patch_control_points,
-    };
-
-    const VkSampleMask sample_mask = (1u << pipeline->sample_count) - 1;
-    const VkPipelineMultisampleStateCreateInfo msaa_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .rasterizationSamples = pipeline->sample_count,
-        .pSampleMask = &sample_mask,
-    };
-
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext = &flags2_info,
+        .pNext = &rendering_info,
         .stageCount = pipeline->stage_count,
         .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,
@@ -1728,15 +1722,15 @@ vk_bind_pipeline(struct vk *vk, const struct vk_pipeline *pipeline, VkCommandBuf
 
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
 
-    vk->CmdSetCullMode(cmd, VK_CULL_MODE_NONE);
-    vk->CmdSetFrontFace(cmd, VK_FRONT_FACE_COUNTER_CLOCKWISE);
-    vk->CmdSetLineWidth(cmd, 1.0f);
-    vk->CmdSetRasterizerDiscardEnable(cmd, pipeline->rasterizer_discard);
-
     vk->CmdSetPrimitiveTopology(cmd, pipeline->topology);
 
     vk->CmdSetViewportWithCount(cmd, 1, &pipeline->viewport);
     vk->CmdSetScissorWithCount(cmd, 1, &pipeline->scissor);
+
+    vk->CmdSetRasterizerDiscardEnable(cmd, pipeline->rasterizer_discard);
+    vk->CmdSetCullMode(cmd, VK_CULL_MODE_NONE);
+    vk->CmdSetFrontFace(cmd, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    vk->CmdSetLineWidth(cmd, 1.0f);
 }
 
 static inline void
