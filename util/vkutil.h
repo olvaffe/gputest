@@ -1629,6 +1629,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 
     const VkPipelineInputAssemblyStateCreateInfo ia_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .topology = pipeline->topology,
     };
 
     const VkPipelineTessellationStateCreateInfo tess_info = {
@@ -1667,7 +1668,6 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     };
 
     const VkDynamicState dynamic_states[] = {
-        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
         VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
         VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT,
         VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE,
@@ -1736,8 +1736,6 @@ vk_bind_pipeline(struct vk *vk, const struct vk_pipeline *pipeline, VkCommandBuf
     }
 
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
-
-    vk->CmdSetPrimitiveTopology(cmd, pipeline->topology);
 
     vk->CmdSetViewportWithCount(cmd, 1, &pipeline->viewport);
     vk->CmdSetScissorWithCount(cmd, 1, &pipeline->scissor);
