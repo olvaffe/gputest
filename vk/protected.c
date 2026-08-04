@@ -258,8 +258,7 @@ protected_test_draw_triangle(struct protected_test *test, VkCommandBuffer cmd)
     vk->CmdBeginRendering(cmd, &rendering_info);
 
     vk_bind_pipeline(vk, test->pipeline, cmd);
-    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 },
-                              &(VkDeviceSize){ test->vb->info.size }, NULL);
+    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);
     vk->CmdBindIndexBuffer2(cmd, test->ib->buf, 0, test->ib->info.size, VK_INDEX_TYPE_UINT16);
 
     vk->CmdDrawIndexed(cmd, ARRAY_SIZE(protected_test_indices), 1, 0, 0, 0);
