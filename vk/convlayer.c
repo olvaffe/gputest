@@ -231,7 +231,9 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
     const VkImageMemoryBarrier2 barriers[] = {
         [0] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
             .srcAccessMask = VK_ACCESS_2_NONE,
+            .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
             .dstAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
@@ -244,7 +246,9 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
         },
         [1] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
             .srcAccessMask = VK_ACCESS_2_NONE,
+            .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
             .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = VK_IMAGE_LAYOUT_GENERAL,
