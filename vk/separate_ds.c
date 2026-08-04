@@ -178,7 +178,9 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
     if (test->depth_bits) {
         before_barriers[before_barrier_count++] = (VkImageMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
             .srcAccessMask = VK_ACCESS_2_NONE,
+            .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
             .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = test->depth_layout,
@@ -193,7 +195,9 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
     if (test->stencil_bits) {
         before_barriers[before_barrier_count++] = (VkImageMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
             .srcAccessMask = VK_ACCESS_2_NONE,
+            .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
             .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = test->stencil_layout,
@@ -223,7 +227,9 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
     if (test->depth_bits) {
         after_barriers[after_barrier_count++] = (VkImageMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
             .srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
             .oldLayout = test->depth_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -238,7 +244,9 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
     if (test->stencil_bits) {
         after_barriers[after_barrier_count++] = (VkImageMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
             .srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
             .oldLayout = test->stencil_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -285,7 +293,9 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
 
         copy_barriers[copy_barrier_count++] = (VkBufferMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
             .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
             .buffer = test->d_buf->buf,
             .size = VK_WHOLE_SIZE,
@@ -316,7 +326,9 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
 
         copy_barriers[copy_barrier_count++] = (VkBufferMemoryBarrier2){
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
             .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
             .buffer = test->s_buf->buf,
             .size = VK_WHOLE_SIZE,
