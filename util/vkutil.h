@@ -40,7 +40,14 @@ struct vk_init_params {
     const char *render_node;
 
     uint32_t api_version;
+
     bool enable_all_features;
+    bool require_robustness;
+    bool require_sparse;
+    bool require_pipeline_stats;
+    bool require_bda;
+    bool require_desc_indexing;
+
     bool geometry_shader;
     bool tessellation_shader;
     bool fill_mode_non_solid;
@@ -319,6 +326,75 @@ vk_init_physical_device_memory_properties(struct vk *vk)
 }
 
 static inline void
+vk_init_physical_device_feature_fixups(struct vk *vk)
+{
+    /* most features are enabled by default */
+
+    if (vk->params.require_robustness) {
+        if (!vk->features.features.robustBufferAccess ||
+            !vk->vulkan_13_features.robustImageAccess ||
+            !vk->vulkan_14_features.pipelineRobustness)
+            vk_die("no robustness");
+    } else if (!vk->params.enable_all_features) {
+        vk->features.features.robustBufferAccess = false;
+        vk->vulkan_13_features.robustImageAccess = false;
+        vk->vulkan_14_features.pipelineRobustness = false;
+    }
+
+    if (vk->params.require_sparse) {
+        if (!vk->features.features.sparseBinding)
+            vk_die("no pipeline stats");
+    } else if (!vk->params.enable_all_features) {
+        vk->features.features.sparseBinding = false;
+        vk->features.features.sparseResidencyBuffer = false;
+        vk->features.features.sparseResidencyImage2D = false;
+        vk->features.features.sparseResidencyImage3D = false;
+        vk->features.features.sparseResidency2Samples = false;
+        vk->features.features.sparseResidency4Samples = false;
+        vk->features.features.sparseResidency8Samples = false;
+        vk->features.features.sparseResidency16Samples = false;
+        vk->features.features.sparseResidencyAliased = false;
+    }
+
+    if (vk->params.require_pipeline_stats) {
+        if (!vk->features.features.pipelineStatisticsQuery)
+            vk_die("no pipeline stats");
+    } else if (!vk->params.enable_all_features) {
+        vk->features.features.pipelineStatisticsQuery = false;
+    }
+
+    if (vk->params.protected_memory) {
+        if (!vk->vulkan_11_features.protectedMemory)
+            vk_die("no protected memory");
+    } else if (!vk->params.enable_all_features) {
+        vk->vulkan_11_features.protectedMemory = false;
+    }
+
+    if (vk->params.require_bda) {
+        if (!vk->vulkan_12_features.bufferDeviceAddress ||
+            !vk->vulkan_12_features.bufferDeviceAddressCaptureReplay)
+            vk_die("no bda");
+    } else if (!vk->params.enable_all_features) {
+        vk->vulkan_12_features.bufferDeviceAddress = false;
+        vk->vulkan_12_features.bufferDeviceAddressCaptureReplay = false;
+    }
+
+    if (vk->params.require_desc_indexing) {
+        if (!vk->vulkan_12_features.descriptorIndexing)
+            vk_die("no desc indexing");
+    } else if (!vk->params.enable_all_features) {
+        vk->vulkan_12_features.descriptorIndexing = false;
+    }
+
+    if (vk->params.geometry_shader && !vk->features.features.geometryShader)
+        vk_die("no geometry shader support");
+    if (vk->params.tessellation_shader && !vk->features.features.tessellationShader)
+        vk_die("no tessellation shader support");
+    if (vk->params.fill_mode_non_solid && !vk->features.features.fillModeNonSolid)
+        vk_die("no non-solid fill mode support");
+}
+
+static inline void
 vk_init_physical_device_features(struct vk *vk)
 {
     vk->features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -426,6 +502,7 @@ vk_init_physical_device(struct vk *vk)
     }
 
     vk_init_physical_device_features(vk);
+    vk_init_physical_device_feature_fixups(vk);
     vk_init_physical_device_memory_properties(vk);
 }
 
@@ -440,55 +517,8 @@ vk_init_device_dispatch(struct vk *vk)
 }
 
 static inline void
-vk_init_device_enabled_features(struct vk *vk, VkPhysicalDeviceFeatures2 *features)
-{
-    if (vk->params.geometry_shader && !vk->features.features.geometryShader)
-        vk_die("no geometry shader support");
-    if (vk->params.tessellation_shader && !vk->features.features.tessellationShader)
-        vk_die("no tessellation shader support");
-    if (vk->params.fill_mode_non_solid && !vk->features.features.fillModeNonSolid)
-        vk_die("no non-solid fill mode support");
-
-    if (vk->params.protected_memory && !vk->vulkan_11_features.protectedMemory)
-        vk_die("no protected memory support");
-
-    // if (!vk->vulkan_11_features.samplerYcbcrConversion)
-    //     vk_die("no ycbcr conversion support");
-
-    if (vk->params.enable_all_features) {
-        *features = vk->features;
-        return;
-    }
-
-    *features = (VkPhysicalDeviceFeatures2){
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .features = {
-            .geometryShader = vk->params.geometry_shader,
-            .tessellationShader = vk->params.tessellation_shader,
-            .fillModeNonSolid = vk->params.fill_mode_non_solid,
-        },
-    };
-
-    void **pnext = &features->pNext;
-    *pnext = &vk->vulkan_11_features;
-    vk->vulkan_11_features.pNext = &vk->vulkan_12_features;
-    vk->vulkan_12_features.pNext = &vk->vulkan_13_features;
-    vk->vulkan_13_features.pNext = &vk->vulkan_14_features;
-    pnext = &vk->vulkan_14_features.pNext;
-    if (vk->EXT_custom_border_color) {
-        *pnext = &vk->custom_border_color_features;
-        pnext = &vk->custom_border_color_features.pNext;
-    }
-
-    *pnext = NULL;
-}
-
-static inline void
 vk_init_device(struct vk *vk)
 {
-    VkPhysicalDeviceFeatures2 enabled_features;
-    vk_init_device_enabled_features(vk, &enabled_features);
-
     vk->queue_family_index = 0;
 
     VkQueueFamilyGlobalPriorityProperties prio_props = {
@@ -532,7 +562,7 @@ vk_init_device(struct vk *vk)
     };
     const VkDeviceCreateInfo dev_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = &enabled_features,
+        .pNext = &vk->features,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = &queue_create_info,
         .enabledExtensionCount = vk->params.dev_ext_count,
