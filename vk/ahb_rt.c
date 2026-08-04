@@ -83,10 +83,12 @@ ahb_rt_test_init_pipeline(struct ahb_rt_test *test)
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(ahb_rt_test_matrices[0]),
     };
-    test->pipeline->color_att_format = test->ahb_fmt_props.format;
+
+    test->pipeline->color_count = 1;
+    test->pipeline->color_formats[0] = test->ahb_fmt_props.format;
     if (test->ahb_fmt_props.format == VK_FORMAT_UNDEFINED) {
         if (test->rt) {
-            test->pipeline->color_att_format = test->ahb_resolve_props.colorAttachmentFormat;
+            test->pipeline->color_formats[0] = test->ahb_resolve_props.colorAttachmentFormat;
         } else {
             test->pipeline->external_format = test->ahb_fmt_props.externalFormat;
         }

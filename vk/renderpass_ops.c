@@ -334,11 +334,13 @@ renderpass_ops_test_begin_pipeline(struct renderpass_ops_test *test,
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    test->pipeline->color_att_format =
-        fmt->color ? test->color_img->info.format : VK_FORMAT_UNDEFINED;
-    test->pipeline->depth_att_format =
+
+    test->pipeline->color_formats[0] = test->color_img->info.format;
+    test->pipeline->color_count = fmt->color ? 1 : 0;
+
+    test->pipeline->depth_format =
         fmt->depth ? test->depth_img->info.format : VK_FORMAT_UNDEFINED;
-    test->pipeline->stencil_att_format =
+    test->pipeline->stencil_format =
         (fmt->stencil && !fmt->depth) ? test->depth_img->info.format : VK_FORMAT_UNDEFINED;
     vk_compile_pipeline(vk, test->pipeline);
 

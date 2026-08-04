@@ -181,9 +181,10 @@ struct vk_pipeline {
     VkStencilOpState stencil_front;
 
     /* fragment output state */
-    VkFormat color_att_format;
-    VkFormat depth_att_format;
-    VkFormat stencil_att_format;
+    VkFormat color_formats[4];
+    uint32_t color_count;
+    VkFormat depth_format;
+    VkFormat stencil_format;
     uint64_t external_format;
 
     VkPipelineLayout layout;
@@ -610,6 +611,10 @@ vk_init_desc_pool(struct vk *vk)
         },
         [7] = {
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+            .descriptorCount = 32,
+        },
+        [8] = {
+            .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
             .descriptorCount = 32,
         },
     };
@@ -1661,14 +1666,17 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
     };
 
-    const VkPipelineColorBlendAttachmentState blend_att = {
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-    };
+    VkPipelineColorBlendAttachmentState blend_atts[ARRAY_SIZE(pipeline->color_formats)];
+    for (uint32_t i = 0; i < pipeline->color_count; i++) {
+        blend_atts[i] = (VkPipelineColorBlendAttachmentState){
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+        };
+    }
     const VkPipelineColorBlendStateCreateInfo blend_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-        .attachmentCount = 1,
-        .pAttachments = &blend_att,
+        .attachmentCount = pipeline->color_count,
+        .pAttachments = blend_atts,
     };
 
     const VkDynamicState dynamic_states[] = {
@@ -1693,8 +1701,6 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pDynamicStates = dynamic_states,
     };
 
-    const uint32_t color_att_count =
-        pipeline->color_att_format != VK_FORMAT_UNDEFINED || pipeline->external_format != 0;
     const VkExternalFormatANDROID ext_fmt = {
         .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
         .pNext = (void *)&flags2_info,
@@ -1703,10 +1709,10 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     const VkPipelineRenderingCreateInfo rendering_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .pNext = pipeline->external_format ? (const void *)&ext_fmt : (const void *)&flags2_info,
-        .colorAttachmentCount = color_att_count,
-        .pColorAttachmentFormats = &pipeline->color_att_format,
-        .depthAttachmentFormat = pipeline->depth_att_format,
-        .stencilAttachmentFormat = pipeline->stencil_att_format,
+        .colorAttachmentCount = pipeline->color_count,
+        .pColorAttachmentFormats = pipeline->color_formats,
+        .depthAttachmentFormat = pipeline->depth_format,
+        .stencilAttachmentFormat = pipeline->stencil_format,
     };
 
     VkGraphicsPipelineCreateInfo pipeline_info = {

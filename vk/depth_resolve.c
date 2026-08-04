@@ -55,7 +55,7 @@ depth_resolve_test_init_pipeline(struct depth_resolve_test *test)
     test->pipeline->depth_write = true;
     test->pipeline->depth_compare_op = VK_COMPARE_OP_LESS;
 
-    test->pipeline->depth_att_format = test->format;
+    test->pipeline->depth_format = test->format;
 
     vk_compile_pipeline(vk, test->pipeline);
 }

@@ -75,7 +75,7 @@ push_const_init_pipeline(struct push_const_test *test)
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(push_const_test_color),
     };
-    test->pipeline->color_att_format = test->color_format;
+    test->pipeline->color_formats[test->pipeline->color_count++] = test->color_format;
     vk_compile_pipeline(vk, test->pipeline);
 }
 

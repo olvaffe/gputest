@@ -70,7 +70,7 @@ ibo_test_init_pipeline(struct ibo_test *test)
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    test->pipeline->color_att_format = test->color_format;
+    test->pipeline->color_formats[test->pipeline->color_count++] = test->color_format;
     vk_compile_pipeline(vk, test->pipeline);
 }
 

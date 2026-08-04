@@ -78,9 +78,9 @@ separate_ds_test_init_pipeline(struct separate_ds_test *test)
         .writeMask = 0xff,
         .reference = 20,
     };
-    test->pipeline->depth_att_format =
+    test->pipeline->depth_format =
         test->depth_bits ? test->depth_format : VK_FORMAT_UNDEFINED;
-    test->pipeline->stencil_att_format =
+    test->pipeline->stencil_format =
         test->stencil_bits ? test->depth_format : VK_FORMAT_UNDEFINED;
 
     vk_compile_pipeline(vk, test->pipeline);

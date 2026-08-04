@@ -179,7 +179,7 @@ ktx_test_init_pipeline(struct ktx_test *test)
 
     test->pipeline->sample_count = test->rt_img->info.samples;
 
-    test->pipeline->color_att_format = test->rt_format;
+    test->pipeline->color_formats[test->pipeline->color_count++] = test->rt_format;
 
     vk_compile_pipeline(vk, test->pipeline);
 }

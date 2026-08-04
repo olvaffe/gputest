@@ -544,7 +544,7 @@ bench_image_test_render_pass(struct bench_image_test *test,
         pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
         vk_set_pipeline_viewport(vk, pipeline, test->width, test->height);
 
-        pipeline->color_att_format = dst->info.format;
+        pipeline->color_formats[pipeline->color_count++] = dst->info.format;
         vk_compile_pipeline(vk, pipeline);
     }
 

@@ -125,7 +125,7 @@ mem_hog_test_init_pipeline(struct mem_hog_test *test)
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(test->push_const),
     };
-    test->pipeline->color_att_format = test->img->info.format;
+    test->pipeline->color_formats[test->pipeline->color_count++] = test->img->info.format;
     vk_compile_pipeline(vk, test->pipeline);
 }
 

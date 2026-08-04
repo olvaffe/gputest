@@ -90,7 +90,7 @@ tri_test_init_pipeline(struct tri_test *test)
     test->pipeline->scissor.extent.width -= tri_border * 2;
     test->pipeline->scissor.extent.height -= tri_border * 2;
 
-    test->pipeline->color_att_format = test->color_format;
+    test->pipeline->color_formats[test->pipeline->color_count++] = test->color_format;
 
     vk_compile_pipeline(vk, test->pipeline);
 }

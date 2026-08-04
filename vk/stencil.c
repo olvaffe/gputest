@@ -75,8 +75,8 @@ stencil_test_init_pipeline(struct stencil_test *test)
         .writeMask = 0xff,
         .reference = 20,
     };
-    test->pipeline->depth_att_format = test->depth_format;
-    test->pipeline->stencil_att_format = test->depth_format;
+    test->pipeline->depth_format = test->depth_format;
+    test->pipeline->stencil_format = test->depth_format;
     vk_compile_pipeline(vk, test->pipeline);
 }
 

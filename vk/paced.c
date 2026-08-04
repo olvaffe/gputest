@@ -96,7 +96,7 @@ paced_test_init_pipelines(struct paced_test *test)
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .size = sizeof(test->push_const),
     };
-    test->gfx->color_att_format = test->format;
+    test->gfx->color_formats[test->gfx->color_count++] = test->format;
     vk_compile_pipeline(vk, test->gfx);
 
     test->comp = vk_create_pipeline(vk);

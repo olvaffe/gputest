@@ -88,7 +88,7 @@ tess_test_init_pipeline(struct tess_test *test)
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     test->pipeline->poly_mode = VK_POLYGON_MODE_LINE;
     test->pipeline->patch_control_points = 3;
-    test->pipeline->color_att_format = test->color_format;
+    test->pipeline->color_formats[test->pipeline->color_count++] = test->color_format;
     vk_compile_pipeline(vk, test->pipeline);
 }
 

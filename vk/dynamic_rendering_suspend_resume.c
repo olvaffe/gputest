@@ -48,7 +48,7 @@ dynamic_rendering_suspend_resume_test_init_pipeline(
         .size = sizeof(float[4]),
     };
 
-    test->pipeline->color_att_format = test->color_format;
+    test->pipeline->color_formats[test->pipeline->color_count++] = test->color_format;
 
     vk_compile_pipeline(vk, test->pipeline);
 }

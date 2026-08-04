@@ -80,7 +80,7 @@ msaa_test_init_pipeline(struct msaa_test *test)
 
     test->pipeline->sample_count = VK_SAMPLE_COUNT_4_BIT;
 
-    test->pipeline->color_att_format = test->color_format;
+    test->pipeline->color_formats[test->pipeline->color_count++] = test->color_format;
     vk_compile_pipeline(vk, test->pipeline);
 }
 
