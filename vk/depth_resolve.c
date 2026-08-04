@@ -51,12 +51,9 @@ depth_resolve_test_init_pipeline(struct depth_resolve_test *test)
 
     test->pipeline->sample_count = test->sample_count;
 
-    test->pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = true,
-        .depthWriteEnable = true,
-        .depthCompareOp = VK_COMPARE_OP_LESS,
-    };
+    test->pipeline->depth_test = true;
+    test->pipeline->depth_write = true;
+    test->pipeline->depth_compare_op = VK_COMPARE_OP_LESS;
 
     test->pipeline->depth_att_format = test->format;
 

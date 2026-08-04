@@ -63,23 +63,20 @@ separate_ds_test_init_pipeline(struct separate_ds_test *test)
     test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
-    test->pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        /* depth test is silently skipped if depth_bits == 0 */
-        .depthTestEnable = true,
-        .depthWriteEnable = true,
-        .depthCompareOp = VK_COMPARE_OP_LESS,
-        /* depth test is silently skipped if stencil_bits == 0 */
-        .stencilTestEnable = true,
-        .front = {
-            .failOp = VK_STENCIL_OP_INCREMENT_AND_CLAMP,
-            .passOp = VK_STENCIL_OP_REPLACE,
-            .depthFailOp = VK_STENCIL_OP_ZERO,
-            .compareOp = VK_COMPARE_OP_LESS,
-            .compareMask = 0xff,
-            .writeMask = 0xff,
-            .reference = 20,
-        },
+    /* depth test is silently skipped if depth_bits == 0 */
+    test->pipeline->depth_test = true;
+    test->pipeline->depth_write = true;
+    test->pipeline->depth_compare_op = VK_COMPARE_OP_LESS;
+    /* depth test is silently skipped if stencil_bits == 0 */
+    test->pipeline->stencil_test = true;
+    test->pipeline->stencil_front = (VkStencilOpState){
+        .failOp = VK_STENCIL_OP_INCREMENT_AND_CLAMP,
+        .passOp = VK_STENCIL_OP_REPLACE,
+        .depthFailOp = VK_STENCIL_OP_ZERO,
+        .compareOp = VK_COMPARE_OP_LESS,
+        .compareMask = 0xff,
+        .writeMask = 0xff,
+        .reference = 20,
     };
     test->pipeline->depth_att_format =
         test->depth_bits ? test->depth_format : VK_FORMAT_UNDEFINED;

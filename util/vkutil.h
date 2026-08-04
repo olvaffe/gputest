@@ -174,7 +174,11 @@ struct vk_pipeline {
 
     /* fragment shader state */
     VkSampleCountFlagBits sample_count;
-    VkPipelineDepthStencilStateCreateInfo depth_info;
+    bool depth_test;
+    bool depth_write;
+    VkCompareOp depth_compare_op;
+    bool stencil_test;
+    VkStencilOpState stencil_front;
 
     /* fragment output state */
     VkFormat color_att_format;
@@ -1457,10 +1461,6 @@ vk_create_pipeline(struct vk *vk)
     pipeline->poly_mode = VK_POLYGON_MODE_FILL;
     pipeline->sample_count = VK_SAMPLE_COUNT_1_BIT;
 
-    pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-    };
-
     return pipeline;
 }
 
@@ -1652,6 +1652,10 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pSampleMask = &sample_mask,
     };
 
+    const VkPipelineDepthStencilStateCreateInfo ds_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+    };
+
     const VkPipelineColorBlendAttachmentState blend_att = {
         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
@@ -1663,10 +1667,21 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     };
 
     const VkDynamicState dynamic_states[] = {
-        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY, VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
-        VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT, VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE,
-        VK_DYNAMIC_STATE_CULL_MODE,          VK_DYNAMIC_STATE_FRONT_FACE,
+        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
+        VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
+        VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT,
+        VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE,
+        VK_DYNAMIC_STATE_CULL_MODE,
+        VK_DYNAMIC_STATE_FRONT_FACE,
         VK_DYNAMIC_STATE_LINE_WIDTH,
+        VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,
+        VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
+        VK_DYNAMIC_STATE_DEPTH_COMPARE_OP,
+        VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE,
+        VK_DYNAMIC_STATE_STENCIL_OP,
+        VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
+        VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
+        VK_DYNAMIC_STATE_STENCIL_REFERENCE,
     };
     const VkPipelineDynamicStateCreateInfo dynamic_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -1701,7 +1716,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pViewportState = &vp_info,
         .pRasterizationState = &rast_info,
         .pMultisampleState = &msaa_info,
-        .pDepthStencilState = &pipeline->depth_info,
+        .pDepthStencilState = &ds_info,
         .pColorBlendState = &blend_info,
         .pDynamicState = &dynamic_info,
         .layout = pipeline->layout,
@@ -1731,6 +1746,19 @@ vk_bind_pipeline(struct vk *vk, const struct vk_pipeline *pipeline, VkCommandBuf
     vk->CmdSetCullMode(cmd, VK_CULL_MODE_NONE);
     vk->CmdSetFrontFace(cmd, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     vk->CmdSetLineWidth(cmd, 1.0f);
+
+    vk->CmdSetDepthTestEnable(cmd, pipeline->depth_test);
+    vk->CmdSetDepthWriteEnable(cmd, pipeline->depth_write);
+    vk->CmdSetDepthCompareOp(cmd, pipeline->depth_compare_op);
+
+    vk->CmdSetStencilTestEnable(cmd, pipeline->stencil_test);
+    vk->CmdSetStencilOp(cmd, VK_STENCIL_FACE_FRONT_BIT, pipeline->stencil_front.failOp,
+                        pipeline->stencil_front.passOp, pipeline->stencil_front.depthFailOp,
+                        pipeline->stencil_front.compareOp);
+    vk->CmdSetStencilCompareMask(cmd, VK_STENCIL_FACE_FRONT_BIT,
+                                 pipeline->stencil_front.compareMask);
+    vk->CmdSetStencilWriteMask(cmd, VK_STENCIL_FACE_FRONT_BIT, pipeline->stencil_front.writeMask);
+    vk->CmdSetStencilReference(cmd, VK_STENCIL_FACE_FRONT_BIT, pipeline->stencil_front.reference);
 }
 
 static inline void
