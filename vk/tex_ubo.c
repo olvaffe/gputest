@@ -92,7 +92,7 @@ tex_ubo_test_init_pipeline(struct tex_ubo_test *test)
 
     const uint32_t comp_count = ARRAY_SIZE(tex_ubo_test_vertices[0]);
     vk_set_pipeline_vertices(vk, test->pipeline, &comp_count, 1);
-    vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+    test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);

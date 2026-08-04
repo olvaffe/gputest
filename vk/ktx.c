@@ -168,7 +168,7 @@ ktx_test_init_pipeline(struct ktx_test *test)
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
                                sizeof(struct ktx_test_push_const));
 
-    vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+    test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->rt_img->info.extent.width,
                              test->rt_img->info.extent.height);

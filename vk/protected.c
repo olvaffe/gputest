@@ -75,7 +75,7 @@ protected_test_init_pipeline(struct protected_test *test)
 
     const uint32_t comp_counts[2] = { 2, 3 };
     vk_set_pipeline_vertices(vk, test->pipeline, comp_counts, ARRAY_SIZE(comp_counts));
-    vk_set_pipeline_topology(vk, test->pipeline, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    test->pipeline->topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);

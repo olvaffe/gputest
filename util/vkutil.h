@@ -149,11 +149,11 @@ struct vk_image {
 };
 
 struct vk_pipeline {
-    VkPipelineShaderStageCreateInfo stages[5];
-    VkShaderModuleCreateInfo shader_infos[5];
-    uint32_t stage_count;
+    VkPipelineCreateFlags2 flags2;
 
-    VkPipelineCreateFlags2CreateInfo flags2_info;
+    VkPipelineShaderStageCreateInfo stages[5];
+    VkShaderModuleCreateInfo mods[5];
+    uint32_t stage_count;
 
     /* vertex input state */
     VkVertexInputBindingDescription vi_binding;
@@ -1462,10 +1462,6 @@ vk_create_pipeline(struct vk *vk)
                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
     };
 
-    pipeline->flags2_info = (VkPipelineCreateFlags2CreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
-    };
-
     pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
     };
@@ -1485,14 +1481,14 @@ vk_add_pipeline_shader(struct vk *vk,
                        size_t size)
 {
     const uint32_t idx = pipeline->stage_count++;
-    pipeline->shader_infos[idx] = (VkShaderModuleCreateInfo){
+    pipeline->mods[idx] = (VkShaderModuleCreateInfo){
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .codeSize = size,
         .pCode = code,
     };
     pipeline->stages[idx] = (VkPipelineShaderStageCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .pNext = &pipeline->shader_infos[idx],
+        .pNext = &pipeline->mods[idx],
         .stage = stage,
         .pName = "main",
     };
@@ -1542,14 +1538,6 @@ vk_set_pipeline_vertices(struct vk *vk,
         .binding = 0,
         .stride = offset,
     };
-}
-
-static inline void
-vk_set_pipeline_topology(struct vk *vk,
-                         struct vk_pipeline *pipeline,
-                         VkPrimitiveTopology topology)
-{
-    pipeline->topology = topology;
 }
 
 static inline void
@@ -1670,13 +1658,16 @@ vk_setup_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline)
 static inline void
 vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 {
-    if (!pipeline->pipeline_layout)
-        vk_setup_pipeline_layout(vk, pipeline);
+    vk_setup_pipeline_layout(vk, pipeline);
 
     if (pipeline->stage_count == 1 && pipeline->stages[0].stage == VK_SHADER_STAGE_COMPUTE_BIT) {
+        const VkPipelineCreateFlags2CreateInfo flags2_info = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
+            .flags = pipeline->flags2,
+        };
         const VkComputePipelineCreateInfo compute_info = {
             .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            .pNext = &pipeline->flags2_info,
+            .pNext = &flags2_info,
             .stage = pipeline->stages[0],
             .layout = pipeline->pipeline_layout,
         };
@@ -1728,11 +1719,15 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pDynamicStates = dynamic_states,
     };
 
-    pipeline->flags2_info.pNext = &pipeline->rendering_info;
+    const VkPipelineCreateFlags2CreateInfo flags2_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
+        .pNext = &pipeline->rendering_info,
+        .flags = pipeline->flags2,
+    };
 
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext = &pipeline->flags2_info,
+        .pNext = &flags2_info,
         .stageCount = pipeline->stage_count,
         .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,
