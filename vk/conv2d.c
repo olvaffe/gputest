@@ -124,7 +124,6 @@ conv2d_test_init_pipeline(struct conv2d_test *test)
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_COMPUTE_BIT,
                                sizeof(struct conv2d_test_push_consts));
 
-    vk_setup_pipeline(vk, test->pipeline);
     vk_compile_pipeline(vk, test->pipeline);
 }
 

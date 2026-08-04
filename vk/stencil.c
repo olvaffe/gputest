@@ -62,7 +62,6 @@ stencil_test_init_pipeline(struct stencil_test *test)
 
     vk_set_pipeline_sample_count(vk, test->pipeline, VK_SAMPLE_COUNT_1_BIT);
 
-    vk_setup_pipeline(vk, test->pipeline);
     test->pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         /* depth test is silently skipped if depth_bits == 0 */

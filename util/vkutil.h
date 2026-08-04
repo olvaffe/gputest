@@ -1453,6 +1453,27 @@ vk_create_pipeline(struct vk *vk)
     if (!pipeline)
         vk_die("failed to alloc pipeline");
 
+    pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+    };
+
+    pipeline->color_att = (VkPipelineColorBlendAttachmentState){
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+    };
+
+    pipeline->flags2_info = (VkPipelineCreateFlags2CreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
+    };
+
+    pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+    };
+
+    pipeline->external_format = (VkExternalFormatANDROID){
+        .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
+    };
+
     return pipeline;
 }
 
@@ -1632,7 +1653,7 @@ vk_set_pipeline_push_const(struct vk *vk,
 }
 
 static inline void
-vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
+vk_setup_pipeline_layout(struct vk *vk, struct vk_pipeline *pipeline)
 {
     const VkPipelineLayoutCreateInfo pipeline_layout_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1644,32 +1665,14 @@ vk_setup_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
     vk->result = vk->CreatePipelineLayout(vk->dev, &pipeline_layout_info, NULL,
                                           &pipeline->pipeline_layout);
     vk_check(vk, "failed to create pipeline layout");
-
-    pipeline->depth_info = (VkPipelineDepthStencilStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-    };
-
-    pipeline->color_att = (VkPipelineColorBlendAttachmentState){
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-    };
-
-    pipeline->flags2_info = (VkPipelineCreateFlags2CreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
-    };
-
-    pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-    };
-
-    pipeline->external_format = (VkExternalFormatANDROID){
-        .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
-    };
 }
 
 static inline void
 vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
 {
+    if (!pipeline->pipeline_layout)
+        vk_setup_pipeline_layout(vk, pipeline);
+
     if (pipeline->stage_count == 1 && pipeline->stages[0].stage == VK_SHADER_STAGE_COMPUTE_BIT) {
         const VkComputePipelineCreateInfo compute_info = {
             .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,

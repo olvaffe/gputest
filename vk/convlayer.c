@@ -142,7 +142,6 @@ convlayer_test_init_pipeline(struct convlayer_test *test)
     /* unused */
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT, 8);
 
-    vk_setup_pipeline(vk, test->pipeline);
     vk_compile_pipeline(vk, test->pipeline);
 }
 

@@ -74,7 +74,6 @@ push_const_init_pipeline(struct push_const_test *test)
 
     vk_set_pipeline_sample_count(vk, test->pipeline, VK_SAMPLE_COUNT_1_BIT);
 
-    vk_setup_pipeline(vk, test->pipeline);
     test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = 1,

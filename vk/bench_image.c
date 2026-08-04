@@ -412,7 +412,6 @@ bench_image_test_dispatch(struct bench_image_test *test,
         };
         vk_add_pipeline_set_layout_from_info(vk, pipeline, &set_layout_info);
 
-        vk_setup_pipeline(vk, pipeline);
         vk_compile_pipeline(vk, pipeline);
     }
 
@@ -547,7 +546,6 @@ bench_image_test_render_pass(struct bench_image_test *test,
         vk_set_pipeline_rasterization(vk, pipeline, VK_POLYGON_MODE_FILL, false);
         vk_set_pipeline_sample_count(vk, pipeline, VK_SAMPLE_COUNT_1_BIT);
 
-        vk_setup_pipeline(vk, pipeline);
         pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
             .colorAttachmentCount = 1,

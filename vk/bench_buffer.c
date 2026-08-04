@@ -249,7 +249,6 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test,
         };
         vk_add_pipeline_set_layout_from_info(vk, pipeline, &set_layout_info);
 
-        vk_setup_pipeline(vk, pipeline);
         vk_compile_pipeline(vk, pipeline);
     }
 
