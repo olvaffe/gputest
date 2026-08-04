@@ -232,8 +232,8 @@ tess_test_draw_triangle(struct tess_test *test, VkCommandBuffer cmd)
 
     vk->CmdBeginRendering(cmd, &test->rendering_info);
 
-    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);
     vk_bind_pipeline(vk, test->pipeline, cmd);
+    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);
 
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 

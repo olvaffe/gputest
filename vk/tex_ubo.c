@@ -263,7 +263,6 @@ tex_ubo_test_draw_triangles(struct tex_ubo_test *test, VkCommandBuffer cmd)
 
     vk->CmdBeginRendering(cmd, &test->rendering_info);
 
-    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const VkBindDescriptorSetsInfo tex_bind_info = {
@@ -286,6 +285,8 @@ tex_ubo_test_draw_triangles(struct tex_ubo_test *test, VkCommandBuffer cmd)
         .pDynamicOffsets = &(uint32_t){ 0 },
     };
     vk->CmdBindDescriptorSets2(cmd, &ubo_bind_info_0);
+
+    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
     vk->CmdBindDescriptorSets2(cmd, &tex_bind_info);

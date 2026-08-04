@@ -237,7 +237,6 @@ ycbcr_test_draw_triangle(struct ycbcr_test *test, VkCommandBuffer cmd)
 
     vk->CmdBeginRendering(cmd, &test->rendering_info);
 
-    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const VkBindDescriptorSetsInfo bind_info = {
@@ -249,6 +248,7 @@ ycbcr_test_draw_triangle(struct ycbcr_test *test, VkCommandBuffer cmd)
     };
     vk->CmdBindDescriptorSets2(cmd, &bind_info);
 
+    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);
     vk->CmdDraw(cmd, ARRAY_SIZE(ycbcr_test_vertices), 1, 0, 0);
 
     vk->CmdEndRendering(cmd);

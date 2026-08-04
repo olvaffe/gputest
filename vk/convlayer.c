@@ -228,8 +228,6 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
-    vk_bind_pipeline(vk, test->pipeline, cmd);
-
     const VkImageMemoryBarrier2 barriers[] = {
         [0] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -265,6 +263,7 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
     };
     vk->CmdPipelineBarrier2(cmd, &dep_info);
 
+    vk_bind_pipeline(vk, test->pipeline, cmd);
     const VkBindDescriptorSetsInfo bind_info = {
         .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,

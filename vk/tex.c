@@ -230,7 +230,6 @@ tex_test_draw_triangle(struct tex_test *test, VkCommandBuffer cmd)
 
     vk->CmdBeginRendering(cmd, &test->rendering_info);
 
-    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const VkBindDescriptorSetsInfo bind_info = {
@@ -241,6 +240,8 @@ tex_test_draw_triangle(struct tex_test *test, VkCommandBuffer cmd)
         .pDescriptorSets = &test->set->set,
     };
     vk->CmdBindDescriptorSets2(cmd, &bind_info);
+
+    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);
 
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
