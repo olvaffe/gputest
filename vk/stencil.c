@@ -21,6 +21,8 @@ struct stencil_test {
     struct vk vk;
 
     struct vk_image *zs;
+    VkRenderingAttachmentInfo ds_att_info;
+    VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
 
@@ -98,6 +100,32 @@ stencil_test_init_fb(struct stencil_test *test)
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     vk_create_image_render_view(vk, test->zs, test->aspect_mask);
+
+    test->ds_att_info = (VkRenderingAttachmentInfo){
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = test->zs->render_view,
+        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue = {
+            .depthStencil = {
+                .depth = 0.5f,
+                .stencil = 127,
+            },
+        },
+    };
+    test->rendering_info = (VkRenderingInfo){
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = {
+            .extent = {
+                .width = test->width,
+                .height = test->height,
+            },
+        },
+        .layerCount = 1,
+        .pDepthAttachment = &test->ds_att_info,
+        .pStencilAttachment = &test->ds_att_info,
+    };
 }
 
 static void
@@ -157,32 +185,7 @@ stencil_test_draw_triangle(struct stencil_test *test, VkCommandBuffer cmd)
     };
     vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
-    const VkRenderingAttachmentInfo ds_att_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = test->zs->render_view,
-        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue = {
-            .depthStencil = {
-                .depth = 0.5f,
-                .stencil = 127,
-            },
-        },
-    };
-    const VkRenderingInfo rendering_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = {
-            .extent = {
-                .width = test->width,
-                .height = test->height,
-            },
-        },
-        .layerCount = 1,
-        .pDepthAttachment = &ds_att_info,
-        .pStencilAttachment = &ds_att_info,
-    };
-    vk->CmdBeginRendering(cmd, &rendering_info);
+    vk->CmdBeginRendering(cmd, &test->rendering_info);
 
     vk_bind_pipeline(vk, test->pipeline, cmd);
 

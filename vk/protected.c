@@ -56,6 +56,8 @@ struct protected_test {
     struct vk_buffer *staging;
 
     struct vk_image *rt;
+    VkRenderingAttachmentInfo color_att;
+    VkRenderingInfo rendering_info;
     struct vk_pipeline *pipeline;
 };
 
@@ -112,6 +114,31 @@ protected_test_init_framebuffer(struct protected_test *test)
     };
     test->rt = vk_create_image_from_info(vk, &img_info);
     vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    test->color_att = (VkRenderingAttachmentInfo){
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = test->rt->render_view,
+        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue = {
+            .color = {
+                .float32 = { 0.2f, 0.2f, 0.2f, 1.0f },
+            },
+        },
+    };
+    test->rendering_info = (VkRenderingInfo){
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = {
+            .extent = {
+                .width = test->width,
+                .height = test->height,
+            },
+        },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &test->color_att,
+    };
 }
 
 static void
@@ -231,31 +258,7 @@ protected_test_draw_triangle(struct protected_test *test, VkCommandBuffer cmd)
     };
     vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
-    const VkRenderingAttachmentInfo att_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageView = test->rt->render_view,
-        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue = {
-            .color = {
-                .float32 = { 0.2f, 0.2f, 0.2f, 1.0f },
-            },
-        },
-    };
-    const VkRenderingInfo rendering_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = {
-            .extent = {
-                .width = test->width,
-                .height = test->height,
-            },
-        },
-        .layerCount = 1,
-        .colorAttachmentCount = 1,
-        .pColorAttachments = &att_info,
-    };
-    vk->CmdBeginRendering(cmd, &rendering_info);
+    vk->CmdBeginRendering(cmd, &test->rendering_info);
 
     vk_bind_pipeline(vk, test->pipeline, cmd);
     vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 }, NULL, NULL);

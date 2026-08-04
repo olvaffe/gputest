@@ -25,6 +25,9 @@ struct renderpass_ops_test {
     VkCommandBuffer cmd;
     struct vk_image *color_img;
     struct vk_image *depth_img;
+    VkRenderingAttachmentInfo color_att;
+    VkRenderingAttachmentInfo depth_att;
+    VkRenderingInfo rendering_info;
     VkAttachmentLoadOp load_op;
     VkAttachmentStoreOp store_op;
     struct vk_pipeline *pipeline;
@@ -255,6 +258,53 @@ renderpass_ops_test_begin_framebuffer(struct renderpass_ops_test *test,
 
     test->load_op = load_op;
     test->store_op = store_op;
+
+    VkClearValue clear_vals[2];
+    uint32_t clear_val_count = 0;
+
+    if (fmt->color || test->force_color_format != VK_FORMAT_UNDEFINED)
+        clear_vals[clear_val_count++].color = (VkClearColorValue){ 0 };
+    if (fmt->depth || fmt->stencil) {
+        clear_vals[clear_val_count++].depthStencil = (VkClearDepthStencilValue){
+            .depth = 1.0f,
+            .stencil = 0,
+        };
+    }
+
+    if (test->color_img) {
+        test->color_att = (VkRenderingAttachmentInfo){
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = test->color_img->render_view,
+            .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .loadOp = test->load_op,
+            .storeOp = test->store_op,
+            .clearValue = clear_vals[0],
+        };
+    }
+    if (test->depth_img) {
+        test->depth_att = (VkRenderingAttachmentInfo){
+            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView = test->depth_img->render_view,
+            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .loadOp = test->load_op,
+            .storeOp = test->store_op,
+            .clearValue = clear_vals[test->color_img ? 1 : 0],
+        };
+    }
+    test->rendering_info = (VkRenderingInfo){
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = {
+            .extent = {
+                .width = test->width,
+                .height = test->height,
+            },
+        },
+        .layerCount = 1,
+        .colorAttachmentCount = test->color_img ? 1 : 0,
+        .pColorAttachments = test->color_img ? &test->color_att : NULL,
+        .pDepthAttachment = test->depth_img ? &test->depth_att : NULL,
+        .pStencilAttachment = (test->depth_img && fmt->stencil) ? &test->depth_att : NULL,
+    };
 }
 
 static void
@@ -302,58 +352,21 @@ renderpass_ops_test_begin_renderpass(struct renderpass_ops_test *test,
 {
     struct vk *vk = &test->vk;
 
-    VkClearValue clear_vals[2];
-    uint32_t clear_val_count = 0;
-
-    if (fmt->color || test->force_color_format != VK_FORMAT_UNDEFINED)
-        clear_vals[clear_val_count++].color = (VkClearColorValue){ 0 };
-    if (fmt->depth || fmt->stencil) {
-        clear_vals[clear_val_count++].depthStencil = (VkClearDepthStencilValue){
-            .depth = 1.0f,
-            .stencil = 0,
-        };
-    }
-
-    VkRenderingAttachmentInfo color_att = { 0 };
-    VkRenderingAttachmentInfo depth_att = { 0 };
-    if (test->color_img) {
-        color_att = (VkRenderingAttachmentInfo){
-            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = test->color_img->render_view,
-            .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .loadOp = test->load_op,
-            .storeOp = test->store_op,
-            .clearValue = clear_vals[0],
-        };
-    }
-    if (test->depth_img) {
-        depth_att = (VkRenderingAttachmentInfo){
-            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = test->depth_img->render_view,
-            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            .loadOp = test->load_op,
-            .storeOp = test->store_op,
-            .clearValue = clear_vals[test->color_img ? 1 : 0],
-        };
-    }
-    const VkRenderingInfo rendering_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = {
-            .extent = {
-                .width = test->width,
-                .height = test->height,
-            },
-        },
-        .layerCount = 1,
-        .colorAttachmentCount = test->color_img ? 1 : 0,
-        .pColorAttachments = test->color_img ? &color_att : NULL,
-        .pDepthAttachment = test->depth_img ? &depth_att : NULL,
-        .pStencilAttachment = (test->depth_img && fmt->stencil) ? &depth_att : NULL,
-    };
-
-    vk->CmdBeginRendering(test->cmd, &rendering_info);
+    vk->CmdBeginRendering(test->cmd, &test->rendering_info);
 
     if (clear_att) {
+        VkClearValue clear_vals[2];
+        uint32_t clear_val_count = 0;
+
+        if (fmt->color || test->force_color_format != VK_FORMAT_UNDEFINED)
+            clear_vals[clear_val_count++].color = (VkClearColorValue){ 0 };
+        if (fmt->depth || fmt->stencil) {
+            clear_vals[clear_val_count++].depthStencil = (VkClearDepthStencilValue){
+                .depth = 1.0f,
+                .stencil = 0,
+            };
+        }
+
         VkClearAttachment atts[2];
         uint32_t att_count = 0;
 

@@ -57,6 +57,8 @@ struct ahb_rt_test {
     VkImageView view;
 
     struct vk_image *rt;
+    VkRenderingAttachmentInfo color_att;
+    VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
 };
@@ -108,14 +110,56 @@ ahb_rt_test_init_rt(struct ahb_rt_test *test)
 {
     struct vk *vk = &test->vk;
 
-    if (test->ahb_fmt_props.format != VK_FORMAT_UNDEFINED ||
-        vk->external_format_resolve_props.nullColorAttachmentWithExternalFormatResolve)
-        return;
+    if (test->ahb_fmt_props.format == VK_FORMAT_UNDEFINED &&
+        !vk->external_format_resolve_props.nullColorAttachmentWithExternalFormatResolve) {
+        test->rt = vk_create_image(vk, test->ahb_resolve_props.colorAttachmentFormat, test->width,
+                                   test->height, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
+                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+        vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
+    }
 
-    test->rt = vk_create_image(vk, test->ahb_resolve_props.colorAttachmentFormat, test->width,
-                               test->height, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL,
-                               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    vk_create_image_render_view(vk, test->rt, VK_IMAGE_ASPECT_COLOR_BIT);
+    test->color_att = (VkRenderingAttachmentInfo){
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue = {
+            .color = {
+                .float32 = { 0.2f, 0.2f, 0.2f, 1.0f },
+            },
+        },
+    };
+    if (test->ahb_fmt_props.format != VK_FORMAT_UNDEFINED) {
+        test->color_att.imageView = test->view;
+    } else {
+        test->color_att.imageView = test->rt ? test->rt->render_view : VK_NULL_HANDLE;
+        test->color_att.resolveMode = VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_BIT_ANDROID;
+        test->color_att.resolveImageView = test->view;
+    }
+
+    if (test->is_ycbcr) {
+        float n[4];
+        for (uint32_t i = 0; i < 3; i++) {
+            const float *row = &ahb_rt_test_matrices[test->is_ycbcr][i * 4];
+            const float *v = test->color_att.clearValue.color.float32;
+            n[i] = row[0] * v[0] + row[1] * v[1] + row[2] * v[2] + row[3] * v[3];
+        }
+        memcpy(test->color_att.clearValue.color.float32, n, sizeof(n));
+    }
+
+    test->rendering_info = (VkRenderingInfo){
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = {
+            .extent = {
+                .width = test->width,
+                .height = test->height,
+            },
+        },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &test->color_att,
+    };
 }
 
 static void
@@ -435,49 +479,7 @@ ahb_rt_test_draw_triangle(struct ahb_rt_test *test, VkCommandBuffer cmd)
         vk->CmdPipelineBarrier2(cmd, &dep_info2);
     }
 
-    VkRenderingAttachmentInfo att_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-        .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue = {
-            .color = {
-                .float32 = { 0.2f, 0.2f, 0.2f, 1.0f },
-            },
-        },
-    };
-    if (test->ahb_fmt_props.format != VK_FORMAT_UNDEFINED) {
-        att_info.imageView = test->view;
-    } else {
-        att_info.imageView = test->rt ? test->rt->render_view : VK_NULL_HANDLE;
-        att_info.resolveMode = VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_BIT_ANDROID;
-        att_info.resolveImageView = test->view;
-    }
-
-    if (test->is_ycbcr) {
-        float n[4];
-        for (uint32_t i = 0; i < 3; i++) {
-            const float *row = &ahb_rt_test_matrices[test->is_ycbcr][i * 4];
-            const float *v = att_info.clearValue.color.float32;
-            n[i] = row[0] * v[0] + row[1] * v[1] + row[2] * v[2] + row[3] * v[3];
-        }
-        memcpy(att_info.clearValue.color.float32, n, sizeof(n));
-    }
-
-    const VkRenderingInfo rendering_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = {
-            .extent = {
-                .width = test->width,
-                .height = test->height,
-            },
-        },
-        .layerCount = 1,
-        .colorAttachmentCount = 1,
-        .pColorAttachments = &att_info,
-    };
-    vk->CmdBeginRendering(cmd, &rendering_info);
+    vk->CmdBeginRendering(cmd, &test->rendering_info);
     vk_bind_pipeline(vk, test->pipeline, cmd);
     const VkPushConstantsInfo push_info = {
         .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,

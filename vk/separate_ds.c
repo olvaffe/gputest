@@ -23,6 +23,9 @@ struct separate_ds_test {
     struct vk vk;
 
     struct vk_image *ds;
+    VkRenderingAttachmentInfo depth_att;
+    VkRenderingAttachmentInfo stencil_att;
+    VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
 
@@ -101,6 +104,43 @@ separate_ds_test_init_image(struct separate_ds_test *test)
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     vk_create_image_render_view(vk, test->ds, test->aspect_mask);
+
+    test->depth_att = (VkRenderingAttachmentInfo){
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = test->ds->render_view,
+        .imageLayout = test->depth_layout,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue = {
+            .depthStencil = {
+                .depth = 0.5f,
+            },
+        },
+    };
+    test->stencil_att = (VkRenderingAttachmentInfo){
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = test->ds->render_view,
+        .imageLayout = test->stencil_layout,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue = {
+            .depthStencil = {
+                .stencil = 127,
+            },
+        },
+    };
+    test->rendering_info = (VkRenderingInfo){
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = {
+            .extent = {
+                .width = test->width,
+                .height = test->height,
+            },
+        },
+        .layerCount = 1,
+        .pDepthAttachment = &test->depth_att,
+        .pStencilAttachment = &test->stencil_att,
+    };
 }
 
 static void
@@ -181,41 +221,7 @@ separate_ds_test_draw_triangle(struct separate_ds_test *test, VkCommandBuffer cm
     };
     vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
-    const VkRenderingInfo rendering_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = {
-            .extent = {
-                .width = test->width,
-                .height = test->height,
-            },
-        },
-        .layerCount = 1,
-        .pDepthAttachment = &(VkRenderingAttachmentInfo){
-            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = test->ds->render_view,
-            .imageLayout = test->depth_layout,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .clearValue = {
-                .depthStencil = {
-                    .depth = 0.5f,
-                },
-            },
-	},
-        .pStencilAttachment = &(VkRenderingAttachmentInfo){
-            .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView = test->ds->render_view,
-            .imageLayout = test->stencil_layout,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .clearValue = {
-                .depthStencil = {
-                    .stencil = 127,
-                },
-            },
-	},
-    };
-    vk->CmdBeginRendering(cmd, &rendering_info);
+    vk->CmdBeginRendering(cmd, &test->rendering_info);
     vk_bind_pipeline(vk, test->pipeline, cmd);
     vk->CmdDraw(cmd, 3, 1, 0, 0);
     vk->CmdEndRendering(cmd);
