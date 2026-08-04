@@ -140,8 +140,7 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
             .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
             .srcAccessMask = VK_ACCESS_2_NONE,
             .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
-                             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = resolve_layout,
             .image = test->resolve->img,
@@ -172,7 +171,7 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
             .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView = test->ds->render_view,
             .imageLayout = ds_layout,
-            .resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT,
+            .resolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT,
             .resolveImageView = test->resolve->render_view,
             .resolveImageLayout = resolve_layout,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -192,8 +191,9 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
     const VkImageMemoryBarrier2 after_barriers[1] = {
         [0] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
-                             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
             .oldLayout = resolve_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -237,7 +237,9 @@ depth_resolve_test_draw_quad(struct depth_resolve_test *test, VkCommandBuffer cm
     const VkBufferMemoryBarrier2 copy_barriers[1] = {
         [0] = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
             .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
             .buffer = test->buf->buf,
             .size = VK_WHOLE_SIZE,
