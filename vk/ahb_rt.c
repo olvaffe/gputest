@@ -92,10 +92,7 @@ ahb_rt_test_init_pipeline(struct ahb_rt_test *test)
             test->pipeline->rendering_info.pColorAttachmentFormats =
                 &test->ahb_resolve_props.colorAttachmentFormat;
         } else {
-            test->pipeline->external_format = (VkExternalFormatANDROID){
-                .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
-                .externalFormat = test->ahb_fmt_props.externalFormat,
-            };
+            test->pipeline->external_format = test->ahb_fmt_props.externalFormat;
         }
     }
 

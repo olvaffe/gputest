@@ -173,9 +173,8 @@ struct vk_pipeline {
     VkPipelineDepthStencilStateCreateInfo depth_info;
 
     /* fragment output state */
-    VkPipelineColorBlendAttachmentState color_att;
     VkPipelineRenderingCreateInfo rendering_info;
-    VkExternalFormatANDROID external_format;
+    uint64_t external_format;
 
     VkDescriptorSetLayout set_layouts[4];
     uint32_t set_layout_count;
@@ -1460,17 +1459,8 @@ vk_create_pipeline(struct vk *vk)
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
     };
 
-    pipeline->color_att = (VkPipelineColorBlendAttachmentState){
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-    };
-
     pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-    };
-
-    pipeline->external_format = (VkExternalFormatANDROID){
-        .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
     };
 
     return pipeline;
@@ -1679,10 +1669,14 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .polygonMode = pipeline->poly_mode,
     };
 
-    const VkPipelineColorBlendStateCreateInfo color_info = {
+    const VkPipelineColorBlendAttachmentState blend_att = {
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+    };
+    const VkPipelineColorBlendStateCreateInfo blend_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .attachmentCount = 1,
-        .pAttachments = &pipeline->color_att,
+        .pAttachments = &blend_att,
     };
 
     const VkDynamicState dynamic_states[] = {
@@ -1730,15 +1724,19 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pRasterizationState = &rast_info,
         .pMultisampleState = &msaa_info,
         .pDepthStencilState = &pipeline->depth_info,
-        .pColorBlendState = &color_info,
+        .pColorBlendState = &blend_info,
         .pDynamicState = &dynamic_info,
         .layout = pipeline->pipeline_layout,
     };
     const void **pnext = &pipeline->rendering_info.pNext;
 
-    if (pipeline->external_format.externalFormat) {
-        *pnext = &pipeline->external_format;
-        pnext = (const void **)&pipeline->external_format.pNext;
+    const VkExternalFormatANDROID ext_fmt = {
+        .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
+        .externalFormat = pipeline->external_format,
+    };
+    if (pipeline->external_format) {
+        *pnext = &ext_fmt;
+        pnext = (const void **)&ext_fmt.pNext;
     }
 
     vk->result = vk->CreateGraphicsPipelines(vk->dev, VK_NULL_HANDLE, 1, &pipeline_info, NULL,
