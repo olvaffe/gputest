@@ -608,6 +608,10 @@ vk_init_desc_pool(struct vk *vk)
             .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 32,
         },
+        [7] = {
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+            .descriptorCount = 32,
+        },
     };
     const VkDescriptorPoolCreateInfo pool_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,

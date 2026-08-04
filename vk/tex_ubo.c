@@ -32,11 +32,11 @@ static const float tex_ubo_test_vertices[6][2] = {
 };
 
 /* note that std140 requires vec4 alignment */
-static const float tex_ubo_test_color_scales[2][4] = {
+static const float tex_ubo_test_color_scales[5][4] = {
     /* tri1 color scale */
     [0] = { 1.0f, 1.0f, 1.0f, 1.0f },
     /* tri2 color scale */
-    [1] = { 0.3f, 0.3f, 0.3f, 0.3f },
+    [4] = { 0.3f, 0.3f, 0.3f, 0.3f },
 };
 
 struct tex_ubo_test {
@@ -299,7 +299,10 @@ tex_ubo_test_draw_triangles(struct tex_ubo_test *test, VkCommandBuffer cmd)
         .descriptorSetCount = 1,
         .pDescriptorSets = &test->ubo_set->set,
         .dynamicOffsetCount = 1,
-        .pDynamicOffsets = &(uint32_t){ sizeof(tex_ubo_test_color_scales[0]) },
+        .pDynamicOffsets =
+            &(uint32_t){
+                sizeof(tex_ubo_test_color_scales[0]) * 4,
+            },
     };
     vk->CmdBindDescriptorSets2(cmd, &ubo_bind_info_1);
     vk->CmdDraw(cmd, 3, 1, 3, 0);
@@ -319,7 +322,9 @@ tex_ubo_test_draw_prep_texture(struct tex_ubo_test *test, VkCommandBuffer cmd)
     };
     const VkImageMemoryBarrier2 barrier1 = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
         .srcAccessMask = VK_ACCESS_2_NONE,
+        .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
         .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -328,7 +333,9 @@ tex_ubo_test_draw_prep_texture(struct tex_ubo_test *test, VkCommandBuffer cmd)
     };
     const VkImageMemoryBarrier2 barrier2 = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
         .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
         .dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
