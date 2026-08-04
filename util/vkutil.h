@@ -48,9 +48,6 @@ struct vk_init_params {
     bool require_bda;
     bool require_desc_indexing;
 
-    bool geometry_shader;
-    bool tessellation_shader;
-    bool fill_mode_non_solid;
     bool protected_memory;
     bool high_priority;
 
@@ -385,13 +382,6 @@ vk_init_physical_device_feature_fixups(struct vk *vk)
     } else if (!vk->params.enable_all_features) {
         vk->vulkan_12_features.descriptorIndexing = false;
     }
-
-    if (vk->params.geometry_shader && !vk->features.features.geometryShader)
-        vk_die("no geometry shader support");
-    if (vk->params.tessellation_shader && !vk->features.features.tessellationShader)
-        vk_die("no tessellation shader support");
-    if (vk->params.fill_mode_non_solid && !vk->features.features.fillModeNonSolid)
-        vk_die("no non-solid fill mode support");
 }
 
 static inline void

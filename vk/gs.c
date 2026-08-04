@@ -122,10 +122,10 @@ gs_test_init(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
-    const struct vk_init_params params = {
-        .geometry_shader = true,
-    };
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
+
+    if (!vk->features.features.geometryShader)
+        vk_die("no geometry shader support");
 
     gs_test_init_vb(test);
 

@@ -123,11 +123,12 @@ tess_test_init(struct tess_test *test)
 {
     struct vk *vk = &test->vk;
 
-    const struct vk_init_params params = {
-        .tessellation_shader = true,
-        .fill_mode_non_solid = true,
-    };
-    vk_init(vk, &params);
+    vk_init(vk, NULL);
+
+    if (!vk->features.features.tessellationShader)
+        vk_die("no tessellation shader support");
+    if (!vk->features.features.fillModeNonSolid)
+        vk_die("no non-solid fill mode support");
 
     tess_test_init_vb(test);
 
