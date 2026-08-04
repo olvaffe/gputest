@@ -96,7 +96,12 @@ dma_heap_test_init_memory(struct dma_heap_test *test)
             memset(test->mem_ptr, 0xff, test->buf_reqs.size);
     }
 
-    vk->result = vk->BindBufferMemory(vk->dev, test->buf, test->mem, 0);
+    const VkBindBufferMemoryInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO,
+        .buffer = test->buf,
+        .memory = test->mem,
+    };
+    vk->result = vk->BindBufferMemory2(vk->dev, 1, &bind_info);
     vk_check(vk, "failed to bind buffer memory");
 }
 

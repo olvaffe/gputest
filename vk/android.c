@@ -162,7 +162,12 @@ android_test_ahb_create_memory(struct android_test *test, AHardwareBuffer *ahb, 
     vk->result = vk->AllocateMemory(vk->dev, &alloc_info, NULL, &mem);
     vk_check(vk, "failed to import ahb");
 
-    vk->result = vk->BindImageMemory(vk->dev, img, mem, 0);
+    const VkBindImageMemoryInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO,
+        .image = img,
+        .memory = mem,
+    };
+    vk->result = vk->BindImageMemory2(vk->dev, 1, &bind_info);
     vk_check(vk, "failed to bind image memory");
 
     return mem;

@@ -764,7 +764,12 @@ vk_create_buffer_with_mt(struct vk *vk,
         buf->is_coherent = mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     }
 
-    vk->result = vk->BindBufferMemory(vk->dev, buf->buf, buf->mem, 0);
+    const VkBindBufferMemoryInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO,
+        .buffer = buf->buf,
+        .memory = buf->mem,
+    };
+    vk->result = vk->BindBufferMemory2(vk->dev, 1, &bind_info);
     vk_check(vk, "failed to bind buffer memory");
 
     return buf;
@@ -903,7 +908,12 @@ vk_init_image(struct vk *vk, struct vk_image *img, uint32_t mt_idx)
         img->is_coherent = mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     }
 
-    vk->result = vk->BindImageMemory(vk->dev, img->img, img->mem, 0);
+    const VkBindImageMemoryInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO,
+        .image = img->img,
+        .memory = img->mem,
+    };
+    vk->result = vk->BindImageMemory2(vk->dev, 1, &bind_info);
     vk_check(vk, "failed to bind image memory");
 }
 

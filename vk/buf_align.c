@@ -69,7 +69,13 @@ buf_align_test_init(struct buf_align_test *test)
     vk_log("buffer memory alignment = %" PRIu64 "", reqs.alignment);
 
     VkDeviceSize mem_offset = 0;
-    vk->result = vk->BindBufferMemory(vk->dev, test->disturb, test->mem, mem_offset);
+    const VkBindBufferMemoryInfo disturb_bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO,
+        .buffer = test->disturb,
+        .memory = test->mem,
+        .memoryOffset = mem_offset,
+    };
+    vk->result = vk->BindBufferMemory2(vk->dev, 1, &disturb_bind_info);
     vk_check(vk, "failed to bind buffer memory");
     test->disturb_ptr = (void *)((uint8_t *)test->mem_ptr + mem_offset);
     vk_log("suballoc disturb of size=%" PRIu64 " at offset=%" PRIu64 "", reqs.size, mem_offset);
@@ -81,7 +87,13 @@ buf_align_test_init(struct buf_align_test *test)
         vk_log("force additional alignment = %" PRIu64 "", test->force_alignment);
         mem_offset = ALIGN(mem_offset, test->force_alignment);
     }
-    vk->result = vk->BindBufferMemory(vk->dev, test->src_buf, test->mem, mem_offset);
+    const VkBindBufferMemoryInfo src_bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO,
+        .buffer = test->src_buf,
+        .memory = test->mem,
+        .memoryOffset = mem_offset,
+    };
+    vk->result = vk->BindBufferMemory2(vk->dev, 1, &src_bind_info);
     vk_check(vk, "failed to bind buffer memory");
     test->src_buf_ptr = (void *)((uint8_t *)test->mem_ptr + mem_offset);
     vk_log("suballoc src_buf of size=%" PRIu64 " at offset=%" PRIu64 "", reqs.size, mem_offset);

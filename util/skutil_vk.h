@@ -56,7 +56,13 @@ class gputest_vulkan_memory_allocator : public skgpu::VulkanMemoryAllocator {
         if (res != VK_SUCCESS)
             return res;
 
-        res = vk->BindImageMemory(vk->dev, image, dev_mem, 0);
+        const VkBindImageMemoryInfo bind_img_info = {
+            .sType = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO,
+            .image = image,
+            .memory = dev_mem,
+            .memoryOffset = 0,
+        };
+        res = vk->BindImageMemory2(vk->dev, 1, &bind_img_info);
         if (res != VK_SUCCESS) {
             vk->FreeMemory(vk->dev, dev_mem, NULL);
             return res;
@@ -104,7 +110,13 @@ class gputest_vulkan_memory_allocator : public skgpu::VulkanMemoryAllocator {
         if (res != VK_SUCCESS)
             return res;
 
-        res = vk->BindBufferMemory(vk->dev, buffer, dev_mem, 0);
+        const VkBindBufferMemoryInfo bind_buf_info = {
+            .sType = VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO,
+            .buffer = buffer,
+            .memory = dev_mem,
+            .memoryOffset = 0,
+        };
+        res = vk->BindBufferMemory2(vk->dev, 1, &bind_buf_info);
         if (res != VK_SUCCESS) {
             vk->FreeMemory(vk->dev, dev_mem, NULL);
             return res;
