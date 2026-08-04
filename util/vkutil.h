@@ -187,9 +187,6 @@ struct vk_pipeline {
     VkFormat stencil_format;
     uint64_t external_format;
 
-    uint32_t color_input_remap[4];
-    uint32_t color_input_count;
-
     VkPipelineLayout layout;
     VkPipeline pipeline;
 };
@@ -1720,17 +1717,9 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .depthAttachmentFormat = pipeline->depth_format,
         .stencilAttachmentFormat = pipeline->stencil_format,
     };
-    const VkRenderingInputAttachmentIndexInfo input_att_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO,
-        .pNext = &rendering_info,
-        .colorAttachmentCount = pipeline->color_input_count,
-        .pColorAttachmentInputIndices = pipeline->color_input_remap,
-    };
-
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext = pipeline->color_input_count ? (const void *)&input_att_info
-                                             : (const void *)&rendering_info,
+        .pNext = &rendering_info,
         .stageCount = pipeline->stage_count,
         .pStages = pipeline->stages,
         .pVertexInputState = &vi_info,
