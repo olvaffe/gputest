@@ -231,14 +231,18 @@ stencil_test_draw_post(struct stencil_test *test, VkCommandBuffer cmd)
     const VkBufferMemoryBarrier2 copy_barriers[2] = {
         [0] = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
             .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
             .buffer = test->z_buf ? test->z_buf->buf : VK_NULL_HANDLE,
             .size = VK_WHOLE_SIZE,
         },
         [1] = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT,
             .dstAccessMask = VK_ACCESS_2_HOST_READ_BIT,
             .buffer = test->s_buf ? test->s_buf->buf : VK_NULL_HANDLE,
             .size = VK_WHOLE_SIZE,
