@@ -30,7 +30,7 @@ timestamp_test_init(struct timestamp_test *test)
         VkTimeDomainEXT domains[16];
         uint32_t count = ARRAY_SIZE(domains);
         vk->result =
-            vk->GetPhysicalDeviceCalibrateableTimeDomainsEXT(vk->physical_dev, &count, domains);
+            vk->GetPhysicalDeviceCalibrateableTimeDomainsKHR(vk->physical_dev, &count, domains);
         vk_check(vk, "failed to get time domains");
 
         bool has_device_domain = false;
@@ -144,9 +144,9 @@ timestamp_test_draw_calibrated(struct timestamp_test *test)
     uint64_t ts[2];
     uint64_t deviation;
 
-    vk->result = vk->GetCalibratedTimestampsEXT(vk->dev, 1, &info, &ts[0], &deviation);
+    vk->result = vk->GetCalibratedTimestampsKHR(vk->dev, 1, &info, &ts[0], &deviation);
     u_sleep(test->sleep);
-    vk->result = vk->GetCalibratedTimestampsEXT(vk->dev, 1, &info, &ts[1], &deviation);
+    vk->result = vk->GetCalibratedTimestampsKHR(vk->dev, 1, &info, &ts[1], &deviation);
 
     timestamp_test_dump_delta(test, __func__, ts);
 }
@@ -164,7 +164,7 @@ timestamp_test_draw_mixed(struct timestamp_test *test)
 
     vk->ResetQueryPool(vk->dev, test->query->pool, 0, 2);
 
-    vk->result = vk->GetCalibratedTimestampsEXT(vk->dev, 1, &info, &ts[0], &deviation);
+    vk->result = vk->GetCalibratedTimestampsKHR(vk->dev, 1, &info, &ts[0], &deviation);
 
     u_sleep(test->sleep / 2);
 
@@ -176,7 +176,7 @@ timestamp_test_draw_mixed(struct timestamp_test *test)
 
     u_sleep(test->sleep / 2);
 
-    vk->result = vk->GetCalibratedTimestampsEXT(vk->dev, 1, &info, &ts[2], &deviation);
+    vk->result = vk->GetCalibratedTimestampsKHR(vk->dev, 1, &info, &ts[2], &deviation);
 
     timestamp_test_dump_delta(test, __func__, &ts[0]);
     timestamp_test_dump_delta(test, __func__, &ts[1]);
@@ -194,7 +194,7 @@ timestamp_test_draw_loop(struct timestamp_test *test)
     uint64_t deviation;
 
     while (true) {
-        vk->result = vk->GetCalibratedTimestampsEXT(vk->dev, 1, &info, &ts, &deviation);
+        vk->result = vk->GetCalibratedTimestampsKHR(vk->dev, 1, &info, &ts, &deviation);
         const uint64_t ns = (uint64_t)(ts * vk->props.properties.limits.timestampPeriod);
         const uint64_t ms = ns / 1000000;
         vk_log("%" PRIu64 ".%03" PRIu64, ms / 1000, ms % 1000);

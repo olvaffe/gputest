@@ -219,9 +219,9 @@ PFN_DEVICE(MapMemory2)
 PFN_DEVICE(TransitionImageLayout)
 PFN_DEVICE(UnmapMemory2)
 
-/* VK_EXT_calibrated_timestamps */
-PFN_INSTANCE(GetPhysicalDeviceCalibrateableTimeDomainsEXT)
-PFN_DEVICE(GetCalibratedTimestampsEXT)
+/* VK_KHR_calibrated_timestamps */
+PFN_INSTANCE(GetPhysicalDeviceCalibrateableTimeDomainsKHR)
+PFN_DEVICE(GetCalibratedTimestampsKHR)
 
 /* VK_KHR_display */
 PFN_INSTANCE(CreateDisplayModeKHR)
@@ -231,6 +231,14 @@ PFN_INSTANCE(GetDisplayPlaneCapabilitiesKHR)
 PFN_INSTANCE(GetDisplayPlaneSupportedDisplaysKHR)
 PFN_INSTANCE(GetPhysicalDeviceDisplayPlanePropertiesKHR)
 PFN_INSTANCE(GetPhysicalDeviceDisplayPropertiesKHR)
+
+/* VK_KHR_external_memory_fd */
+PFN_DEVICE(GetMemoryFdKHR)
+PFN_DEVICE(GetMemoryFdPropertiesKHR)
+
+/* VK_KHR_external_semaphore_fd */
+PFN_DEVICE(GetSemaphoreFdKHR)
+PFN_DEVICE(ImportSemaphoreFdKHR)
 
 /* VK_KHR_surface */
 PFN_INSTANCE(DestroySurfaceKHR)
@@ -248,14 +256,6 @@ PFN_DEVICE(GetDeviceGroupPresentCapabilitiesKHR)
 PFN_DEVICE(GetDeviceGroupSurfacePresentModesKHR)
 PFN_DEVICE(GetSwapchainImagesKHR)
 PFN_DEVICE(QueuePresentKHR)
-
-/* VK_KHR_external_memory_fd */
-PFN_DEVICE(GetMemoryFdKHR)
-PFN_DEVICE(GetMemoryFdPropertiesKHR)
-
-/* VK_KHR_external_semaphore_fd */
-PFN_DEVICE(GetSemaphoreFdKHR)
-PFN_DEVICE(ImportSemaphoreFdKHR)
 
 /* VK_ANDROID_external_memory_android_hardware_buffer */
 PFN_DEVICE(GetAndroidHardwareBufferPropertiesANDROID)
