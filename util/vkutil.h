@@ -164,7 +164,8 @@ struct vk_pipeline {
     /* pre-rasterization shader state */
     VkViewport viewport;
     VkRect2D scissor;
-    VkPipelineRasterizationStateCreateInfo rast_info;
+    VkPolygonMode poly_mode;
+    bool rasterizer_discard;
     VkPipelineTessellationStateCreateInfo tess_info;
 
     /* fragment shader state */
@@ -1556,12 +1557,8 @@ vk_set_pipeline_rasterization(struct vk *vk,
                               VkPolygonMode poly_mode,
                               bool discard)
 {
-    pipeline->rast_info = (VkPipelineRasterizationStateCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .rasterizerDiscardEnable = discard,
-        .polygonMode = poly_mode,
-        .lineWidth = 1.0f,
-    };
+    pipeline->poly_mode = poly_mode;
+    pipeline->rasterizer_discard = discard;
 }
 
 static inline void
@@ -1702,6 +1699,11 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
     };
 
+    const VkPipelineRasterizationStateCreateInfo rast_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .polygonMode = pipeline->poly_mode,
+    };
+
     const VkPipelineColorBlendStateCreateInfo color_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .attachmentCount = 1,
@@ -1712,6 +1714,10 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
         VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT,
         VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
+        VK_DYNAMIC_STATE_CULL_MODE,
+        VK_DYNAMIC_STATE_FRONT_FACE,
+        VK_DYNAMIC_STATE_LINE_WIDTH,
+        VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE,
     };
     const VkPipelineDynamicStateCreateInfo dynamic_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -1730,7 +1736,7 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pInputAssemblyState = &ia_info,
         .pTessellationState = &pipeline->tess_info,
         .pViewportState = &vp_info,
-        .pRasterizationState = &pipeline->rast_info,
+        .pRasterizationState = &rast_info,
         .pMultisampleState = &pipeline->msaa_info,
         .pDepthStencilState = &pipeline->depth_info,
         .pColorBlendState = &color_info,
@@ -1758,6 +1764,11 @@ vk_bind_pipeline(struct vk *vk, const struct vk_pipeline *pipeline, VkCommandBuf
     }
 
     vk->CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
+
+    vk->CmdSetCullMode(cmd, VK_CULL_MODE_NONE);
+    vk->CmdSetFrontFace(cmd, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    vk->CmdSetLineWidth(cmd, 1.0f);
+    vk->CmdSetRasterizerDiscardEnable(cmd, pipeline->rasterizer_discard);
 
     vk->CmdSetPrimitiveTopology(cmd, pipeline->topology);
 
