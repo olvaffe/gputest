@@ -62,8 +62,15 @@ buf_align_test_init(struct buf_align_test *test)
     vk->result = vk->CreateBuffer(vk->dev, &buf_info, NULL, &test->src_buf);
     vk_check(vk, "failed to create buffer");
 
-    VkMemoryRequirements reqs;
-    vk->GetBufferMemoryRequirements(vk->dev, test->disturb, &reqs);
+    const VkBufferMemoryRequirementsInfo2 reqs_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2,
+        .buffer = test->disturb,
+    };
+    VkMemoryRequirements2 reqs2 = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+    };
+    vk->GetBufferMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
+    const VkMemoryRequirements reqs = reqs2.memoryRequirements;
     if (!(reqs.memoryTypeBits & (1u << vk->buf_mt_index)))
         vk_die("failed to meet buf memory reqs: 0x%x", reqs.memoryTypeBits);
     vk_log("buffer memory alignment = %" PRIu64 "", reqs.alignment);

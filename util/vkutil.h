@@ -710,12 +710,18 @@ vk_get_buffer_mt_mask(struct vk *vk,
     vk->result = vk->CreateBuffer(vk->dev, &info, NULL, &buf);
     vk_check(vk, "failed to create test buffer");
 
-    VkMemoryRequirements reqs;
-    vk->GetBufferMemoryRequirements(vk->dev, buf, &reqs);
+    const VkBufferMemoryRequirementsInfo2 reqs_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2,
+        .buffer = buf,
+    };
+    VkMemoryRequirements2 reqs2 = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+    };
+    vk->GetBufferMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
 
     vk->DestroyBuffer(vk->dev, buf, NULL);
 
-    return reqs.memoryTypeBits;
+    return reqs2.memoryRequirements.memoryTypeBits;
 }
 
 static inline struct vk_buffer *
@@ -743,13 +749,20 @@ vk_create_buffer_with_mt(struct vk *vk,
     vk->result = vk->CreateBuffer(vk->dev, &buf->info, NULL, &buf->buf);
     vk_check(vk, "failed to create buffer");
 
-    VkMemoryRequirements reqs;
-    vk->GetBufferMemoryRequirements(vk->dev, buf->buf, &reqs);
-    if (!(reqs.memoryTypeBits & (1u << mt_idx)))
-        vk_die("failed to meet buf memory reqs: 0x%x", reqs.memoryTypeBits);
+    const VkBufferMemoryRequirementsInfo2 reqs_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2,
+        .buffer = buf->buf,
+    };
+    VkMemoryRequirements2 reqs2 = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+    };
+    vk->GetBufferMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
+    const VkMemoryRequirements *reqs = &reqs2.memoryRequirements;
+    if (!(reqs->memoryTypeBits & (1u << mt_idx)))
+        vk_die("failed to meet buf memory reqs: 0x%x", reqs->memoryTypeBits);
 
-    buf->mem = vk_alloc_memory(vk, reqs.size, mt_idx);
-    buf->mem_size = reqs.size;
+    buf->mem = vk_alloc_memory(vk, reqs->size, mt_idx);
+    buf->mem_size = reqs->size;
 
     const VkMemoryType *mt = &vk->mem_props.memoryTypes[mt_idx];
     if (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
@@ -866,12 +879,18 @@ vk_get_image_mt_mask(struct vk *vk, const VkImageCreateInfo *info)
     vk->result = vk->CreateImage(vk->dev, info, NULL, &img);
     vk_check(vk, "failed to create test image");
 
-    VkMemoryRequirements reqs;
-    vk->GetImageMemoryRequirements(vk->dev, img, &reqs);
+    const VkImageMemoryRequirementsInfo2 reqs_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
+        .image = img,
+    };
+    VkMemoryRequirements2 reqs2 = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+    };
+    vk->GetImageMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
 
     vk->DestroyImage(vk->dev, img, NULL);
 
-    return reqs.memoryTypeBits;
+    return reqs2.memoryRequirements.memoryTypeBits;
 }
 
 static inline void
@@ -882,18 +901,25 @@ vk_init_image(struct vk *vk, struct vk_image *img, uint32_t mt_idx)
     vk->result = vk->CreateImage(vk->dev, &img->info, NULL, &img->img);
     vk_check(vk, "failed to create image");
 
-    VkMemoryRequirements reqs;
-    vk->GetImageMemoryRequirements(vk->dev, img->img, &reqs);
+    const VkImageMemoryRequirementsInfo2 reqs_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
+        .image = img->img,
+    };
+    VkMemoryRequirements2 reqs2 = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+    };
+    vk->GetImageMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
+    const VkMemoryRequirements *reqs = &reqs2.memoryRequirements;
 
     if (mt_idx == VK_MAX_MEMORY_TYPES) {
-        if (reqs.memoryTypeBits & (1u << vk->buf_mt_index))
+        if (reqs->memoryTypeBits & (1u << vk->buf_mt_index))
             mt_idx = vk->buf_mt_index;
         else
-            mt_idx = ffs(reqs.memoryTypeBits) - 1;
+            mt_idx = ffs(reqs->memoryTypeBits) - 1;
     }
 
-    img->mem = vk_alloc_memory(vk, reqs.size, mt_idx);
-    img->mem_size = reqs.size;
+    img->mem = vk_alloc_memory(vk, reqs->size, mt_idx);
+    img->mem_size = reqs->size;
 
     const VkMemoryType *mt = &vk->mem_props.memoryTypes[mt_idx];
     if (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {

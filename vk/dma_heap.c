@@ -155,7 +155,15 @@ dma_heap_test_init_buffer(struct dma_heap_test *test)
     vk->result = vk->CreateBuffer(vk->dev, &create_info, NULL, &test->buf);
     vk_check(vk, "failed to create buffer");
 
-    vk->GetBufferMemoryRequirements(vk->dev, test->buf, &test->buf_reqs);
+    const VkBufferMemoryRequirementsInfo2 reqs_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2,
+        .buffer = test->buf,
+    };
+    VkMemoryRequirements2 reqs2 = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+    };
+    vk->GetBufferMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
+    test->buf_reqs = reqs2.memoryRequirements;
 }
 
 static void

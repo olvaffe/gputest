@@ -38,8 +38,15 @@ class gputest_vulkan_memory_allocator : public skgpu::VulkanMemoryAllocator {
                                  uint32_t allocationPropertyFlags,
                                  skgpu::VulkanBackendMemory *memory) override
     {
-        VkMemoryRequirements reqs;
-        vk->GetImageMemoryRequirements(vk->dev, image, &reqs);
+        const VkImageMemoryRequirementsInfo2 reqs_info = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
+            .image = image,
+        };
+        VkMemoryRequirements2 reqs2 = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        };
+        vk->GetImageMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
+        const VkMemoryRequirements &reqs = reqs2.memoryRequirements;
 
         uint32_t type_idx =
             find_memory_type(reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -73,9 +80,9 @@ class gputest_vulkan_memory_allocator : public skgpu::VulkanMemoryAllocator {
         alloc->fOffset = 0;
         alloc->fSize = reqs.size;
         alloc->fFlags = 0;
-        alloc->fBackendMemory = (skgpu::VulkanBackendMemory)alloc;
 
-        *memory = (skgpu::VulkanBackendMemory)alloc;
+        *memory = reinterpret_cast<skgpu::VulkanBackendMemory>(alloc);
+
         return VK_SUCCESS;
     }
 
@@ -84,8 +91,15 @@ class gputest_vulkan_memory_allocator : public skgpu::VulkanMemoryAllocator {
                                   uint32_t allocationPropertyFlags,
                                   skgpu::VulkanBackendMemory *memory) override
     {
-        VkMemoryRequirements reqs;
-        vk->GetBufferMemoryRequirements(vk->dev, buffer, &reqs);
+        const VkBufferMemoryRequirementsInfo2 reqs_info = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2,
+            .buffer = buffer,
+        };
+        VkMemoryRequirements2 reqs2 = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        };
+        vk->GetBufferMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
+        const VkMemoryRequirements &reqs = reqs2.memoryRequirements;
 
         VkMemoryPropertyFlags props = 0;
         if (usage == BufferUsage::kCpuWritesGpuReads ||

@@ -95,7 +95,15 @@ kms_test_init_memory(struct kms_test *test)
         .buffer = test->ahb,
     };
 #else
-    vk->GetImageMemoryRequirements(vk->dev, test->img, &reqs);
+    const VkImageMemoryRequirementsInfo2 reqs_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
+        .image = test->img,
+    };
+    VkMemoryRequirements2 reqs2 = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+    };
+    vk->GetImageMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
+    reqs = reqs2.memoryRequirements;
 
     uint32_t mt_mask = reqs.memoryTypeBits;
     int import_fd = -1;
