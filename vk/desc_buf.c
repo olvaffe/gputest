@@ -22,6 +22,8 @@ struct desc_buf_test {
 
     struct vk vk;
 
+    struct vk_pipeline *pipeline;
+
     struct vk_buffer *buf;
 
     VkDeviceSize src_ubo_offset;
@@ -41,7 +43,6 @@ struct desc_buf_test {
     VkDeviceSize dst_ibo_size;
     VkBufferView dst_ibo_view;
 
-    struct vk_pipeline *pipeline;
     struct vk_descriptor_set *set;
 
     struct vk_stopwatch *stopwatch;
@@ -257,8 +258,8 @@ desc_buf_test_init(struct desc_buf_test *test)
 
     vk_init(vk, NULL);
 
-    desc_buf_test_init_buffer(test);
     desc_buf_test_init_pipeline(test);
+    desc_buf_test_init_buffer(test);
     desc_buf_test_init_descriptor_set(test);
 
     test->stopwatch = vk_create_stopwatch(vk, 2);
@@ -272,12 +273,13 @@ desc_buf_test_cleanup(struct desc_buf_test *test)
     vk_destroy_stopwatch(vk, test->stopwatch);
 
     vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
 
     vk->DestroyBufferView(vk->dev, test->src_tbo_view, NULL);
     vk->DestroyBufferView(vk->dev, test->src_ibo_view, NULL);
     vk->DestroyBufferView(vk->dev, test->dst_ibo_view, NULL);
     vk_destroy_buffer(vk, test->buf);
+
+    vk_destroy_pipeline(vk, test->pipeline);
 
     vk_cleanup(vk);
 }

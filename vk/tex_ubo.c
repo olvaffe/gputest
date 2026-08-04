@@ -46,18 +46,19 @@ struct tex_ubo_test {
     uint32_t height;
 
     struct vk vk;
-    struct vk_buffer *vb;
-
-    struct vk_image *tex;
-    struct vk_buffer *ubo;
 
     struct vk_image *rt;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
+
+    struct vk_image *tex;
+    struct vk_buffer *ubo;
     struct vk_descriptor_set *tex_set;
     struct vk_descriptor_set *ubo_set;
+
+    struct vk_buffer *vb;
 };
 
 static void
@@ -173,13 +174,12 @@ tex_ubo_test_init(struct tex_ubo_test *test)
     struct vk *vk = &test->vk;
 
     vk_init(vk, NULL);
-    tex_ubo_test_init_vb(test);
-
-    tex_ubo_test_init_tex(test);
-    tex_ubo_test_init_ubo(test);
     tex_ubo_test_init_rt(test);
     tex_ubo_test_init_pipeline(test);
+    tex_ubo_test_init_tex(test);
+    tex_ubo_test_init_ubo(test);
     tex_ubo_test_init_descriptor_sets(test);
+    tex_ubo_test_init_vb(test);
 }
 
 static void
@@ -187,16 +187,13 @@ tex_ubo_test_cleanup(struct tex_ubo_test *test)
 {
     struct vk *vk = &test->vk;
 
+    vk_destroy_buffer(vk, test->vb);
     vk_destroy_descriptor_set(vk, test->tex_set);
     vk_destroy_descriptor_set(vk, test->ubo_set);
-    vk_destroy_pipeline(vk, test->pipeline);
-
-    vk_destroy_image(vk, test->rt);
-
-    vk_destroy_image(vk, test->tex);
     vk_destroy_buffer(vk, test->ubo);
-
-    vk_destroy_buffer(vk, test->vb);
+    vk_destroy_image(vk, test->tex);
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_image(vk, test->rt);
 
     vk_cleanup(vk);
 }

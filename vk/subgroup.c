@@ -14,10 +14,10 @@ struct subgroup_test {
 
     struct vk vk;
 
+    struct vk_pipeline *pipeline;
+
     struct vk_buffer *src;
     struct vk_buffer *dst;
-
-    struct vk_pipeline *pipeline;
     struct vk_descriptor_set *set;
 };
 
@@ -108,8 +108,8 @@ subgroup_test_init(struct subgroup_test *test)
 
     vk_init(vk, NULL);
 
-    subgroup_test_init_buffers(test);
     subgroup_test_init_pipeline(test);
+    subgroup_test_init_buffers(test);
     subgroup_test_init_descriptor_set(test);
 }
 
@@ -119,9 +119,9 @@ subgroup_test_cleanup(struct subgroup_test *test)
     struct vk *vk = &test->vk;
 
     vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
     vk_destroy_buffer(vk, test->dst);
     vk_destroy_buffer(vk, test->src);
+    vk_destroy_pipeline(vk, test->pipeline);
 
     vk_cleanup(vk);
 }

@@ -57,13 +57,14 @@ struct gs_test {
     uint32_t height;
 
     struct vk vk;
-    struct vk_buffer *vb;
 
     struct vk_image *rt;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
+
+    struct vk_buffer *vb;
 };
 
 static void
@@ -145,10 +146,9 @@ gs_test_init(struct gs_test *test)
     if (!vk->features.features.geometryShader)
         vk_die("no geometry shader support");
 
-    gs_test_init_vb(test);
-
     gs_test_init_rt(test);
     gs_test_init_pipeline(test);
+    gs_test_init_vb(test);
 }
 
 static void
@@ -156,11 +156,9 @@ gs_test_cleanup(struct gs_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_destroy_pipeline(vk, test->pipeline);
-
-    vk_destroy_image(vk, test->rt);
-
     vk_destroy_buffer(vk, test->vb);
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_image(vk, test->rt);
 
     vk_cleanup(vk);
 }

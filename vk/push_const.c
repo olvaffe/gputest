@@ -32,13 +32,14 @@ struct push_const_test {
     uint32_t height;
 
     struct vk vk;
-    struct vk_buffer *ubo;
 
     struct vk_image *rt;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
+
+    struct vk_buffer *ubo;
     struct vk_descriptor_set *set;
 };
 
@@ -136,10 +137,9 @@ push_const_init(struct push_const_test *test)
     struct vk *vk = &test->vk;
 
     vk_init(vk, NULL);
-    push_const_test_init_ubo(test);
-
     push_const_init_rt(test);
     push_const_init_pipeline(test);
+    push_const_test_init_ubo(test);
     push_const_test_init_descriptor_set(test);
 }
 
@@ -149,11 +149,9 @@ push_const_cleanup(struct push_const_test *test)
     struct vk *vk = &test->vk;
 
     vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
-
-    vk_destroy_image(vk, test->rt);
-
     vk_destroy_buffer(vk, test->ubo);
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_image(vk, test->rt);
 
     vk_cleanup(vk);
 }

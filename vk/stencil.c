@@ -126,8 +126,8 @@ stencil_test_init(struct stencil_test *test)
     vk_init(vk, NULL);
 
     stencil_test_init_rt(test);
-    stencil_test_init_buffers(test);
     stencil_test_init_pipeline(test);
+    stencil_test_init_buffers(test);
 }
 
 static void

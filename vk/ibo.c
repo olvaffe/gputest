@@ -22,14 +22,15 @@ struct ibo_test {
 
     struct vk vk;
 
-    struct vk_buffer *ibo;
-    VkBufferView ibo_view;
-
     struct vk_image *rt;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
+
+    struct vk_buffer *ibo;
+    VkBufferView ibo_view;
+
     struct vk_descriptor_set *set;
 };
 
@@ -144,9 +145,9 @@ ibo_test_init(struct ibo_test *test)
 
     vk_init(vk, NULL);
 
-    ibo_test_init_ibo(test);
     ibo_test_init_rt(test);
     ibo_test_init_pipeline(test);
+    ibo_test_init_ibo(test);
     ibo_test_init_descriptor_set(test);
 }
 
@@ -156,12 +157,10 @@ ibo_test_cleanup(struct ibo_test *test)
     struct vk *vk = &test->vk;
 
     vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
-
-    vk_destroy_image(vk, test->rt);
-
     vk->DestroyBufferView(vk->dev, test->ibo_view, NULL);
     vk_destroy_buffer(vk, test->ibo);
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_image(vk, test->rt);
 
     vk_cleanup(vk);
 }

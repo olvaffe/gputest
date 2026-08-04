@@ -24,9 +24,8 @@ struct storage_3d_test {
 
     struct vk vk;
     struct vk_image *img;
-    struct vk_buffer *buf;
-
     struct vk_pipeline *pipeline;
+    struct vk_buffer *buf;
     struct vk_descriptor_set **sets;
     VkImageView *views;
 };
@@ -180,8 +179,8 @@ storage_3d_test_init(struct storage_3d_test *test)
     vk_init(vk, NULL);
 
     storage_3d_test_init_image(test);
-    storage_3d_test_init_buffer(test);
     storage_3d_test_init_pipeline(test);
+    storage_3d_test_init_buffer(test);
     storage_3d_test_init_descriptor_sets(test);
 }
 
@@ -197,9 +196,8 @@ storage_3d_test_cleanup(struct storage_3d_test *test)
     free(test->views);
     free(test->sets);
 
-    vk_destroy_pipeline(vk, test->pipeline);
-
     vk_destroy_buffer(vk, test->buf);
+    vk_destroy_pipeline(vk, test->pipeline);
     vk_destroy_image(vk, test->img);
 
     vk_cleanup(vk);

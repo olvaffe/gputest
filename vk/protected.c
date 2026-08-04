@@ -51,14 +51,15 @@ struct protected_test {
 
     struct vk vk;
 
-    struct vk_buffer *vb;
-    struct vk_buffer *ib;
-    struct vk_buffer *staging;
-
     struct vk_image *rt;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
+
     struct vk_pipeline *pipeline;
+
+    struct vk_buffer *vb;
+    struct vk_buffer *ib;
+    struct vk_buffer *staging;
 };
 
 static void
@@ -174,9 +175,9 @@ protected_test_init(struct protected_test *test)
     };
     vk_init(vk, &params);
 
-    protected_test_init_buffers(test);
     protected_test_init_rt(test);
     protected_test_init_pipeline(test);
+    protected_test_init_buffers(test);
 }
 
 static void
@@ -184,13 +185,12 @@ protected_test_cleanup(struct protected_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_destroy_pipeline(vk, test->pipeline);
-
-    vk_destroy_image(vk, test->rt);
-
-    vk_destroy_buffer(vk, test->vb);
-    vk_destroy_buffer(vk, test->ib);
     vk_destroy_buffer(vk, test->staging);
+    vk_destroy_buffer(vk, test->ib);
+    vk_destroy_buffer(vk, test->vb);
+
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_image(vk, test->rt);
 
     vk_cleanup(vk);
 }

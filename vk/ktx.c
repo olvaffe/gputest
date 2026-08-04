@@ -32,13 +32,15 @@ struct ktx_test {
     ktxTexture *tex;
 
     struct vk vk;
-    struct vk_buffer *staging_buf;
-    struct vk_image *tex_img;
 
     struct vk_image *rt_img;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
+
     struct vk_pipeline *pipeline;
+
+    struct vk_buffer *staging_buf;
+    struct vk_image *tex_img;
     struct vk_descriptor_set *set;
 };
 
@@ -298,10 +300,10 @@ ktx_test_init(struct ktx_test *test)
 
     vk_init(vk, NULL);
 
-    ktx_test_init_staging_buffer(test);
-    ktx_test_init_tex(test);
     ktx_test_init_rt(test);
     ktx_test_init_pipeline(test);
+    ktx_test_init_staging_buffer(test);
+    ktx_test_init_tex(test);
     ktx_test_init_descriptor_set(test);
 }
 
@@ -311,11 +313,10 @@ ktx_test_cleanup(struct ktx_test *test)
     struct vk *vk = &test->vk;
 
     vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
-    vk_destroy_image(vk, test->rt_img);
-
     vk_destroy_image(vk, test->tex_img);
     vk_destroy_buffer(vk, test->staging_buf);
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_image(vk, test->rt_img);
     vk_cleanup(vk);
 
     ktxTexture_Destroy(test->tex);

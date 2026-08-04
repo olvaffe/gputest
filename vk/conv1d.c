@@ -23,11 +23,11 @@ struct conv1d_test {
 
     struct vk vk;
 
+    struct vk_pipeline *pipeline;
+
     struct vk_buffer *src;
     struct vk_buffer *dst;
     struct vk_buffer *weight;
-
-    struct vk_pipeline *pipeline;
     struct vk_descriptor_set *set;
 };
 
@@ -143,8 +143,8 @@ conv1d_test_init(struct conv1d_test *test)
 
     vk_init(vk, NULL);
 
-    conv1d_test_init_buffers(test);
     conv1d_test_init_pipeline(test);
+    conv1d_test_init_buffers(test);
     conv1d_test_init_descriptor_set(test);
 }
 
@@ -154,10 +154,10 @@ conv1d_test_cleanup(struct conv1d_test *test)
     struct vk *vk = &test->vk;
 
     vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
     vk_destroy_buffer(vk, test->weight);
     vk_destroy_buffer(vk, test->dst);
     vk_destroy_buffer(vk, test->src);
+    vk_destroy_pipeline(vk, test->pipeline);
 
     vk_cleanup(vk);
 }

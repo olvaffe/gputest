@@ -31,12 +31,12 @@ struct convlayer_test {
 
     struct vk vk;
 
+    struct vk_pipeline *pipeline;
+
     struct vk_buffer *ssbo;
     struct vk_buffer *ubo;
     struct vk_image *src;
     struct vk_image *dst;
-
-    struct vk_pipeline *pipeline;
     struct vk_descriptor_set *set;
 };
 
@@ -199,9 +199,9 @@ convlayer_test_init(struct convlayer_test *test)
 
     vk_init(vk, NULL);
 
+    convlayer_test_init_pipeline(test);
     convlayer_test_init_buffers(test);
     convlayer_test_init_images(test);
-    convlayer_test_init_pipeline(test);
     convlayer_test_init_descriptor_set(test);
 }
 
@@ -211,11 +211,11 @@ convlayer_test_cleanup(struct convlayer_test *test)
     struct vk *vk = &test->vk;
 
     vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
     vk_destroy_image(vk, test->src);
     vk_destroy_image(vk, test->dst);
     vk_destroy_buffer(vk, test->ssbo);
     vk_destroy_buffer(vk, test->ubo);
+    vk_destroy_pipeline(vk, test->pipeline);
 
     vk_cleanup(vk);
 }

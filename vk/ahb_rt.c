@@ -389,9 +389,8 @@ ahb_rt_test_init(struct ahb_rt_test *test)
     ahb_rt_test_init_memory(test);
     ahb_rt_test_init_ycbcr_conv(test);
     ahb_rt_test_init_image_view(test);
-    ahb_rt_test_init_pipeline(test);
-
     ahb_rt_test_init_rt(test);
+    ahb_rt_test_init_pipeline(test);
 }
 
 static void

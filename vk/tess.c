@@ -55,13 +55,14 @@ struct tess_test {
     uint32_t height;
 
     struct vk vk;
-    struct vk_buffer *vb;
 
     struct vk_image *rt;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
+
+    struct vk_buffer *vb;
 };
 
 static void
@@ -149,10 +150,9 @@ tess_test_init(struct tess_test *test)
     if (!vk->features.features.fillModeNonSolid)
         vk_die("no non-solid fill mode support");
 
-    tess_test_init_vb(test);
-
     tess_test_init_rt(test);
     tess_test_init_pipeline(test);
+    tess_test_init_vb(test);
 }
 
 static void
@@ -160,11 +160,9 @@ tess_test_cleanup(struct tess_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_destroy_pipeline(vk, test->pipeline);
-
-    vk_destroy_image(vk, test->rt);
-
     vk_destroy_buffer(vk, test->vb);
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_image(vk, test->rt);
 
     vk_cleanup(vk);
 }

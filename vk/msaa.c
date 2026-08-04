@@ -49,7 +49,6 @@ struct msaa_test {
     uint32_t height;
 
     struct vk vk;
-    struct vk_buffer *vb;
 
     struct vk_image *rt;
     struct vk_image *resolved;
@@ -57,6 +56,8 @@ struct msaa_test {
     VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
+
+    struct vk_buffer *vb;
 };
 
 static void
@@ -143,10 +144,9 @@ msaa_test_init(struct msaa_test *test)
     struct vk *vk = &test->vk;
 
     vk_init(vk, NULL);
-    msaa_test_init_vb(test);
-
     msaa_test_init_rt(test);
     msaa_test_init_pipeline(test);
+    msaa_test_init_vb(test);
 }
 
 static void
@@ -154,12 +154,10 @@ msaa_test_cleanup(struct msaa_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_destroy_pipeline(vk, test->pipeline);
-
-    vk_destroy_image(vk, test->rt);
-    vk_destroy_image(vk, test->resolved);
-
     vk_destroy_buffer(vk, test->vb);
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_image(vk, test->resolved);
+    vk_destroy_image(vk, test->rt);
 
     vk_cleanup(vk);
 }

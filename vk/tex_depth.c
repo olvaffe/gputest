@@ -38,15 +38,17 @@ struct tex_depth_test {
     uint32_t height;
 
     struct vk vk;
-    struct vk_buffer *vb;
 
     struct vk_image *rt;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
+
+    struct vk_pipeline *pipeline;
+
     struct vk_image *depth_tex;
     struct vk_descriptor_set *set;
 
-    struct vk_pipeline *pipeline;
+    struct vk_buffer *vb;
 };
 
 static void
@@ -148,12 +150,11 @@ tex_depth_test_init(struct tex_depth_test *test)
     struct vk *vk = &test->vk;
 
     vk_init(vk, NULL);
-    tex_depth_test_init_vb(test);
-
-    tex_depth_test_init_tex(test);
     tex_depth_test_init_rt(test);
     tex_depth_test_init_pipeline(test);
+    tex_depth_test_init_tex(test);
     tex_depth_test_init_descriptor_set(test);
+    tex_depth_test_init_vb(test);
 }
 
 static void
@@ -161,14 +162,11 @@ tex_depth_test_cleanup(struct tex_depth_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
-
-    vk_destroy_image(vk, test->rt);
-
-    vk_destroy_image(vk, test->depth_tex);
-
     vk_destroy_buffer(vk, test->vb);
+    vk_destroy_descriptor_set(vk, test->set);
+    vk_destroy_image(vk, test->depth_tex);
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_image(vk, test->rt);
 
     vk_cleanup(vk);
 }

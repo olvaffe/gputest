@@ -54,13 +54,14 @@ struct tri_test {
     uint32_t height;
 
     struct vk vk;
-    struct vk_buffer *vb;
 
     struct vk_image *rt;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
+
+    struct vk_buffer *vb;
 };
 
 static void
@@ -152,9 +153,9 @@ tri_test_init(struct tri_test *test)
 
     vk_init(vk, NULL);
 
-    tri_test_init_vb(test);
     tri_test_init_rt(test);
     tri_test_init_pipeline(test);
+    tri_test_init_vb(test);
 }
 
 static void
@@ -162,9 +163,9 @@ tri_test_cleanup(struct tri_test *test)
 {
     struct vk *vk = &test->vk;
 
+    vk_destroy_buffer(vk, test->vb);
     vk_destroy_pipeline(vk, test->pipeline);
     vk_destroy_image(vk, test->rt);
-    vk_destroy_buffer(vk, test->vb);
 
     vk_cleanup(vk);
 }

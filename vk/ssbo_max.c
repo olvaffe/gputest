@@ -15,12 +15,13 @@ static const uint32_t ssbo_max_test_cs[] = {
 
 struct ssbo_max_test {
     uint32_t local_size;
+    uint32_t grid_size;
 
     struct vk vk;
-    uint32_t grid_size;
-    struct vk_buffer *ssbo;
 
     struct vk_pipeline *pipeline;
+
+    struct vk_buffer *ssbo;
     struct vk_descriptor_set *set;
 };
 
@@ -70,9 +71,8 @@ ssbo_max_test_init(struct ssbo_max_test *test)
     struct vk *vk = &test->vk;
 
     vk_init(vk, NULL);
-    ssbo_max_test_init_ssbo(test);
-
     ssbo_max_test_init_pipeline(test);
+    ssbo_max_test_init_ssbo(test);
     ssbo_max_test_init_descriptor_set(test);
 }
 
@@ -82,9 +82,8 @@ ssbo_max_test_cleanup(struct ssbo_max_test *test)
     struct vk *vk = &test->vk;
 
     vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
-
     vk_destroy_buffer(vk, test->ssbo);
+    vk_destroy_pipeline(vk, test->pipeline);
 
     vk_cleanup(vk);
 }

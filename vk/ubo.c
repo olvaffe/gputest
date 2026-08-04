@@ -47,15 +47,17 @@ struct ubo_test {
     uint32_t height;
 
     struct vk vk;
-    struct vk_buffer *vb;
-    struct vk_buffer *ubo;
 
     struct vk_image *rt;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
 
     struct vk_pipeline *pipeline;
+
+    struct vk_buffer *ubo;
     struct vk_descriptor_set *set;
+
+    struct vk_buffer *vb;
 };
 
 static void
@@ -162,12 +164,11 @@ ubo_test_init(struct ubo_test *test)
     struct vk *vk = &test->vk;
 
     vk_init(vk, NULL);
-    ubo_test_init_vb(test);
-    ubo_test_init_ubo(test);
-
     ubo_test_init_rt(test);
     ubo_test_init_pipeline(test);
+    ubo_test_init_ubo(test);
     ubo_test_init_descriptor_set(test);
+    ubo_test_init_vb(test);
 }
 
 static void
@@ -175,13 +176,11 @@ ubo_test_cleanup(struct ubo_test *test)
 {
     struct vk *vk = &test->vk;
 
-    vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
-
-    vk_destroy_image(vk, test->rt);
-
     vk_destroy_buffer(vk, test->vb);
+    vk_destroy_descriptor_set(vk, test->set);
     vk_destroy_buffer(vk, test->ubo);
+    vk_destroy_pipeline(vk, test->pipeline);
+    vk_destroy_image(vk, test->rt);
 
     vk_cleanup(vk);
 }

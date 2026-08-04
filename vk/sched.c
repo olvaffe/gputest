@@ -35,11 +35,11 @@ struct sched_test {
 
     struct vk vk;
 
+    struct vk_pipeline *pipeline;
+
     struct vk_buffer *src;
     struct vk_buffer *dst;
     struct vk_buffer *weight;
-
-    struct vk_pipeline *pipeline;
     struct vk_descriptor_set *set;
 
     thrd_t *threads;
@@ -176,8 +176,8 @@ sched_test_init(struct sched_test *test)
     };
     vk_init(vk, &params);
 
-    sched_test_init_buffer(test);
     sched_test_init_pipeline(test);
+    sched_test_init_buffer(test);
     sched_test_init_descriptor_set(test);
 
     sched_test_init_threads(test);
@@ -196,8 +196,8 @@ sched_test_cleanup(struct sched_test *test)
     free(test->threads);
 
     vk_destroy_descriptor_set(vk, test->set);
-    vk_destroy_pipeline(vk, test->pipeline);
     vk_destroy_buffer(vk, test->dst);
+    vk_destroy_pipeline(vk, test->pipeline);
 
     vk_cleanup(vk);
 }

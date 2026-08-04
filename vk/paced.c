@@ -57,10 +57,11 @@ struct paced_test {
     struct vk_image *img;
     VkRenderingAttachmentInfo color_att;
     VkRenderingInfo rendering_info;
-    struct vk_buffer *ssbo;
 
     struct vk_pipeline *gfx;
     struct vk_pipeline *comp;
+
+    struct vk_buffer *ssbo;
     struct vk_descriptor_set *comp_set;
 };
 
@@ -164,8 +165,8 @@ paced_test_init(struct paced_test *test)
     vk_init(vk, &params);
 
     paced_test_init_rt(test);
-    paced_test_init_ssbo(test);
     paced_test_init_pipelines(test);
+    paced_test_init_ssbo(test);
     paced_test_init_descriptor_set(test);
 }
 
@@ -175,11 +176,10 @@ paced_test_cleanup(struct paced_test *test)
     struct vk *vk = &test->vk;
 
     vk_destroy_descriptor_set(vk, test->comp_set);
-
-    vk_destroy_pipeline(vk, test->gfx);
-    vk_destroy_pipeline(vk, test->comp);
-
     vk_destroy_buffer(vk, test->ssbo);
+
+    vk_destroy_pipeline(vk, test->comp);
+    vk_destroy_pipeline(vk, test->gfx);
 
     vk_destroy_image(vk, test->img);
 
