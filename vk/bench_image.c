@@ -545,11 +545,7 @@ bench_image_test_render_pass(struct bench_image_test *test,
         vk_set_pipeline_viewport(vk, pipeline, test->width, test->height);
         vk_set_pipeline_rasterization(vk, pipeline, VK_POLYGON_MODE_FILL, false);
 
-        pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-            .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &dst->info.format,
-        };
+        pipeline->color_att_format = dst->info.format;
         vk_compile_pipeline(vk, pipeline);
     }
 

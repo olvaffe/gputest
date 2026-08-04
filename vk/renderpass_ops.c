@@ -327,16 +327,12 @@ renderpass_ops_test_begin_pipeline(struct renderpass_ops_test *test,
 
     vk_set_pipeline_viewport(vk, test->pipeline, test->width, test->height);
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
-    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = test->color_img ? 1 : 0,
-        .pColorAttachmentFormats = test->color_img ? &test->color_img->info.format : NULL,
-        .depthAttachmentFormat =
-            test->depth_img ? test->depth_img->info.format : VK_FORMAT_UNDEFINED,
-        .stencilAttachmentFormat = (test->depth_img && fmt->stencil)
-                                       ? test->depth_img->info.format
-                                       : VK_FORMAT_UNDEFINED,
-    };
+    test->pipeline->color_att_format =
+        test->color_img ? test->color_img->info.format : VK_FORMAT_UNDEFINED;
+    test->pipeline->depth_att_format =
+        test->depth_img ? test->depth_img->info.format : VK_FORMAT_UNDEFINED;
+    test->pipeline->stencil_att_format =
+        (test->depth_img && fmt->stencil) ? test->depth_img->info.format : VK_FORMAT_UNDEFINED;
     vk_compile_pipeline(vk, test->pipeline);
 
     vk_bind_pipeline(vk, test->pipeline, test->cmd);

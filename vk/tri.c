@@ -89,11 +89,7 @@ tri_test_init_pipeline(struct tri_test *test)
     test->pipeline->scissor.extent.width -= tri_border * 2;
     test->pipeline->scissor.extent.height -= tri_border * 2;
     vk_set_pipeline_rasterization(vk, test->pipeline, VK_POLYGON_MODE_FILL, false);
-    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &test->color_format,
-    };
+    test->pipeline->color_att_format = test->color_format;
 
     vk_compile_pipeline(vk, test->pipeline);
 }

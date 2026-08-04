@@ -59,10 +59,7 @@ depth_resolve_test_init_pipeline(struct depth_resolve_test *test)
         .depthCompareOp = VK_COMPARE_OP_LESS,
     };
 
-    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .depthAttachmentFormat = test->format,
-    };
+    test->pipeline->depth_att_format = test->format;
 
     vk_compile_pipeline(vk, test->pipeline);
 }

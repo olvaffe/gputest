@@ -173,7 +173,9 @@ struct vk_pipeline {
     VkPipelineDepthStencilStateCreateInfo depth_info;
 
     /* fragment output state */
-    VkPipelineRenderingCreateInfo rendering_info;
+    VkFormat color_att_format;
+    VkFormat depth_att_format;
+    VkFormat stencil_att_format;
     uint64_t external_format;
 
     VkDescriptorSetLayout set_layouts[4];
@@ -1459,10 +1461,6 @@ vk_create_pipeline(struct vk *vk)
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
     };
 
-    pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-    };
-
     return pipeline;
 }
 
@@ -1694,9 +1692,23 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pDynamicStates = dynamic_states,
     };
 
+    const VkExternalFormatANDROID ext_fmt = {
+        .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
+        .externalFormat = pipeline->external_format,
+    };
+
+    const VkPipelineRenderingCreateInfo rendering_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .pNext = pipeline->external_format ? &ext_fmt : NULL,
+        .colorAttachmentCount = pipeline->color_att_format != VK_FORMAT_UNDEFINED ? 1u : 0u,
+        .pColorAttachmentFormats = &pipeline->color_att_format,
+        .depthAttachmentFormat = pipeline->depth_att_format,
+        .stencilAttachmentFormat = pipeline->stencil_att_format,
+    };
+
     const VkPipelineCreateFlags2CreateInfo flags2_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO,
-        .pNext = &pipeline->rendering_info,
+        .pNext = &rendering_info,
         .flags = pipeline->flags2,
     };
 
@@ -1728,16 +1740,6 @@ vk_compile_pipeline(struct vk *vk, struct vk_pipeline *pipeline)
         .pDynamicState = &dynamic_info,
         .layout = pipeline->pipeline_layout,
     };
-    const void **pnext = &pipeline->rendering_info.pNext;
-
-    const VkExternalFormatANDROID ext_fmt = {
-        .sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
-        .externalFormat = pipeline->external_format,
-    };
-    if (pipeline->external_format) {
-        *pnext = &ext_fmt;
-        pnext = (const void **)&ext_fmt.pNext;
-    }
 
     vk->result = vk->CreateGraphicsPipelines(vk->dev, VK_NULL_HANDLE, 1, &pipeline_info, NULL,
                                              &pipeline->pipeline);

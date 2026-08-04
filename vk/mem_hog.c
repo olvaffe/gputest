@@ -125,11 +125,7 @@ mem_hog_test_init_pipeline(struct mem_hog_test *test)
     vk_set_pipeline_push_const(vk, test->pipeline,
                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                sizeof(test->push_const));
-    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &test->img->info.format,
-    };
+    test->pipeline->color_att_format = test->img->info.format;
     vk_compile_pipeline(vk, test->pipeline);
 }
 

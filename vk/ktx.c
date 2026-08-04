@@ -176,11 +176,7 @@ ktx_test_init_pipeline(struct ktx_test *test)
 
     test->pipeline->sample_count = test->rt_img->info.samples;
 
-    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &test->rt_format,
-    };
+    test->pipeline->color_att_format = test->rt_format;
 
     vk_compile_pipeline(vk, test->pipeline);
 }

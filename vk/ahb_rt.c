@@ -82,15 +82,10 @@ ahb_rt_test_init_pipeline(struct ahb_rt_test *test)
 
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
                                sizeof(ahb_rt_test_matrices[0]));
-    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &test->ahb_fmt_props.format,
-    };
+    test->pipeline->color_att_format = test->ahb_fmt_props.format;
     if (test->ahb_fmt_props.format == VK_FORMAT_UNDEFINED) {
         if (test->rt) {
-            test->pipeline->rendering_info.pColorAttachmentFormats =
-                &test->ahb_resolve_props.colorAttachmentFormat;
+            test->pipeline->color_att_format = test->ahb_resolve_props.colorAttachmentFormat;
         } else {
             test->pipeline->external_format = test->ahb_fmt_props.externalFormat;
         }

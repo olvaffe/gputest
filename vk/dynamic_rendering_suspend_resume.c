@@ -47,11 +47,7 @@ dynamic_rendering_suspend_resume_test_init_pipeline(
     vk_set_pipeline_push_const(vk, test->pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
                                sizeof(float[4]));
 
-    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &test->color_format,
-    };
+    test->pipeline->color_att_format = test->color_format;
 
     vk_compile_pipeline(vk, test->pipeline);
 }

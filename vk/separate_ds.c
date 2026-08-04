@@ -82,11 +82,10 @@ separate_ds_test_init_pipeline(struct separate_ds_test *test)
             .reference = 20,
         },
     };
-    test->pipeline->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .depthAttachmentFormat = test->depth_bits ? test->depth_format : VK_FORMAT_UNDEFINED,
-        .stencilAttachmentFormat = test->stencil_bits ? test->depth_format : VK_FORMAT_UNDEFINED,
-    };
+    test->pipeline->depth_att_format =
+        test->depth_bits ? test->depth_format : VK_FORMAT_UNDEFINED;
+    test->pipeline->stencil_att_format =
+        test->stencil_bits ? test->depth_format : VK_FORMAT_UNDEFINED;
 
     vk_compile_pipeline(vk, test->pipeline);
 }

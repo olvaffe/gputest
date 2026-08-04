@@ -94,11 +94,7 @@ paced_test_init_pipelines(struct paced_test *test)
     vk_set_pipeline_push_const(vk, test->gfx,
                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                sizeof(test->push_const));
-    test->gfx->rendering_info = (VkPipelineRenderingCreateInfo){
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-        .colorAttachmentCount = 1,
-        .pColorAttachmentFormats = &test->format,
-    };
+    test->gfx->color_att_format = test->format;
     vk_compile_pipeline(vk, test->gfx);
 
     test->comp = vk_create_pipeline(vk);
