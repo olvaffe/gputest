@@ -234,7 +234,8 @@ ubo_test_draw_triangle(struct ubo_test *test, VkCommandBuffer cmd)
     };
     vk->CmdBeginRendering(cmd, &rendering_info);
 
-    vk->CmdBindVertexBuffers(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 });
+    vk->CmdBindVertexBuffers2(cmd, 0, 1, &test->vb->buf, &(VkDeviceSize){ 0 },
+                              &(VkDeviceSize){ test->vb->info.size }, NULL);
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
