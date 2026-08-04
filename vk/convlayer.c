@@ -266,8 +266,14 @@ convlayer_test_dispatch(struct convlayer_test *test, bool warmup)
     };
     vk->CmdPipelineBarrier2(cmd, &dep_info);
 
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                              test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
+    const VkBindDescriptorSetsInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .layout = test->pipeline->pipeline_layout,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &test->set->set,
+    };
+    vk->CmdBindDescriptorSets2(cmd, &bind_info);
 
     const uint32_t dispatch_width =
         DIV_ROUND_UP(test->grid_width, test->local_size[0] * test->block_size[0]);

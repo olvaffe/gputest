@@ -274,9 +274,14 @@ mem_hog_test_draw_triangle(struct mem_hog_test *test, VkCommandBuffer cmd)
 
     vk->CmdBeginRendering(cmd, &rendering_info);
     vk_bind_pipeline(vk, test->pipeline, cmd);
-    vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout,
-                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(test->push_const), &test->push_const);
+    const VkPushConstantsInfo push_info = {
+        .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
+        .layout = test->pipeline->pipeline_layout,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(test->push_const),
+        .pValues = &test->push_const,
+    };
+    vk->CmdPushConstants2(cmd, &push_info);
     vk->CmdDraw(cmd, 3, 1, 0, 0);
     vk->CmdEndRendering(cmd);
 }

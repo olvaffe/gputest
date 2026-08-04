@@ -205,11 +205,23 @@ push_const_draw_triangle(struct push_const_test *test, VkCommandBuffer cmd)
     vk->CmdBeginRendering(cmd, &rendering_info);
 
     vk_bind_pipeline(vk, test->pipeline, cmd);
-    vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(push_const_test_color), push_const_test_color);
+    const VkPushConstantsInfo push_info = {
+        .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
+        .layout = test->pipeline->pipeline_layout,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(push_const_test_color),
+        .pValues = push_const_test_color,
+    };
+    vk->CmdPushConstants2(cmd, &push_info);
 
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
+    const VkBindDescriptorSetsInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
+        .layout = test->pipeline->pipeline_layout,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &test->set->set,
+    };
+    vk->CmdBindDescriptorSets2(cmd, &bind_info);
 
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 

@@ -253,20 +253,41 @@ tex_ubo_test_draw_triangles(struct tex_ubo_test *test, VkCommandBuffer cmd)
                               &(VkDeviceSize){ test->vb->info.size }, NULL);
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              test->pipeline->pipeline_layout, 0, 1, &test->tex_set->set, 0,
-                              NULL);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              test->pipeline->pipeline_layout, 1, 1, &test->ubo_set->set, 1,
-                              &(uint32_t){ 0 });
+    const VkBindDescriptorSetsInfo tex_bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
+        .layout = test->pipeline->pipeline_layout,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &test->tex_set->set,
+    };
+    vk->CmdBindDescriptorSets2(cmd, &tex_bind_info);
+
+    const VkBindDescriptorSetsInfo ubo_bind_info_0 = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
+        .layout = test->pipeline->pipeline_layout,
+        .firstSet = 1,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &test->ubo_set->set,
+        .dynamicOffsetCount = 1,
+        .pDynamicOffsets = &(uint32_t){ 0 },
+    };
+    vk->CmdBindDescriptorSets2(cmd, &ubo_bind_info_0);
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              test->pipeline->pipeline_layout, 0, 1, &test->tex_set->set, 0,
-                              NULL);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              test->pipeline->pipeline_layout, 1, 1, &test->ubo_set->set, 1,
-                              &(uint32_t){ sizeof(tex_ubo_test_color_scales[0]) });
+    vk->CmdBindDescriptorSets2(cmd, &tex_bind_info);
+
+    const VkBindDescriptorSetsInfo ubo_bind_info_1 = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
+        .layout = test->pipeline->pipeline_layout,
+        .firstSet = 1,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &test->ubo_set->set,
+        .dynamicOffsetCount = 1,
+        .pDynamicOffsets = &(uint32_t){ sizeof(tex_ubo_test_color_scales[0]) },
+    };
+    vk->CmdBindDescriptorSets2(cmd, &ubo_bind_info_1);
     vk->CmdDraw(cmd, 3, 1, 3, 0);
 
     vk->CmdEndRendering(cmd);

@@ -247,15 +247,26 @@ storage_3d_test_draw_quad(struct storage_3d_test *test, VkCommandBuffer cmd)
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     for (uint32_t i = 0; i < test->img->info.mipLevels; i++) {
-        vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                  test->pipeline->pipeline_layout, 0, 1, &test->sets[i]->set, 0,
-                                  NULL);
+        const VkBindDescriptorSetsInfo bind_info = {
+            .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .layout = test->pipeline->pipeline_layout,
+            .descriptorSetCount = 1,
+            .pDescriptorSets = &test->sets[i]->set,
+        };
+        vk->CmdBindDescriptorSets2(cmd, &bind_info);
 
         const struct storage_3d_test_push_const push = {
             .level = i,
         };
-        vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                             sizeof(push), &push);
+        const VkPushConstantsInfo push_info = {
+            .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
+            .layout = test->pipeline->pipeline_layout,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .size = sizeof(push),
+            .pValues = &push,
+        };
+        vk->CmdPushConstants2(cmd, &push_info);
 
         const uint32_t workgroup_size[3] = { 4, 4, 4 };
         const uint32_t workgroup_count[3] = {

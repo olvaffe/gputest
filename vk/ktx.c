@@ -373,10 +373,22 @@ ktx_test_draw_quad(struct ktx_test *test, VkCommandBuffer cmd)
         .slice =
             (float)test->slice / (test->tex->baseDepth == 1 ? 1 : (test->tex->baseDepth - 1)),
     };
-    vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(push), &push);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
+    const VkPushConstantsInfo push_info = {
+        .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
+        .layout = test->pipeline->pipeline_layout,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(push),
+        .pValues = &push,
+    };
+    vk->CmdPushConstants2(cmd, &push_info);
+    const VkBindDescriptorSetsInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
+        .layout = test->pipeline->pipeline_layout,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &test->set->set,
+    };
+    vk->CmdBindDescriptorSets2(cmd, &bind_info);
     vk->CmdDraw(cmd, 4, 1, 0, 0);
     vk->CmdEndRendering(cmd);
 

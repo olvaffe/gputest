@@ -107,8 +107,14 @@ ssbo_max_test_dispatch_ssbo(struct ssbo_max_test *test, VkCommandBuffer cmd)
 
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                              test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
+    const VkBindDescriptorSetsInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .layout = test->pipeline->pipeline_layout,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &test->set->set,
+    };
+    vk->CmdBindDescriptorSets2(cmd, &bind_info);
 
     const uint32_t count = test->grid_size / test->local_size;
     vk->CmdDispatch(cmd, count, count, 1);

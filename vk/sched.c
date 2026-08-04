@@ -209,14 +209,26 @@ sched_test_dispatch_once(struct sched_test *test)
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     vk_bind_pipeline(vk, test->pipeline, cmd);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                              test->pipeline->pipeline_layout, 0, 1, &test->set->set, 0, NULL);
+    const VkBindDescriptorSetsInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .layout = test->pipeline->pipeline_layout,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &test->set->set,
+    };
+    vk->CmdBindDescriptorSets2(cmd, &bind_info);
 
     const struct sched_test_push_consts consts = {
         .loop = test->loop,
     };
-    vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                         sizeof(consts), &consts);
+    const VkPushConstantsInfo push_info = {
+        .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
+        .layout = test->pipeline->pipeline_layout,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .size = sizeof(consts),
+        .pValues = &consts,
+    };
+    vk->CmdPushConstants2(cmd, &push_info);
 
     vk->CmdDispatch(cmd, test->group_count, 1, 1);
 

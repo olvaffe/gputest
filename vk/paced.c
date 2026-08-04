@@ -202,10 +202,22 @@ paced_test_draw_comp(struct paced_test *test, VkCommandBuffer cmd)
     vk->CmdPipelineBarrier2(cmd, &dep_info1);
 
     vk_bind_pipeline(vk, test->comp, cmd);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, test->comp->pipeline_layout, 0,
-                              1, &test->comp_set->set, 0, NULL);
-    vk->CmdPushConstants(cmd, test->comp->pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                         sizeof(test->push_const), &test->push_const);
+    const VkBindDescriptorSetsInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .layout = test->comp->pipeline_layout,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &test->comp_set->set,
+    };
+    vk->CmdBindDescriptorSets2(cmd, &bind_info);
+    const VkPushConstantsInfo comp_push_info = {
+        .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
+        .layout = test->comp->pipeline_layout,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .size = sizeof(test->push_const),
+        .pValues = &test->push_const,
+    };
+    vk->CmdPushConstants2(cmd, &comp_push_info);
     vk->CmdDispatch(cmd, test->group_count, 1, 1);
 
     const VkDependencyInfo dep_info2 = {
@@ -277,9 +289,14 @@ paced_test_draw_gfx(struct paced_test *test, VkCommandBuffer cmd)
     };
     vk->CmdBeginRendering(cmd, &rendering_info);
     vk_bind_pipeline(vk, test->gfx, cmd);
-    vk->CmdPushConstants(cmd, test->gfx->pipeline_layout,
-                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(test->push_const), &test->push_const);
+    const VkPushConstantsInfo gfx_push_info = {
+        .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
+        .layout = test->gfx->pipeline_layout,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(test->push_const),
+        .pValues = &test->push_const,
+    };
+    vk->CmdPushConstants2(cmd, &gfx_push_info);
     vk->CmdDraw(cmd, test->vertex_count, 1, 0, 0);
     vk->CmdEndRendering(cmd);
 

@@ -169,8 +169,14 @@ dynamic_rendering_suspend_resume_test_draw_triangle_1(
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const float red[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
-    vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(red), red);
+    const VkPushConstantsInfo red_push_info = {
+        .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
+        .layout = test->pipeline->pipeline_layout,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(red),
+        .pValues = red,
+    };
+    vk->CmdPushConstants2(cmd, &red_push_info);
     vk->CmdDraw(cmd, 3, 1, 0, 0);
     vk->CmdEndRendering(cmd);
 }
@@ -186,8 +192,14 @@ dynamic_rendering_suspend_resume_test_draw_triangle_2(
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const float green[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
-    vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(green), green);
+    const VkPushConstantsInfo green_push_info = {
+        .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
+        .layout = test->pipeline->pipeline_layout,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(green),
+        .pValues = green,
+    };
+    vk->CmdPushConstants2(cmd, &green_push_info);
     vk->CmdDraw(cmd, 3, 1, 1, 0);
     vk->CmdEndRendering(cmd);
 }
@@ -220,8 +232,14 @@ dynamic_rendering_suspend_resume_test_draw_triangle_3(
     vk_bind_pipeline(vk, test->pipeline, cmd);
 
     const float blue[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
-    vk->CmdPushConstants(cmd, test->pipeline->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(blue), blue);
+    const VkPushConstantsInfo blue_push_info = {
+        .sType = VK_STRUCTURE_TYPE_PUSH_CONSTANTS_INFO,
+        .layout = test->pipeline->pipeline_layout,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .size = sizeof(blue),
+        .pValues = blue,
+    };
+    vk->CmdPushConstants2(cmd, &blue_push_info);
     vk->CmdDraw(cmd, 3, 1, 2, 0);
     vk->CmdEndRendering(cmd);
 

@@ -459,6 +459,14 @@ bench_image_test_dispatch(struct bench_image_test *test,
     const uint32_t group_count_x = test->width / test->cs_local_size;
     const uint32_t group_count_y = test->height / test->cs_local_size;
 
+    const VkBindDescriptorSetsInfo comp_bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .layout = pipeline->pipeline_layout,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &set->set,
+    };
+
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
     bench_image_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -474,16 +482,14 @@ bench_image_test_dispatch(struct bench_image_test *test,
                              VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                              VK_ACCESS_2_SHADER_WRITE_BIT);
     vk_bind_pipeline(vk, pipeline, cmd);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
-                              1, &set->set, 0, NULL);
+    vk->CmdBindDescriptorSets2(cmd, &comp_bind_info);
     vk->CmdDispatch(cmd, group_count_x, group_count_y, 1);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     cmd = vk_begin_cmd(vk, false);
     vk_bind_pipeline(vk, pipeline, cmd);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
-                              1, &set->set, 0, NULL);
+    vk->CmdBindDescriptorSets2(cmd, &comp_bind_info);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     for (uint32_t i = 0; i < test->loop; i++)
         vk->CmdDispatch(cmd, group_count_x, group_count_y, 1);
@@ -595,6 +601,14 @@ bench_image_test_render_pass(struct bench_image_test *test,
         .pColorAttachments = &att_info,
     };
 
+    const VkBindDescriptorSetsInfo gfx_bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS,
+        .layout = pipeline->pipeline_layout,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &set->set,
+    };
+
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
     bench_image_test_barrier(test, cmd, src, VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
                              VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -610,8 +624,7 @@ bench_image_test_render_pass(struct bench_image_test *test,
                              VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                              VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
     vk_bind_pipeline(vk, pipeline, cmd);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, 0,
-                              1, &set->set, 0, NULL);
+    vk->CmdBindDescriptorSets2(cmd, &gfx_bind_info);
     vk->CmdBeginRendering(cmd, &rendering_info);
     vk->CmdDraw(cmd, 4, 1, 0, 0);
     vk->CmdEndRendering(cmd);
@@ -620,8 +633,7 @@ bench_image_test_render_pass(struct bench_image_test *test,
 
     cmd = vk_begin_cmd(vk, false);
     vk_bind_pipeline(vk, pipeline, cmd);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline_layout, 0,
-                              1, &set->set, 0, NULL);
+    vk->CmdBindDescriptorSets2(cmd, &gfx_bind_info);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     vk->CmdBeginRendering(cmd, &rendering_info);
     for (uint32_t i = 0; i < test->loop; i++)

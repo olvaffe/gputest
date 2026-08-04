@@ -288,22 +288,28 @@ bench_buffer_test_dispatch(struct bench_buffer_test *test,
     assert(grid_size * grid_size * test->elem_size == test->size);
     assert(group_count * test->cs_local_size == grid_size);
 
+    const VkBindDescriptorSetsInfo bind_info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .layout = pipeline->pipeline_layout,
+        .descriptorSetCount = 1,
+        .pDescriptorSets = &set->set,
+    };
+
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
     vk->CmdFillBuffer(cmd, src->buf, 0, test->size, val);
     bench_buffer_test_barrier(
         test, cmd, src, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
     vk_bind_pipeline(vk, pipeline, cmd);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
-                              1, &set->set, 0, NULL);
+    vk->CmdBindDescriptorSets2(cmd, &bind_info);
     vk->CmdDispatch(cmd, group_count, group_count, 1);
     vk_end_cmd(vk);
     vk_wait(vk);
 
     cmd = vk_begin_cmd(vk, false);
     vk_bind_pipeline(vk, pipeline, cmd);
-    vk->CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout, 0,
-                              1, &set->set, 0, NULL);
+    vk->CmdBindDescriptorSets2(cmd, &bind_info);
     vk_write_stopwatch(vk, test->stopwatch, cmd);
     for (uint32_t i = 0; i < test->loop; i++)
         vk->CmdDispatch(cmd, group_count, group_count, 1);
