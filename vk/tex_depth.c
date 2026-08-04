@@ -182,16 +182,11 @@ tex_depth_test_cleanup(struct tex_depth_test *test)
 }
 
 static void
-tex_depth_test_draw_triangle(struct tex_depth_test *test, VkCommandBuffer cmd)
+tex_depth_test_draw_pre(struct tex_depth_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
-    const VkImageSubresourceRange subres_range = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .levelCount = 1,
-        .layerCount = 1,
-    };
-    const VkImageMemoryBarrier2 barrier1 = {
+    const VkImageMemoryBarrier2 barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
         .srcAccessMask = VK_ACCESS_2_NONE,
@@ -200,9 +195,27 @@ tex_depth_test_draw_triangle(struct tex_depth_test *test, VkCommandBuffer cmd)
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .image = test->rt->img,
-        .subresourceRange = subres_range,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount = 1,
+            .layerCount = 1,
+        },
     };
-    const VkImageMemoryBarrier2 barrier2 = {
+
+    const VkDependencyInfo dep_info = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &barrier,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info);
+}
+
+static void
+tex_depth_test_draw_post(struct tex_depth_test *test, VkCommandBuffer cmd)
+{
+    struct vk *vk = &test->vk;
+
+    const VkImageMemoryBarrier2 barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
         .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -211,15 +224,25 @@ tex_depth_test_draw_triangle(struct tex_depth_test *test, VkCommandBuffer cmd)
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_GENERAL,
         .image = test->rt->img,
-        .subresourceRange = subres_range,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount = 1,
+            .layerCount = 1,
+        },
     };
 
-    const VkDependencyInfo dep_info1 = {
+    const VkDependencyInfo dep_info = {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
         .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &barrier1,
+        .pImageMemoryBarriers = &barrier,
     };
-    vk->CmdPipelineBarrier2(cmd, &dep_info1);
+    vk->CmdPipelineBarrier2(cmd, &dep_info);
+}
+
+static void
+tex_depth_test_draw_triangle(struct tex_depth_test *test, VkCommandBuffer cmd)
+{
+    struct vk *vk = &test->vk;
 
     vk->CmdBeginRendering(cmd, &test->rendering_info);
 
@@ -238,13 +261,6 @@ tex_depth_test_draw_triangle(struct tex_depth_test *test, VkCommandBuffer cmd)
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
     vk->CmdEndRendering(cmd);
-
-    const VkDependencyInfo dep_info2 = {
-        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &barrier2,
-    };
-    vk->CmdPipelineBarrier2(cmd, &dep_info2);
 }
 
 static void
@@ -304,7 +320,9 @@ tex_depth_test_draw(struct tex_depth_test *test)
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
     tex_depth_test_draw_prep_texture(test, cmd);
+    tex_depth_test_draw_pre(test, cmd);
     tex_depth_test_draw_triangle(test, cmd);
+    tex_depth_test_draw_post(test, cmd);
 
     vk_end_cmd(vk);
     vk_wait(vk);

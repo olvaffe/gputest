@@ -170,16 +170,11 @@ msaa_test_cleanup(struct msaa_test *test)
 }
 
 static void
-msaa_test_draw_triangle(struct msaa_test *test, VkCommandBuffer cmd)
+msaa_test_draw_pre(struct msaa_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
-    const VkImageSubresourceRange subres_range = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .levelCount = 1,
-        .layerCount = 1,
-    };
-    const VkImageMemoryBarrier2 barriers1[] = {
+    const VkImageMemoryBarrier2 barriers[] = {
         [0] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
             .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
@@ -189,7 +184,11 @@ msaa_test_draw_triangle(struct msaa_test *test, VkCommandBuffer cmd)
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .image = test->rt->img,
-            .subresourceRange = subres_range,
+            .subresourceRange = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .levelCount = 1,
+                .layerCount = 1,
+            },
         },
         [1] = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -200,10 +199,28 @@ msaa_test_draw_triangle(struct msaa_test *test, VkCommandBuffer cmd)
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .image = test->resolved->img,
-            .subresourceRange = subres_range,
+            .subresourceRange = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .levelCount = 1,
+                .layerCount = 1,
+            },
         },
     };
-    const VkImageMemoryBarrier2 barrier2 = {
+
+    const VkDependencyInfo dep_info = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 2,
+        .pImageMemoryBarriers = barriers,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info);
+}
+
+static void
+msaa_test_draw_post(struct msaa_test *test, VkCommandBuffer cmd)
+{
+    struct vk *vk = &test->vk;
+
+    const VkImageMemoryBarrier2 barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
         .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -212,15 +229,25 @@ msaa_test_draw_triangle(struct msaa_test *test, VkCommandBuffer cmd)
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_GENERAL,
         .image = test->resolved->img,
-        .subresourceRange = subres_range,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount = 1,
+            .layerCount = 1,
+        },
     };
 
-    const VkDependencyInfo dep_info1 = {
+    const VkDependencyInfo dep_info = {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .imageMemoryBarrierCount = 2,
-        .pImageMemoryBarriers = barriers1,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &barrier,
     };
-    vk->CmdPipelineBarrier2(cmd, &dep_info1);
+    vk->CmdPipelineBarrier2(cmd, &dep_info);
+}
+
+static void
+msaa_test_draw_triangle(struct msaa_test *test, VkCommandBuffer cmd)
+{
+    struct vk *vk = &test->vk;
 
     vk->CmdBeginRendering(cmd, &test->rendering_info);
 
@@ -230,13 +257,6 @@ msaa_test_draw_triangle(struct msaa_test *test, VkCommandBuffer cmd)
     vk->CmdDraw(cmd, 3, 1, 0, 0);
 
     vk->CmdEndRendering(cmd);
-
-    const VkDependencyInfo dep_info2 = {
-        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &barrier2,
-    };
-    vk->CmdPipelineBarrier2(cmd, &dep_info2);
 }
 
 static void
@@ -246,7 +266,9 @@ msaa_test_draw(struct msaa_test *test)
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
+    msaa_test_draw_pre(test, cmd);
     msaa_test_draw_triangle(test, cmd);
+    msaa_test_draw_post(test, cmd);
 
     vk_end_cmd(vk);
     vk_wait(vk);

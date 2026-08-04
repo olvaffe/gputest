@@ -119,18 +119,11 @@ pipeline_stats_test_cleanup(struct pipeline_stats_test *test)
 }
 
 static void
-pipeline_stats_test_draw_triangle(struct pipeline_stats_test *test, VkCommandBuffer cmd)
+pipeline_stats_test_draw_pre(struct pipeline_stats_test *test, VkCommandBuffer cmd)
 {
     struct vk *vk = &test->vk;
 
-    vk->ResetQueryPool(vk->dev, test->query->pool, 0, 1);
-
-    const VkImageSubresourceRange subres_range = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .levelCount = 1,
-        .layerCount = 1,
-    };
-    const VkImageMemoryBarrier2 before_barrier = {
+    const VkImageMemoryBarrier2 barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
         .srcAccessMask = VK_ACCESS_2_NONE,
@@ -139,9 +132,27 @@ pipeline_stats_test_draw_triangle(struct pipeline_stats_test *test, VkCommandBuf
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .image = test->rt->img,
-        .subresourceRange = subres_range,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount = 1,
+            .layerCount = 1,
+        },
     };
-    const VkImageMemoryBarrier2 after_barrier = {
+
+    const VkDependencyInfo dep_info = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &barrier,
+    };
+    vk->CmdPipelineBarrier2(cmd, &dep_info);
+}
+
+static void
+pipeline_stats_test_draw_post(struct pipeline_stats_test *test, VkCommandBuffer cmd)
+{
+    struct vk *vk = &test->vk;
+
+    const VkImageMemoryBarrier2 barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
         .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -150,15 +161,27 @@ pipeline_stats_test_draw_triangle(struct pipeline_stats_test *test, VkCommandBuf
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_GENERAL,
         .image = test->rt->img,
-        .subresourceRange = subres_range,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount = 1,
+            .layerCount = 1,
+        },
     };
 
-    const VkDependencyInfo dep_info1 = {
+    const VkDependencyInfo dep_info = {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
         .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &before_barrier,
+        .pImageMemoryBarriers = &barrier,
     };
-    vk->CmdPipelineBarrier2(cmd, &dep_info1);
+    vk->CmdPipelineBarrier2(cmd, &dep_info);
+}
+
+static void
+pipeline_stats_test_draw_triangle(struct pipeline_stats_test *test, VkCommandBuffer cmd)
+{
+    struct vk *vk = &test->vk;
+
+    vk->ResetQueryPool(vk->dev, test->query->pool, 0, 1);
 
     vk->CmdBeginQuery(cmd, test->query->pool, 0, 0);
     vk->CmdBeginRendering(cmd, &test->rendering_info);
@@ -166,13 +189,6 @@ pipeline_stats_test_draw_triangle(struct pipeline_stats_test *test, VkCommandBuf
     vk->CmdDraw(cmd, 3, 1, 0, 0);
     vk->CmdEndRendering(cmd);
     vk->CmdEndQuery(cmd, test->query->pool, 0);
-
-    const VkDependencyInfo dep_info2 = {
-        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &after_barrier,
-    };
-    vk->CmdPipelineBarrier2(cmd, &dep_info2);
 }
 
 static void
@@ -182,7 +198,9 @@ pipeline_stats_test_draw(struct pipeline_stats_test *test)
 
     VkCommandBuffer cmd = vk_begin_cmd(vk, false);
 
+    pipeline_stats_test_draw_pre(test, cmd);
     pipeline_stats_test_draw_triangle(test, cmd);
+    pipeline_stats_test_draw_post(test, cmd);
 
     vk_end_cmd(vk);
     vk_wait(vk);
