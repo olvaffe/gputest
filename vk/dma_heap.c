@@ -238,7 +238,9 @@ dma_heap_test_draw(struct dma_heap_test *test)
     const VkBufferMemoryBarrier2 barriers[] = {
         [0] = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_NONE,
             .srcAccessMask = VK_ACCESS_2_NONE,
+            .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT,
             .dstQueueFamilyIndex = vk->queue_family_index,
@@ -247,7 +249,9 @@ dma_heap_test_draw(struct dma_heap_test *test)
         },
         [1] = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_NONE,
             .dstAccessMask = VK_ACCESS_2_NONE,
             .srcQueueFamilyIndex = vk->queue_family_index,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_FOREIGN_EXT,
