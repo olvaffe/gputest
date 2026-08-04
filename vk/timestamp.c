@@ -7,7 +7,7 @@
 
 struct timestamp_test {
     uint32_t sleep;
-    bool EXT_calibrated_timestamps;
+    bool KHR_calibrated_timestamps;
     bool loop;
 
     struct vk vk;
@@ -21,13 +21,13 @@ timestamp_test_init(struct timestamp_test *test)
     struct vk *vk = &test->vk;
 
     const struct vk_init_params params = {
-        .dev_exts = (const char *[]){ VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME },
-        .dev_ext_count = test->EXT_calibrated_timestamps,
+        .dev_exts = (const char *[]){ VK_KHR_CALIBRATED_TIMESTAMPS_EXTENSION_NAME },
+        .dev_ext_count = test->KHR_calibrated_timestamps,
     };
     vk_init(vk, &params);
 
-    if (test->EXT_calibrated_timestamps) {
-        VkTimeDomainEXT domains[16];
+    if (test->KHR_calibrated_timestamps) {
+        VkTimeDomainKHR domains[16];
         uint32_t count = ARRAY_SIZE(domains);
         vk->result =
             vk->GetPhysicalDeviceCalibrateableTimeDomainsKHR(vk->physical_dev, &count, domains);
@@ -35,7 +35,7 @@ timestamp_test_init(struct timestamp_test *test)
 
         bool has_device_domain = false;
         for (uint32_t i = 0; i < count; i++) {
-            if (domains[i] == VK_TIME_DOMAIN_DEVICE_EXT) {
+            if (domains[i] == VK_TIME_DOMAIN_DEVICE_KHR) {
                 has_device_domain = true;
                 break;
             }
@@ -137,9 +137,9 @@ static void
 timestamp_test_draw_calibrated(struct timestamp_test *test)
 {
     struct vk *vk = &test->vk;
-    const VkCalibratedTimestampInfoEXT info = {
-        .sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT,
-        .timeDomain = VK_TIME_DOMAIN_DEVICE_EXT,
+    const VkCalibratedTimestampInfoKHR info = {
+        .sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR,
+        .timeDomain = VK_TIME_DOMAIN_DEVICE_KHR,
     };
     uint64_t ts[2];
     uint64_t deviation;
@@ -155,9 +155,9 @@ static void
 timestamp_test_draw_mixed(struct timestamp_test *test)
 {
     struct vk *vk = &test->vk;
-    const VkCalibratedTimestampInfoEXT info = {
-        .sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT,
-        .timeDomain = VK_TIME_DOMAIN_DEVICE_EXT,
+    const VkCalibratedTimestampInfoKHR info = {
+        .sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR,
+        .timeDomain = VK_TIME_DOMAIN_DEVICE_KHR,
     };
     uint64_t ts[3];
     uint64_t deviation;
@@ -186,9 +186,9 @@ static void
 timestamp_test_draw_loop(struct timestamp_test *test)
 {
     struct vk *vk = &test->vk;
-    const VkCalibratedTimestampInfoEXT info = {
-        .sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT,
-        .timeDomain = VK_TIME_DOMAIN_DEVICE_EXT,
+    const VkCalibratedTimestampInfoKHR info = {
+        .sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR,
+        .timeDomain = VK_TIME_DOMAIN_DEVICE_KHR,
     };
     uint64_t ts;
     uint64_t deviation;
@@ -208,7 +208,7 @@ timestamp_test_draw(struct timestamp_test *test)
     timestamp_test_draw_same_cmd(test);
     timestamp_test_draw_two_cmds(test);
 
-    if (test->EXT_calibrated_timestamps) {
+    if (test->KHR_calibrated_timestamps) {
         timestamp_test_draw_calibrated(test);
         timestamp_test_draw_mixed(test);
         if (test->loop)
@@ -221,7 +221,7 @@ main(void)
 {
     struct timestamp_test test = {
         .sleep = 200,
-        .EXT_calibrated_timestamps = true,
+        .KHR_calibrated_timestamps = true,
         .loop = false,
     };
 
