@@ -240,14 +240,14 @@ PFN_DEVICE(GetMemoryFdPropertiesKHR)
 PFN_DEVICE(GetSemaphoreFdKHR)
 PFN_DEVICE(ImportSemaphoreFdKHR)
 
+/* VK_KHR_get_surface_capabilities2 */
+PFN_INSTANCE(GetPhysicalDeviceSurfaceCapabilities2KHR)
+PFN_INSTANCE(GetPhysicalDeviceSurfaceFormats2KHR)
+
 /* VK_KHR_surface */
 PFN_INSTANCE(DestroySurfaceKHR)
 PFN_INSTANCE(GetPhysicalDeviceSurfacePresentModesKHR)
 PFN_INSTANCE(GetPhysicalDeviceSurfaceSupportKHR)
-
-/* VK_KHR_get_surface_capabilities2 */
-PFN_INSTANCE(GetPhysicalDeviceSurfaceCapabilities2KHR)
-PFN_INSTANCE(GetPhysicalDeviceSurfaceFormats2KHR)
 
 /* VK_KHR_swapchain */
 PFN_INSTANCE(GetPhysicalDevicePresentRectanglesKHR)
@@ -258,6 +258,9 @@ PFN_DEVICE(GetDeviceGroupPresentCapabilitiesKHR)
 PFN_DEVICE(GetDeviceGroupSurfacePresentModesKHR)
 PFN_DEVICE(GetSwapchainImagesKHR)
 PFN_DEVICE(QueuePresentKHR)
+
+/* VK_KHR_swapchain_maintenance1 */
+PFN_DEVICE(ReleaseSwapchainImagesKHR)
 
 /* VK_EXT_debug_utils */
 PFN_INSTANCE(CreateDebugUtilsMessengerEXT)
