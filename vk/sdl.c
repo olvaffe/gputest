@@ -105,9 +105,13 @@ sdl_test_dump_surface_caps(struct sdl_test *test, VkPresentModeKHR mode)
         .surface = test->surf,
     };
 
+    VkSharedPresentSurfaceCapabilitiesKHR shared_caps = {
+        .sType = VK_STRUCTURE_TYPE_SHARED_PRESENT_SURFACE_CAPABILITIES_KHR,
+    };
     VkPresentModeKHR compat_modes[16];
     VkSurfacePresentModeCompatibilityKHR compat_caps = {
         .sType = VK_STRUCTURE_TYPE_SURFACE_PRESENT_MODE_COMPATIBILITY_KHR,
+        .pNext = &shared_caps,
         .pPresentModes = compat_modes,
         .presentModeCount = ARRAY_SIZE(compat_modes),
     };
@@ -157,6 +161,9 @@ sdl_test_dump_surface_caps(struct sdl_test *test, VkPresentModeKHR mode)
     vk_log("  compatible modes:");
     for (uint32_t i = 0; i < compat_caps.presentModeCount; i++)
         vk_log("    %s", present_mode_str(compat_caps.pPresentModes[i]));
+
+    vk_log("  sharedPresentSupportedUsageFlags=0x%x",
+           shared_caps.sharedPresentSupportedUsageFlags);
 }
 
 static void

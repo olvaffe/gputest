@@ -244,6 +244,9 @@ PFN_DEVICE(ImportSemaphoreFdKHR)
 PFN_INSTANCE(GetPhysicalDeviceSurfaceCapabilities2KHR)
 PFN_INSTANCE(GetPhysicalDeviceSurfaceFormats2KHR)
 
+/* VK_KHR_shared_presentable_image */
+PFN_DEVICE(GetSwapchainStatusKHR)
+
 /* VK_KHR_surface */
 PFN_INSTANCE(DestroySurfaceKHR)
 PFN_INSTANCE(GetPhysicalDeviceSurfacePresentModesKHR)
