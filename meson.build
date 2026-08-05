@@ -153,7 +153,7 @@ dep_libva = dependency('libva', required: false)
 dep_libva_drm = dependency('libva-drm', required: false)
 
 # for wlutil
-dep_wl_client = dependency('wayland-client', required: false)
+dep_wl_client = dependency('wayland-client', version: '>= 1.23', required: false)
 dep_wl_protocols = dependency('wayland-protocols', version: '>= 1.41', required: false)
 
 dep_ktx = dependency('Ktx', method: 'cmake', required: false)

@@ -711,9 +711,12 @@ wl_registry_event_global(
 {
     struct wl *wl = data;
 
+#ifdef WL_FIXES_INTERFACE
     if (!strcmp(interface, wl_fixes_interface.name)) {
         wl->globals.fixes = wl_registry_bind(reg, name, &wl_fixes_interface, 1);
-    } else if (!strcmp(interface, wl_seat_interface.name)) {
+    } else
+#endif
+        if (!strcmp(interface, wl_seat_interface.name)) {
         if (version < WL_SEAT_RELEASE_SINCE_VERSION) {
             wl_die("%s ver %d req %d", interface, version, WL_SEAT_RELEASE_SINCE_VERSION);
         }
@@ -815,8 +818,10 @@ wl_init_globals(struct wl *wl)
     /* roundtrip again because we might have called wl_registry_bind */
     wl_display_roundtrip(wl->display);
 
+#ifdef WL_FIXES_INTERFACE
     if (wl->globals.fixes)
         wl_fixes_destroy_registry(wl->globals.fixes, reg);
+#endif
     wl_registry_destroy(reg);
 
     if (wl->params.explicit_sync && !wl->globals.syncobj_manager)
@@ -1057,8 +1062,10 @@ wl_cleanup_globals(struct wl *wl)
         wl_seat_release(wl->globals.seat);
     }
 
+#ifdef WL_FIXES_INTERFACE
     if (wl->globals.fixes)
         wl_fixes_destroy(wl->globals.fixes);
+#endif
 }
 
 static inline void
