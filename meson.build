@@ -160,6 +160,7 @@ dep_ktx = dependency('Ktx', method: 'cmake', required: false)
 
 inc_include = include_directories('include')
 
+subdir('android-stubs')
 subdir('util')
 subdir('misc')
 
