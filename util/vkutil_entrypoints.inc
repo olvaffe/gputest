@@ -284,6 +284,12 @@ PFN_DEVICE(SetDebugUtilsObjectTagEXT)
 /* VK_EXT_hdr_metadata */
 PFN_DEVICE(SetHdrMetadataEXT)
 
+/* VK_EXT_present_timing */
+PFN_DEVICE(GetPastPresentationTimingEXT)
+PFN_DEVICE(GetSwapchainTimeDomainPropertiesEXT)
+PFN_DEVICE(GetSwapchainTimingPropertiesEXT)
+PFN_DEVICE(SetSwapchainPresentTimingQueueSizeEXT)
+
 /* VK_ANDROID_external_memory_android_hardware_buffer */
 PFN_DEVICE(GetAndroidHardwareBufferPropertiesANDROID)
 PFN_DEVICE(GetMemoryAndroidHardwareBufferANDROID)

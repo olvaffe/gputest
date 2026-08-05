@@ -108,9 +108,13 @@ sdl_test_dump_surface_caps(struct sdl_test *test, VkPresentModeKHR mode)
     VkSharedPresentSurfaceCapabilitiesKHR shared_caps = {
         .sType = VK_STRUCTURE_TYPE_SHARED_PRESENT_SURFACE_CAPABILITIES_KHR,
     };
+    VkPresentTimingSurfaceCapabilitiesEXT timing_caps = {
+        .sType = VK_STRUCTURE_TYPE_PRESENT_TIMING_SURFACE_CAPABILITIES_EXT,
+        .pNext = &shared_caps,
+    };
     VkSurfaceCapabilitiesPresentWait2KHR wait2_caps = {
         .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_PRESENT_WAIT_2_KHR,
-        .pNext = &shared_caps,
+        .pNext = &timing_caps,
     };
     VkSurfaceCapabilitiesPresentId2KHR id2_caps = {
         .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_PRESENT_ID_2_KHR,
@@ -173,6 +177,10 @@ sdl_test_dump_surface_caps(struct sdl_test *test, VkPresentModeKHR mode)
 
     vk_log("  presentId2Supported=%d", id2_caps.presentId2Supported);
     vk_log("  presentWait2Supported=%d", wait2_caps.presentWait2Supported);
+    vk_log("  presentTimingSupported=%d, presentAtAbsoluteTimeSupported=%d, "
+           "presentAtRelativeTimeSupported=%d, presentStageQueries=0x%x",
+           timing_caps.presentTimingSupported, timing_caps.presentAtAbsoluteTimeSupported,
+           timing_caps.presentAtRelativeTimeSupported, timing_caps.presentStageQueries);
 
     vk_log("  sharedPresentSupportedUsageFlags=0x%x",
            shared_caps.sharedPresentSupportedUsageFlags);

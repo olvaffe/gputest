@@ -71,6 +71,7 @@ struct vk {
     bool EXT_image_compression_control;
     bool EXT_image_compression_control_swapchain;
     bool EXT_physical_device_drm;
+    bool EXT_present_timing;
 
     struct {
         void *handle;
@@ -110,6 +111,7 @@ struct vk {
     VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT
         image_compression_control_swapchain_features;
     VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT msrtss_features;
+    VkPhysicalDevicePresentTimingFeaturesEXT present_timing_features;
     VkPhysicalDeviceExternalFormatResolveFeaturesANDROID external_format_resolve_features;
 
     VkPhysicalDeviceMemoryProperties mem_props;
@@ -286,6 +288,8 @@ vk_init_params(struct vk *vk, const struct vk_init_params *params)
             vk->EXT_image_compression_control_swapchain = true;
         else if (!strcmp(vk->params.dev_exts[i], VK_EXT_PHYSICAL_DEVICE_DRM_EXTENSION_NAME))
             vk->EXT_physical_device_drm = true;
+        else if (!strcmp(vk->params.dev_exts[i], VK_EXT_PRESENT_TIMING_EXTENSION_NAME))
+            vk->EXT_present_timing = true;
     }
 }
 
@@ -555,6 +559,13 @@ vk_init_physical_device_features(struct vk *vk)
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_FEATURES_EXT;
     *pnext = &vk->msrtss_features;
     pnext = &vk->msrtss_features.pNext;
+
+    if (vk->EXT_present_timing) {
+        vk->present_timing_features.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_TIMING_FEATURES_EXT;
+        *pnext = &vk->present_timing_features;
+        pnext = &vk->present_timing_features.pNext;
+    }
 
     vk->external_format_resolve_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FORMAT_RESOLVE_FEATURES_ANDROID;
