@@ -63,6 +63,7 @@ struct vk {
     bool KHR_get_surface_capabilities2;
     bool KHR_present_id2;
     bool KHR_present_mode_fifo_latest_ready;
+    bool KHR_present_wait2;
     bool KHR_swapchain;
     bool KHR_swapchain_maintenance1;
     bool EXT_custom_border_color;
@@ -98,6 +99,7 @@ struct vk {
 
     VkPhysicalDevicePresentId2FeaturesKHR present_id2_features;
     VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR present_mode_fifo_latest_ready_features;
+    VkPhysicalDevicePresentWait2FeaturesKHR present_wait2_features;
     VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
     VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT msrtss_features;
@@ -260,7 +262,9 @@ vk_init_params(struct vk *vk, const struct vk_init_params *params)
         else if (!strcmp(vk->params.dev_exts[i],
                          VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME))
             vk->KHR_present_mode_fifo_latest_ready = true;
-	else if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_EXTENSION_NAME))
+        else if (!strcmp(vk->params.dev_exts[i], VK_KHR_PRESENT_WAIT_2_EXTENSION_NAME))
+            vk->KHR_present_wait2 = true;
+        else if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_EXTENSION_NAME))
             vk->KHR_swapchain = true;
         else if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME))
             vk->KHR_swapchain_maintenance1 = true;
@@ -491,6 +495,13 @@ vk_init_physical_device_features(struct vk *vk)
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_MODE_FIFO_LATEST_READY_FEATURES_KHR;
         *pnext = &vk->present_mode_fifo_latest_ready_features;
         pnext = &vk->present_mode_fifo_latest_ready_features.pNext;
+    }
+
+    if (vk->KHR_present_wait2) {
+        vk->present_wait2_features.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_WAIT_2_FEATURES_KHR;
+        *pnext = &vk->present_wait2_features;
+        pnext = &vk->present_wait2_features.pNext;
     }
 
     if (vk->KHR_swapchain_maintenance1) {
@@ -2370,6 +2381,22 @@ vk_recreate_swapchain(struct vk *vk,
     vk_check(vk, "failed to create swapchain");
 
     if (swapchain->info.oldSwapchain != VK_NULL_HANDLE) {
+        if (swapchain->frame_count) {
+            if (vk->KHR_present_wait2) {
+                const VkPresentWait2InfoKHR wait_info = {
+                    .sType = VK_STRUCTURE_TYPE_PRESENT_WAIT_2_INFO_KHR,
+                    .presentId = swapchain->frame_count,
+                    .timeout = UINT64_MAX,
+                };
+                vk->result =
+                    vk->WaitForPresent2KHR(vk->dev, swapchain->info.oldSwapchain, &wait_info);
+                vk_check(vk, "failed to wait for present");
+            } else {
+                vk_wait(vk);
+            }
+            swapchain->frame_count = 0;
+        }
+
         vk->DestroySwapchainKHR(vk->dev, swapchain->info.oldSwapchain, NULL);
         free(swapchain->img_handles);
         free(swapchain->imgs);
