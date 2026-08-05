@@ -281,6 +281,9 @@ PFN_DEVICE(QueueInsertDebugUtilsLabelEXT)
 PFN_DEVICE(SetDebugUtilsObjectNameEXT)
 PFN_DEVICE(SetDebugUtilsObjectTagEXT)
 
+/* VK_EXT_hdr_metadata */
+PFN_DEVICE(SetHdrMetadataEXT)
+
 /* VK_ANDROID_external_memory_android_hardware_buffer */
 PFN_DEVICE(GetAndroidHardwareBufferPropertiesANDROID)
 PFN_DEVICE(GetMemoryAndroidHardwareBufferANDROID)
