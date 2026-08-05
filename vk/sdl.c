@@ -30,6 +30,155 @@ struct sdl_test {
 };
 
 static void
+sdl_test_dump_surface_caps(struct sdl_test *test, VkPresentModeKHR mode)
+{
+    struct vk *vk = &test->vk;
+
+    const VkSurfacePresentModeKHR mode_info = {
+        .sType = VK_STRUCTURE_TYPE_SURFACE_PRESENT_MODE_KHR,
+        .presentMode = mode,
+    };
+    const VkPhysicalDeviceSurfaceInfo2KHR info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR,
+        .pNext = &mode_info,
+        .surface = test->surf,
+    };
+
+    VkPresentModeKHR compat_modes[16];
+    VkSurfacePresentModeCompatibilityKHR compat_caps = {
+        .sType = VK_STRUCTURE_TYPE_SURFACE_PRESENT_MODE_COMPATIBILITY_KHR,
+        .pPresentModes = compat_modes,
+        .presentModeCount = ARRAY_SIZE(compat_modes),
+    };
+    VkSurfacePresentScalingCapabilitiesKHR scaling_caps = {
+        .sType = VK_STRUCTURE_TYPE_SURFACE_PRESENT_SCALING_CAPABILITIES_KHR,
+        .pNext = &compat_caps,
+    };
+    VkSurfaceProtectedCapabilitiesKHR prot_caps = {
+        .sType = VK_STRUCTURE_TYPE_SURFACE_PROTECTED_CAPABILITIES_KHR,
+        .pNext = &scaling_caps,
+    };
+    VkSurfaceCapabilities2KHR caps = {
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR,
+        .pNext = &prot_caps,
+    };
+
+    vk->result = vk->GetPhysicalDeviceSurfaceCapabilities2KHR(vk->physical_dev, &info, &caps);
+    vk_check(vk, "failed to get surface caps");
+
+    vk_log("surface present mode: %d", mode);
+
+    vk_log("  minImageCount=%d, maxImageCount=%d", caps.surfaceCapabilities.minImageCount,
+           caps.surfaceCapabilities.maxImageCount);
+    vk_log("  currentExtent=%dx%d, minExtent=%dx%d, maxExtent=%dx%d",
+           caps.surfaceCapabilities.currentExtent.width,
+           caps.surfaceCapabilities.currentExtent.height,
+           caps.surfaceCapabilities.minImageExtent.width,
+           caps.surfaceCapabilities.minImageExtent.height,
+           caps.surfaceCapabilities.maxImageExtent.width,
+           caps.surfaceCapabilities.maxImageExtent.height);
+    vk_log("  transforms=0x%x, currentTransform=0x%x, compositeAlpha=0x%x, "
+           "usages=0x%x",
+           caps.surfaceCapabilities.supportedTransforms,
+           caps.surfaceCapabilities.currentTransform,
+           caps.surfaceCapabilities.supportedCompositeAlpha,
+           caps.surfaceCapabilities.supportedUsageFlags);
+
+    vk_log("  supportsProtected=%d", prot_caps.supportsProtected);
+
+    vk_log("  scaling=0x%x, gravityX=0x%x, gravityY=0x%x, "
+           "minExtent=%dx%d, maxExtent=%dx%d",
+           scaling_caps.supportedPresentScaling, scaling_caps.supportedPresentGravityX,
+           scaling_caps.supportedPresentGravityY, scaling_caps.minScaledImageExtent.width,
+           scaling_caps.minScaledImageExtent.height, scaling_caps.maxScaledImageExtent.width,
+           scaling_caps.maxScaledImageExtent.height);
+
+    for (uint32_t i = 0; i < compat_caps.presentModeCount; i++)
+        vk_log("  compat mode: %d", compat_caps.pPresentModes[i]);
+}
+
+static void
+sdl_test_dump_surface_formats(struct sdl_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    const VkPhysicalDeviceSurfaceInfo2KHR info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR,
+        .surface = test->surf,
+    };
+
+    VkSurfaceFormat2KHR fmts[32];
+    uint32_t count = ARRAY_SIZE(fmts);
+    for (uint32_t i = 0; i < count; i++)
+        fmts[i].sType = VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR;
+    vk->result = vk->GetPhysicalDeviceSurfaceFormats2KHR(vk->physical_dev, &info, &count, fmts);
+    vk_check(vk, "failed to get surface formats");
+
+    vk_log("surface formats:");
+    for (uint32_t i = 0; i < count; i++) {
+        const VkSurfaceFormatKHR *fmt = &fmts[i].surfaceFormat;
+        vk_log("  %d: format %d, colorSpace %d", i, fmt->format, fmt->colorSpace);
+    }
+}
+
+static void
+sdl_test_dump_surface(struct sdl_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    VkBool32 supported;
+    vk->result = vk->GetPhysicalDeviceSurfaceSupportKHR(vk->physical_dev, vk->queue_family_index,
+                                                        test->surf, &supported);
+    vk_check(vk, "failed to get surface support");
+
+    VkPresentModeKHR modes[16];
+    uint32_t count = ARRAY_SIZE(modes);
+    vk->result =
+        vk->GetPhysicalDeviceSurfacePresentModesKHR(vk->physical_dev, test->surf, &count, modes);
+    vk_check(vk, "failed to get surface present modes");
+
+    vk_log("surface support: %d", supported);
+
+    sdl_test_dump_surface_formats(test);
+
+    for (uint32_t i = 0; i < count; i++)
+        sdl_test_dump_surface_caps(test, modes[i]);
+}
+
+static uint32_t
+sdl_test_init_instance_exts(struct sdl_test *test, const char **exts, uint32_t count)
+{
+    struct sdl *sdl = &test->sdl;
+
+    const char *surface_exts[] = {
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+        VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+        VK_KHR_SURFACE_PROTECTED_CAPABILITIES_EXTENSION_NAME,
+        VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME,
+    };
+    if (sdl->wsi_ext_count + ARRAY_SIZE(surface_exts) > count)
+        vk_die("too many wsi instance exts");
+
+    memcpy(exts, sdl->wsi_exts, sizeof(exts[0]) * sdl->wsi_ext_count);
+    count = sdl->wsi_ext_count;
+
+    for (uint32_t i = 0; i < ARRAY_SIZE(surface_exts); i++) {
+        bool found = false;
+        for (uint32_t j = 0; j < sdl->wsi_ext_count; j++) {
+            if (!strcmp(surface_exts[i], sdl->wsi_exts[j])) {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            exts[count++] = surface_exts[i];
+    }
+
+    return count;
+}
+
+static void
 sdl_test_init(struct sdl_test *test)
 {
     struct sdl *sdl = &test->sdl;
@@ -43,13 +192,17 @@ sdl_test_init(struct sdl_test *test)
     };
     sdl_init(sdl, &sdl_params);
 
+    const char *instance_exts[64];
+    const uint32_t instance_ext_count =
+        sdl_test_init_instance_exts(test, instance_exts, ARRAY_SIZE(instance_exts));
+
     const char *dev_exts[] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 
     const struct vk_init_params params = {
-        .instance_exts = sdl->wsi_exts,
-        .instance_ext_count = sdl->wsi_ext_count,
+        .instance_exts = instance_exts,
+        .instance_ext_count = instance_ext_count,
         .dev_exts = dev_exts,
         .dev_ext_count = ARRAY_SIZE(dev_exts),
     };
@@ -57,6 +210,8 @@ sdl_test_init(struct sdl_test *test)
 
     if (!SDL_Vulkan_CreateSurface(sdl->win, vk->instance, NULL, &test->surf))
         vk_die("failed to create surface");
+
+    sdl_test_dump_surface(test);
 }
 
 static void
