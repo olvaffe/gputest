@@ -2255,7 +2255,9 @@ vk_validate_swapchain(struct vk *vk, const struct vk_swapchain *swapchain)
     };
 
     /* check caps */
-    VkSurfaceCapabilities2KHR caps;
+    VkSurfaceCapabilities2KHR caps = {
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR,
+    };
     vk->result =
         vk->GetPhysicalDeviceSurfaceCapabilities2KHR(vk->physical_dev, &surf_info, &caps);
     vk_check(vk, "failed to get surface caps");
@@ -2278,6 +2280,8 @@ vk_validate_swapchain(struct vk *vk, const struct vk_swapchain *swapchain)
     /* check format */
     VkSurfaceFormat2KHR fmts[8];
     uint32_t count = ARRAY_SIZE(fmts);
+    for (uint32_t i = 0; i < count; i++)
+        fmts[i].sType = VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR;
     vk->result =
         vk->GetPhysicalDeviceSurfaceFormats2KHR(vk->physical_dev, &surf_info, &count, fmts);
     vk_check(vk, "failed to get surface formats");
@@ -2391,13 +2395,15 @@ vk_create_swapchain(struct vk *vk,
     if (!vk->KHR_get_surface_capabilities2)
         vk_die("VK_KHR_get_surface_capabilities2 is disabled");
 
-    const VkPhysicalDeviceSurfaceInfo2KHR caps_info = {
+    const VkPhysicalDeviceSurfaceInfo2KHR surf_info = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR,
         .surface = surf,
     };
-    VkSurfaceCapabilities2KHR caps;
+    VkSurfaceCapabilities2KHR caps = {
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR,
+    };
     vk->result =
-        vk->GetPhysicalDeviceSurfaceCapabilities2KHR(vk->physical_dev, &caps_info, &caps);
+        vk->GetPhysicalDeviceSurfaceCapabilities2KHR(vk->physical_dev, &surf_info, &caps);
     vk_check(vk, "failed to get surface caps");
 
     struct vk_swapchain *swapchain = (struct vk_swapchain *)calloc(1, sizeof(*swapchain));
