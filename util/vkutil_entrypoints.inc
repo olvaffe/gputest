@@ -242,10 +242,12 @@ PFN_DEVICE(ImportSemaphoreFdKHR)
 
 /* VK_KHR_surface */
 PFN_INSTANCE(DestroySurfaceKHR)
-PFN_INSTANCE(GetPhysicalDeviceSurfaceCapabilitiesKHR)
-PFN_INSTANCE(GetPhysicalDeviceSurfaceFormatsKHR)
 PFN_INSTANCE(GetPhysicalDeviceSurfacePresentModesKHR)
 PFN_INSTANCE(GetPhysicalDeviceSurfaceSupportKHR)
+
+/* VK_KHR_get_surface_capabilities2 */
+PFN_INSTANCE(GetPhysicalDeviceSurfaceCapabilities2KHR)
+PFN_INSTANCE(GetPhysicalDeviceSurfaceFormats2KHR)
 
 /* VK_KHR_swapchain */
 PFN_INSTANCE(GetPhysicalDevicePresentRectanglesKHR)

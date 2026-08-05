@@ -60,6 +60,7 @@ struct vk_init_params {
 
 struct vk {
     struct vk_init_params params;
+    bool KHR_get_surface_capabilities2;
     bool KHR_swapchain;
     bool EXT_custom_border_color;
     bool EXT_physical_device_drm;
@@ -238,6 +239,12 @@ vk_init_params(struct vk *vk, const struct vk_init_params *params)
         vk->params = *params;
     if (vk->params.api_version < VKUTIL_MIN_API_VERSION)
         vk->params.api_version = VKUTIL_MIN_API_VERSION;
+
+    for (uint32_t i = 0; i < vk->params.instance_ext_count; i++) {
+        if (!strcmp(vk->params.instance_exts[i],
+                    VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME))
+            vk->KHR_get_surface_capabilities2 = true;
+    }
 
     for (uint32_t i = 0; i < vk->params.dev_ext_count; i++) {
         if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_EXTENSION_NAME))
@@ -2231,6 +2238,8 @@ vk_validate_swapchain(struct vk *vk, const struct vk_swapchain *swapchain)
 {
     if (!vk->KHR_swapchain)
         vk_die("VK_KHR_swapchain is disabled");
+    if (!vk->KHR_get_surface_capabilities2)
+        vk_die("VK_KHR_get_surface_capabilities2 is disabled");
 
     /* check support */
     VkBool32 supported;
@@ -2240,36 +2249,44 @@ vk_validate_swapchain(struct vk *vk, const struct vk_swapchain *swapchain)
     if (!supported)
         vk_die("surface is unsupported");
 
+    const VkPhysicalDeviceSurfaceInfo2KHR surf_info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR,
+        .surface = swapchain->info.surface,
+    };
+
     /* check caps */
-    VkSurfaceCapabilitiesKHR caps;
-    vk->result = vk->GetPhysicalDeviceSurfaceCapabilitiesKHR(vk->physical_dev,
-                                                             swapchain->info.surface, &caps);
+    VkSurfaceCapabilities2KHR caps;
+    vk->result =
+        vk->GetPhysicalDeviceSurfaceCapabilities2KHR(vk->physical_dev, &surf_info, &caps);
     vk_check(vk, "failed to get surface caps");
-    if (swapchain->info.imageExtent.width < caps.minImageExtent.width ||
-        swapchain->info.imageExtent.width > caps.maxImageExtent.width ||
-        swapchain->info.imageExtent.height < caps.minImageExtent.height ||
-        swapchain->info.imageExtent.height > caps.maxImageExtent.height) {
+    if (swapchain->info.imageExtent.width < caps.surfaceCapabilities.minImageExtent.width ||
+        swapchain->info.imageExtent.width > caps.surfaceCapabilities.maxImageExtent.width ||
+        swapchain->info.imageExtent.height < caps.surfaceCapabilities.minImageExtent.height ||
+        swapchain->info.imageExtent.height > caps.surfaceCapabilities.maxImageExtent.height) {
         vk_die("bad swapchain extent: req %dx%d min %dx%d max %dx%d",
                swapchain->info.imageExtent.width, swapchain->info.imageExtent.height,
-               caps.minImageExtent.width, caps.minImageExtent.height, caps.maxImageExtent.width,
-               caps.maxImageExtent.height);
+               caps.surfaceCapabilities.minImageExtent.width,
+               caps.surfaceCapabilities.minImageExtent.height,
+               caps.surfaceCapabilities.maxImageExtent.width,
+               caps.surfaceCapabilities.maxImageExtent.height);
     }
 
-    if (swapchain->info.minImageCount < caps.minImageCount ||
-        swapchain->info.minImageCount < caps.maxImageCount)
+    if (swapchain->info.minImageCount < caps.surfaceCapabilities.minImageCount ||
+        swapchain->info.minImageCount < caps.surfaceCapabilities.maxImageCount)
         vk_die("swapchain min image count %d is invalid", swapchain->info.minImageCount);
 
     /* check format */
-    VkSurfaceFormatKHR fmts[8];
+    VkSurfaceFormat2KHR fmts[8];
     uint32_t count = ARRAY_SIZE(fmts);
-    vk->result = vk->GetPhysicalDeviceSurfaceFormatsKHR(vk->physical_dev, swapchain->info.surface,
-                                                        &count, fmts);
+    vk->result =
+        vk->GetPhysicalDeviceSurfaceFormats2KHR(vk->physical_dev, &surf_info, &count, fmts);
     vk_check(vk, "failed to get surface formats");
 
     bool found = false;
     for (uint32_t i = 0; i < count; i++) {
-        if (fmts[i].format == swapchain->info.imageFormat &&
-            fmts[i].colorSpace == swapchain->info.imageColorSpace) {
+        const VkSurfaceFormatKHR *fmt = &fmts[i].surfaceFormat;
+        if (fmt->format == swapchain->info.imageFormat &&
+            fmt->colorSpace == swapchain->info.imageColorSpace) {
             found = true;
             break;
         }
@@ -2369,8 +2386,18 @@ vk_create_swapchain(struct vk *vk,
                     VkPresentModeKHR mode,
                     VkImageUsageFlags usage)
 {
-    VkSurfaceCapabilitiesKHR surf_caps;
-    vk->result = vk->GetPhysicalDeviceSurfaceCapabilitiesKHR(vk->physical_dev, surf, &surf_caps);
+    if (!vk->KHR_swapchain)
+        vk_die("VK_KHR_swapchain is disabled");
+    if (!vk->KHR_get_surface_capabilities2)
+        vk_die("VK_KHR_get_surface_capabilities2 is disabled");
+
+    const VkPhysicalDeviceSurfaceInfo2KHR caps_info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR,
+        .surface = surf,
+    };
+    VkSurfaceCapabilities2KHR caps;
+    vk->result =
+        vk->GetPhysicalDeviceSurfaceCapabilities2KHR(vk->physical_dev, &caps_info, &caps);
     vk_check(vk, "failed to get surface caps");
 
     struct vk_swapchain *swapchain = (struct vk_swapchain *)calloc(1, sizeof(*swapchain));
@@ -2381,7 +2408,7 @@ vk_create_swapchain(struct vk *vk,
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .flags = flags,
         .surface = surf,
-        .minImageCount = surf_caps.minImageCount,
+        .minImageCount = caps.surfaceCapabilities.minImageCount,
         .imageFormat = format,
         .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
         .imageExtent = {
