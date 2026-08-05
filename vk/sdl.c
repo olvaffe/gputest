@@ -53,6 +53,44 @@ present_mode_str(VkPresentModeKHR mode)
 }
 
 static void
+sdl_test_dump_swapchain_caps(struct sdl_test *test)
+{
+    struct vk *vk = &test->vk;
+
+    VkDeviceGroupPresentCapabilitiesKHR caps = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_GROUP_PRESENT_CAPABILITIES_KHR,
+    };
+    vk->result = vk->GetDeviceGroupPresentCapabilitiesKHR(vk->dev, &caps);
+    vk_check(vk, "failed to get device group present caps");
+
+    VkDeviceGroupPresentModeFlagsKHR modes = 0;
+    vk->result = vk->GetDeviceGroupSurfacePresentModesKHR(vk->dev, test->surf, &modes);
+    vk_check(vk, "failed to get device group surface present modes");
+
+    VkRect2D rects[16];
+    uint32_t count = ARRAY_SIZE(rects);
+    vk->result =
+        vk->GetPhysicalDevicePresentRectanglesKHR(vk->physical_dev, test->surf, &count, rects);
+    vk_check(vk, "failed to get present rectangles");
+
+    vk_log("swapchain group caps:");
+    vk_log("  modes: 0x%x", caps.modes);
+    for (uint32_t i = 0; i < ARRAY_SIZE(caps.presentMask); i++) {
+        if (caps.presentMask[i])
+            vk_log("  dev %d: 0x%x", i, caps.presentMask[i]);
+    }
+
+    vk_log("swapchain group modes: 0x%x", modes);
+
+    vk_log("swapchain rectangles:");
+    for (uint32_t i = 0; i < count; i++) {
+        const VkRect2D *rect = &rects[i];
+        vk_log("  %d: offset (%d, %d), extent %dx%d", i, rect->offset.x, rect->offset.y,
+               rect->extent.width, rect->extent.height);
+    }
+}
+
+static void
 sdl_test_dump_surface_caps(struct sdl_test *test, VkPresentModeKHR mode)
 {
     struct vk *vk = &test->vk;
@@ -236,6 +274,7 @@ sdl_test_init(struct sdl_test *test)
         vk_die("failed to create surface");
 
     sdl_test_dump_surface(test);
+    sdl_test_dump_swapchain_caps(test);
 }
 
 static void
