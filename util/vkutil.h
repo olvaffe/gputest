@@ -92,6 +92,7 @@ struct vk {
     VkPhysicalDeviceVulkan14Features vulkan_14_features;
 
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
+    VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT msrtss_features;
     VkPhysicalDeviceExternalFormatResolveFeaturesANDROID external_format_resolve_features;
 
     VkPhysicalDeviceMemoryProperties mem_props;
@@ -412,15 +413,20 @@ vk_init_physical_device_features(struct vk *vk)
     *pnext = &vk->vulkan_14_features;
     pnext = &vk->vulkan_14_features.pNext;
 
-    vk->external_format_resolve_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FORMAT_RESOLVE_FEATURES_ANDROID;
-    *pnext = &vk->external_format_resolve_features;
-    pnext = &vk->external_format_resolve_features.pNext;
-
     vk->custom_border_color_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
     *pnext = &vk->custom_border_color_features;
     pnext = &vk->custom_border_color_features.pNext;
+
+    vk->msrtss_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_FEATURES_EXT;
+    *pnext = &vk->msrtss_features;
+    pnext = &vk->msrtss_features.pNext;
+
+    vk->external_format_resolve_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FORMAT_RESOLVE_FEATURES_ANDROID;
+    *pnext = &vk->external_format_resolve_features;
+    pnext = &vk->external_format_resolve_features.pNext;
 
     vk->GetPhysicalDeviceFeatures2(vk->physical_dev, &vk->features);
 }

@@ -30,6 +30,7 @@ tests = [
   'mem_alloc',
   'mem_hog',
   'msaa',
+  'msrtss',
   'paced',
   'pipeline_stats',
   'profile',
