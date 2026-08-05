@@ -67,6 +67,8 @@ struct vk {
     bool KHR_swapchain;
     bool KHR_swapchain_maintenance1;
     bool EXT_custom_border_color;
+    bool EXT_image_compression_control;
+    bool EXT_image_compression_control_swapchain;
     bool EXT_physical_device_drm;
 
     struct {
@@ -102,6 +104,9 @@ struct vk {
     VkPhysicalDevicePresentWait2FeaturesKHR present_wait2_features;
     VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
+    VkPhysicalDeviceImageCompressionControlFeaturesEXT image_compression_control_features;
+    VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT
+        image_compression_control_swapchain_features;
     VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT msrtss_features;
     VkPhysicalDeviceExternalFormatResolveFeaturesANDROID external_format_resolve_features;
 
@@ -270,6 +275,11 @@ vk_init_params(struct vk *vk, const struct vk_init_params *params)
             vk->KHR_swapchain_maintenance1 = true;
         else if (!strcmp(vk->params.dev_exts[i], VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME))
             vk->EXT_custom_border_color = true;
+        else if (!strcmp(vk->params.dev_exts[i], VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME))
+            vk->EXT_image_compression_control = true;
+        else if (!strcmp(vk->params.dev_exts[i],
+                         VK_EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_EXTENSION_NAME))
+            vk->EXT_image_compression_control_swapchain = true;
         else if (!strcmp(vk->params.dev_exts[i], VK_EXT_PHYSICAL_DEVICE_DRM_EXTENSION_NAME))
             vk->EXT_physical_device_drm = true;
     }
@@ -515,6 +525,20 @@ vk_init_physical_device_features(struct vk *vk)
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
     *pnext = &vk->custom_border_color_features;
     pnext = &vk->custom_border_color_features.pNext;
+
+    if (vk->EXT_image_compression_control) {
+        vk->image_compression_control_features.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_COMPRESSION_CONTROL_FEATURES_EXT;
+        *pnext = &vk->image_compression_control_features;
+        pnext = &vk->image_compression_control_features.pNext;
+    }
+
+    if (vk->EXT_image_compression_control_swapchain) {
+        vk->image_compression_control_swapchain_features.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_FEATURES_EXT;
+        *pnext = &vk->image_compression_control_swapchain_features;
+        pnext = &vk->image_compression_control_swapchain_features.pNext;
+    }
 
     vk->msrtss_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_FEATURES_EXT;
