@@ -257,6 +257,19 @@ PFN_DEVICE(GetDeviceGroupSurfacePresentModesKHR)
 PFN_DEVICE(GetSwapchainImagesKHR)
 PFN_DEVICE(QueuePresentKHR)
 
+/* VK_EXT_debug_utils */
+PFN_INSTANCE(CreateDebugUtilsMessengerEXT)
+PFN_INSTANCE(DestroyDebugUtilsMessengerEXT)
+PFN_INSTANCE(SubmitDebugUtilsMessageEXT)
+PFN_DEVICE(CmdBeginDebugUtilsLabelEXT)
+PFN_DEVICE(CmdEndDebugUtilsLabelEXT)
+PFN_DEVICE(CmdInsertDebugUtilsLabelEXT)
+PFN_DEVICE(QueueBeginDebugUtilsLabelEXT)
+PFN_DEVICE(QueueEndDebugUtilsLabelEXT)
+PFN_DEVICE(QueueInsertDebugUtilsLabelEXT)
+PFN_DEVICE(SetDebugUtilsObjectNameEXT)
+PFN_DEVICE(SetDebugUtilsObjectTagEXT)
+
 /* VK_ANDROID_external_memory_android_hardware_buffer */
 PFN_DEVICE(GetAndroidHardwareBufferPropertiesANDROID)
 PFN_DEVICE(GetMemoryAndroidHardwareBufferANDROID)

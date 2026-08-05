@@ -73,6 +73,7 @@ struct vk {
     VkResult result;
 
     VkInstance instance;
+    VkDebugUtilsMessengerEXT debug_utils;
 
     VkPhysicalDevice physical_dev;
 
@@ -278,6 +279,16 @@ vk_init_instance_dispatch(struct vk *vk)
 #include "vkutil_entrypoints.inc"
 }
 
+static inline VKAPI_ATTR VkBool32 VKAPI_CALL
+vk_debug_utils_log(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+                   VkDebugUtilsMessageTypeFlagsEXT types,
+                   const VkDebugUtilsMessengerCallbackDataEXT *data,
+                   void *user_data)
+{
+    vk_log("%s", data->pMessage);
+    return VK_FALSE;
+}
+
 static inline void
 vk_init_instance(struct vk *vk)
 {
@@ -286,21 +297,60 @@ vk_init_instance(struct vk *vk)
     if (api_version < vk->params.api_version)
         vk_die("instance api version %d < %d", api_version, vk->params.api_version);
 
+    VkExtensionProperties exts[64];
+    uint32_t ext_count = ARRAY_SIZE(exts);
+    vk->result = vk->EnumerateInstanceExtensionProperties(NULL, &ext_count, exts);
+    vk_check(vk, "failed to enumerate instance exts");
+
+    bool has_debug_utils = false;
+    for (uint32_t i = 0; i < ext_count; i++) {
+        if (!strcmp(exts[i].extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
+            has_debug_utils = true;
+            break;
+        }
+    }
+
+    const char *enabled_exts[64];
+    if (vk->params.instance_ext_count > ARRAY_SIZE(enabled_exts) - 8)
+        vk_die("too many enabled instance exts");
+    memcpy(enabled_exts, vk->params.instance_exts,
+           sizeof(enabled_exts[0]) * vk->params.instance_ext_count);
+    ext_count = vk->params.instance_ext_count;
+
+    if (has_debug_utils)
+        enabled_exts[ext_count++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+
+    const VkDebugUtilsMessengerCreateInfoEXT debug_utils_info = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+        .pfnUserCallback = vk_debug_utils_log,
+    };
     const VkApplicationInfo app_info = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .apiVersion = vk->params.api_version,
     };
     const VkInstanceCreateInfo instance_info = {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        .pNext = has_debug_utils ? &debug_utils_info : NULL,
         .pApplicationInfo = &app_info,
-        .enabledExtensionCount = vk->params.instance_ext_count,
-        .ppEnabledExtensionNames = vk->params.instance_exts,
+        .enabledExtensionCount = ext_count,
+        .ppEnabledExtensionNames = enabled_exts,
     };
 
     vk->result = vk->CreateInstance(&instance_info, NULL, &vk->instance);
     vk_check(vk, "failed to create instance: %d (no icd?)", vk->result);
 
     vk_init_instance_dispatch(vk);
+
+    if (has_debug_utils) {
+        vk->result = vk->CreateDebugUtilsMessengerEXT(vk->instance, &debug_utils_info, NULL,
+                                                      &vk->debug_utils);
+        vk_check(vk, "failed to create debug utils messenger");
+    }
 }
 
 static inline void
@@ -703,6 +753,8 @@ vk_cleanup(struct vk *vk)
 
     vk->DestroyDevice(vk->dev, NULL);
 
+    if (vk->debug_utils)
+        vk->DestroyDebugUtilsMessengerEXT(vk->instance, vk->debug_utils, NULL);
     vk->DestroyInstance(vk->instance, NULL);
 
     dlclose(vk->handle);
