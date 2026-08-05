@@ -61,6 +61,7 @@ struct vk_init_params {
 struct vk {
     struct vk_init_params params;
     bool KHR_get_surface_capabilities2;
+    bool KHR_present_mode_fifo_latest_ready;
     bool KHR_swapchain;
     bool KHR_swapchain_maintenance1;
     bool EXT_custom_border_color;
@@ -94,6 +95,7 @@ struct vk {
     VkPhysicalDeviceVulkan13Features vulkan_13_features;
     VkPhysicalDeviceVulkan14Features vulkan_14_features;
 
+    VkPhysicalDevicePresentModeFifoLatestReadyFeaturesKHR present_mode_fifo_latest_ready_features;
     VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
     VkPhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT msrtss_features;
@@ -249,7 +251,10 @@ vk_init_params(struct vk *vk, const struct vk_init_params *params)
     }
 
     for (uint32_t i = 0; i < vk->params.dev_ext_count; i++) {
-        if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_EXTENSION_NAME))
+        if (!strcmp(vk->params.dev_exts[i],
+                         VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME))
+            vk->KHR_present_mode_fifo_latest_ready = true;
+	else if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_EXTENSION_NAME))
             vk->KHR_swapchain = true;
         else if (!strcmp(vk->params.dev_exts[i], VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME))
             vk->KHR_swapchain_maintenance1 = true;
@@ -467,6 +472,13 @@ vk_init_physical_device_features(struct vk *vk)
     vk->vulkan_14_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
     *pnext = &vk->vulkan_14_features;
     pnext = &vk->vulkan_14_features.pNext;
+
+    if (vk->KHR_present_mode_fifo_latest_ready) {
+        vk->present_mode_fifo_latest_ready_features.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_MODE_FIFO_LATEST_READY_FEATURES_KHR;
+        *pnext = &vk->present_mode_fifo_latest_ready_features;
+        pnext = &vk->present_mode_fifo_latest_ready_features.pNext;
+    }
 
     if (vk->KHR_swapchain_maintenance1) {
         vk->swapchain_maintenance1_features.sType =
