@@ -67,6 +67,7 @@ struct vk {
     bool KHR_swapchain;
     bool KHR_swapchain_maintenance1;
     bool EXT_custom_border_color;
+    bool EXT_frame_boundary;
     bool EXT_image_compression_control;
     bool EXT_image_compression_control_swapchain;
     bool EXT_physical_device_drm;
@@ -104,6 +105,7 @@ struct vk {
     VkPhysicalDevicePresentWait2FeaturesKHR present_wait2_features;
     VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_features;
     VkPhysicalDeviceCustomBorderColorFeaturesEXT custom_border_color_features;
+    VkPhysicalDeviceFrameBoundaryFeaturesEXT frame_boundary_features;
     VkPhysicalDeviceImageCompressionControlFeaturesEXT image_compression_control_features;
     VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT
         image_compression_control_swapchain_features;
@@ -275,6 +277,8 @@ vk_init_params(struct vk *vk, const struct vk_init_params *params)
             vk->KHR_swapchain_maintenance1 = true;
         else if (!strcmp(vk->params.dev_exts[i], VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME))
             vk->EXT_custom_border_color = true;
+        else if (!strcmp(vk->params.dev_exts[i], VK_EXT_FRAME_BOUNDARY_EXTENSION_NAME))
+            vk->EXT_frame_boundary = true;
         else if (!strcmp(vk->params.dev_exts[i], VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME))
             vk->EXT_image_compression_control = true;
         else if (!strcmp(vk->params.dev_exts[i],
@@ -525,6 +529,13 @@ vk_init_physical_device_features(struct vk *vk)
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
     *pnext = &vk->custom_border_color_features;
     pnext = &vk->custom_border_color_features.pNext;
+
+    if (vk->EXT_frame_boundary) {
+        vk->frame_boundary_features.sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAME_BOUNDARY_FEATURES_EXT;
+        *pnext = &vk->frame_boundary_features;
+        pnext = &vk->frame_boundary_features.pNext;
+    }
 
     if (vk->EXT_image_compression_control) {
         vk->image_compression_control_features.sType =
