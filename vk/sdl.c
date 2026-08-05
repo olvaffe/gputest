@@ -29,6 +29,29 @@ struct sdl_test {
     struct vk_swapchain *swapchain;
 };
 
+static const char *
+present_mode_str(VkPresentModeKHR mode)
+{
+    switch (mode) {
+    case VK_PRESENT_MODE_IMMEDIATE_KHR:
+        return "VK_PRESENT_MODE_IMMEDIATE_KHR";
+    case VK_PRESENT_MODE_MAILBOX_KHR:
+        return "VK_PRESENT_MODE_MAILBOX_KHR";
+    case VK_PRESENT_MODE_FIFO_KHR:
+        return "VK_PRESENT_MODE_FIFO_KHR";
+    case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
+        return "VK_PRESENT_MODE_FIFO_RELAXED_KHR";
+    case VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR:
+        return "VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR";
+    case VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR:
+        return "VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR";
+    case VK_PRESENT_MODE_FIFO_LATEST_READY_KHR:
+        return "VK_PRESENT_MODE_FIFO_LATEST_READY_KHR";
+    default:
+        return "unknown";
+    }
+}
+
 static void
 sdl_test_dump_surface_caps(struct sdl_test *test, VkPresentModeKHR mode)
 {
@@ -66,7 +89,7 @@ sdl_test_dump_surface_caps(struct sdl_test *test, VkPresentModeKHR mode)
     vk->result = vk->GetPhysicalDeviceSurfaceCapabilities2KHR(vk->physical_dev, &info, &caps);
     vk_check(vk, "failed to get surface caps");
 
-    vk_log("surface present mode: %d", mode);
+    vk_log("surface %s:", present_mode_str(mode));
 
     vk_log("  minImageCount=%d, maxImageCount=%d", caps.surfaceCapabilities.minImageCount,
            caps.surfaceCapabilities.maxImageCount);
@@ -93,8 +116,9 @@ sdl_test_dump_surface_caps(struct sdl_test *test, VkPresentModeKHR mode)
            scaling_caps.minScaledImageExtent.height, scaling_caps.maxScaledImageExtent.width,
            scaling_caps.maxScaledImageExtent.height);
 
+    vk_log("  compatible modes:");
     for (uint32_t i = 0; i < compat_caps.presentModeCount; i++)
-        vk_log("  compat mode: %d", compat_caps.pPresentModes[i]);
+        vk_log("    %s", present_mode_str(compat_caps.pPresentModes[i]));
 }
 
 static void
