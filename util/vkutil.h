@@ -96,7 +96,7 @@ struct vk {
     VkPhysicalDeviceExternalFormatResolveFeaturesANDROID external_format_resolve_features;
 
     VkPhysicalDeviceMemoryProperties mem_props;
-    uint32_t buf_mt_index;
+    uint32_t buf_mt_mask;
 
     VkDevice dev;
     VkQueue queue;
@@ -314,19 +314,13 @@ vk_init_physical_device_memory_properties(struct vk *vk)
 
     const VkMemoryPropertyFlags mt_flags =
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    bool mt_found = false;
+    uint32_t mt_mask = 0;
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
         const VkMemoryType *mt = &vk->mem_props.memoryTypes[i];
-        if ((mt->propertyFlags & mt_flags) == mt_flags) {
-            vk->buf_mt_index = i;
-            mt_found = true;
-            /* prefer cached */
-            if (mt->propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT)
-                break;
-        }
+        if ((mt->propertyFlags & mt_flags) == mt_flags)
+            mt_mask |= 1u << i;
     }
-    if (!mt_found)
-        vk_die("failed to find a coherent and visible memory type for buffers");
+    vk->buf_mt_mask = mt_mask;
 }
 
 static inline void
@@ -800,11 +794,11 @@ vk_create_buffer_with_mt_mask(struct vk *vk,
     const VkMemoryRequirements *reqs = &reqs2.memoryRequirements;
 
     mt_mask &= reqs->memoryTypeBits;
+    mt_mask &= vk->buf_mt_mask;
     if (!mt_mask)
         vk_die("failed to meet buf memory reqs: 0x%x", reqs->memoryTypeBits);
 
-    const uint32_t mt_idx =
-        mt_mask & (1u << vk->buf_mt_index) ? vk->buf_mt_index : (uint32_t)(ffs(mt_mask) - 1);
+    const uint32_t mt_idx = (uint32_t)(ffs(mt_mask) - 1);
     buf->mem = vk_alloc_memory(vk, reqs->size, mt_idx);
     buf->mem_size = reqs->size;
 
@@ -838,7 +832,7 @@ vk_create_buffer(struct vk *vk,
                  VkDeviceSize size,
                  VkBufferUsageFlags2 usage)
 {
-    return vk_create_buffer_with_mt_mask(vk, flags, size, usage, 1 << vk->buf_mt_index);
+    return vk_create_buffer_with_mt_mask(vk, flags, size, usage, vk->buf_mt_mask);
 }
 
 static inline void
@@ -956,11 +950,12 @@ vk_init_image(struct vk *vk, struct vk_image *img, uint32_t mt_mask)
     const VkMemoryRequirements *reqs = &reqs2.memoryRequirements;
 
     mt_mask &= reqs->memoryTypeBits;
+    if (mt_mask & vk->buf_mt_mask)
+        mt_mask &= vk->buf_mt_mask;
     if (!mt_mask)
         vk_die("failed to meet img memory reqs: 0x%x", reqs->memoryTypeBits);
 
-    const uint32_t mt_idx =
-        mt_mask & (1u << vk->buf_mt_index) ? vk->buf_mt_index : (uint32_t)(ffs(mt_mask) - 1);
+    const uint32_t mt_idx = (uint32_t)(ffs(mt_mask) - 1);
     img->mem = vk_alloc_memory(vk, reqs->size, mt_idx);
     img->mem_size = reqs->size;
 

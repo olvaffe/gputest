@@ -139,15 +139,13 @@ protected_test_init_buffers(struct protected_test *test)
 {
     struct vk *vk = &test->vk;
 
-    uint32_t protected_mt = VK_MAX_MEMORY_TYPES;
+    uint32_t protected_mask = 0;
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {
         const VkMemoryType *mt = &vk->mem_props.memoryTypes[i];
-        if (mt->propertyFlags & VK_MEMORY_PROPERTY_PROTECTED_BIT) {
-            protected_mt = i;
-            break;
-        }
+        if (mt->propertyFlags & VK_MEMORY_PROPERTY_PROTECTED_BIT)
+            protected_mask |= 1 << i;
     }
-    if (protected_mt == VK_MAX_MEMORY_TYPES)
+    if (!protected_mask)
         vk_die("no protected mt");
 
     const VkDeviceSize vb_size = sizeof(protected_test_vertices);
@@ -161,9 +159,8 @@ protected_test_init_buffers(struct protected_test *test)
     const VkBufferCreateFlags ib_flags = test->protected ? VK_BUFFER_CREATE_PROTECTED_BIT : 0;
     const VkBufferUsageFlags2 ib_usage =
         VK_BUFFER_USAGE_2_TRANSFER_DST_BIT | VK_BUFFER_USAGE_2_INDEX_BUFFER_BIT;
-    test->ib =
-        vk_create_buffer_with_mt_mask(vk, ib_flags, ib_size, ib_usage,
-                                      1 << (test->protected ? protected_mt : vk->buf_mt_index));
+    test->ib = vk_create_buffer_with_mt_mask(vk, ib_flags, ib_size, ib_usage,
+                                             test->protected ? protected_mask : vk->buf_mt_mask);
 
     test->staging = vk_create_buffer(vk, 0, ib_size, VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT);
     memcpy(test->staging->mem_ptr, protected_test_indices, ib_size);

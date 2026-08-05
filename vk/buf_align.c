@@ -39,7 +39,8 @@ buf_align_test_init(struct buf_align_test *test)
     vk_init(vk, NULL);
 
     /* allocate a page to be suballocated for VkBuffer */
-    test->mem = vk_alloc_memory(vk, 4096, vk->buf_mt_index);
+    const uint32_t mt_idx = (uint32_t)(ffs(vk->buf_mt_mask) - 1);
+    test->mem = vk_alloc_memory(vk, 4096, mt_idx);
     test->mem_used = 0;
     const VkMemoryMapInfo map_info = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO,
@@ -71,7 +72,7 @@ buf_align_test_init(struct buf_align_test *test)
     };
     vk->GetBufferMemoryRequirements2(vk->dev, &reqs_info, &reqs2);
     const VkMemoryRequirements reqs = reqs2.memoryRequirements;
-    if (!(reqs.memoryTypeBits & (1u << vk->buf_mt_index)))
+    if (!(reqs.memoryTypeBits & vk->buf_mt_mask))
         vk_die("failed to meet buf memory reqs: 0x%x", reqs.memoryTypeBits);
     vk_log("buffer memory alignment = %" PRIu64 "", reqs.alignment);
 
