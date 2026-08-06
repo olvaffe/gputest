@@ -56,7 +56,7 @@ tests = [
 ]
 
 if idep_androidutil.found()
-  tests += ['ahb_rt', 'android']
+  tests += ['ahb_rt', 'android-native-activity']
 endif
 if idep_drmutil.found()
   tests += ['residency']
@@ -112,7 +112,7 @@ foreach t : tests
   test_deps = [idep_vkutil, idep_dmautil, idep_rdocutil]
   test_args = []
 
-  if t == 'ahb_rt' or t == 'android'
+  if t == 'ahb_rt' or t == 'android-native-activity'
     test_deps += [idep_androidutil, dep_android]
   elif t == 'compile'
     test_deps += [idep_spvutil]
@@ -138,7 +138,7 @@ foreach t : tests
     test_deps += [idep_wlutil, idep_drmutil]
   endif
 
-  if t == 'android'
+  if t == 'android-native-activity'
     shared_library(
       t,
       sources: [test_src, test_incs],
