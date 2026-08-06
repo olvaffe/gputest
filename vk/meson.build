@@ -56,7 +56,7 @@ tests = [
 ]
 
 if idep_androidutil.found()
-  tests += ['ahb_rt', 'android-native-activity']
+  tests += ['ahb_rt', 'android-native-activity', 'android-root']
 endif
 if idep_drmutil.found()
   tests += ['residency']
@@ -112,8 +112,11 @@ foreach t : tests
   test_deps = [idep_vkutil, idep_dmautil, idep_rdocutil]
   test_args = []
 
-  if t == 'ahb_rt' or t == 'android-native-activity'
+  if t == 'ahb_rt' or t == 'android-native-activity' or t == 'android-root'
     test_deps += [idep_androidutil, dep_android]
+    if t == 'android-root'
+      test_deps += [idep_android_stubs]
+    endif
   elif t == 'compile'
     test_deps += [idep_spvutil]
   elif t == 'kms'
