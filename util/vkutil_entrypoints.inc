@@ -219,6 +219,9 @@ PFN_DEVICE(MapMemory2)
 PFN_DEVICE(TransitionImageLayout)
 PFN_DEVICE(UnmapMemory2)
 
+/* VK_KHR_android_surface */
+PFN_INSTANCE(CreateAndroidSurfaceKHR)
+
 /* VK_KHR_calibrated_timestamps */
 PFN_INSTANCE(GetPhysicalDeviceCalibrateableTimeDomainsKHR)
 PFN_DEVICE(GetCalibratedTimestampsKHR)

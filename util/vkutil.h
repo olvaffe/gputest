@@ -2367,7 +2367,8 @@ vk_validate_swapchain(struct vk *vk, const struct vk_swapchain *swapchain)
     }
 
     if (swapchain->info.minImageCount < caps.surfaceCapabilities.minImageCount ||
-        swapchain->info.minImageCount < caps.surfaceCapabilities.maxImageCount)
+        (caps.surfaceCapabilities.maxImageCount &&
+         swapchain->info.minImageCount > caps.surfaceCapabilities.maxImageCount))
         vk_die("swapchain min image count %d is invalid", swapchain->info.minImageCount);
 
     /* check format */
