@@ -41,11 +41,11 @@ class SurfaceComposerClient : public RefBase {
         status_t apply(bool synchronous = false, bool oneWay = false);
 
       private:
-        [[maybe_unused]] char mPadding[1024];
+        [[maybe_unused]] char pad[1024];
     };
 
   private:
-    [[maybe_unused]] char mPadding[256];
+    [[maybe_unused]] char pad[256];
 };
 
 } // namespace android

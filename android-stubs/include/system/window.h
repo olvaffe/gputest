@@ -4,7 +4,8 @@
 
 #define ANDROID_NATIVE_WINDOW_MAGIC 0x5f776e64 /* '_wnd' */
 
-// sizeof(stub) == sizeof(real). This is required by Surface.
+// This is not directly constructible, but we have to make sure
+// sizeof(stub) == sizeof(real) for Surface.
 struct ANativeWindow {
   public:
     int magic;

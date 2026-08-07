@@ -10,7 +10,7 @@ struct LayerMetadata {
     LayerMetadata();
 
   private:
-    [[maybe_unused]] char mPadding[128];
+    [[maybe_unused]] char pad[128];
 };
 
 } // namespace gui

@@ -9,7 +9,7 @@ class String8 {
     ~String8();
 
   private:
-    [[maybe_unused]] const char *mString;
+    [[maybe_unused]] void *pad;
 };
 
 } // namespace android

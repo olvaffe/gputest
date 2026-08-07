@@ -14,7 +14,7 @@ class RefBase {
     virtual ~RefBase();
 
   private:
-    [[maybe_unused]] void *mRefs;
+    [[maybe_unused]] void *pad;
 };
 
 } // namespace android
