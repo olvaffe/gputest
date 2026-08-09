@@ -3,10 +3,6 @@
 
 namespace android {
 
-RefBase::RefBase() {}
-
-RefBase::~RefBase() {}
-
 void
 RefBase::incStrong(const void *) const
 {

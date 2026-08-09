@@ -4,10 +4,13 @@
 
 namespace android {
 
-// This is not directly constructible. Needed only for name mangling.
-class IBinder : public RefBase {
+// memory layout: compatible but not directly constructed/destructed/accessed
+// vtable: truncated
+// methods: none exposed
+class IBinder : public virtual RefBase {
   private:
     IBinder() = delete;
+    ~IBinder() override = default;
 };
 
 } // namespace android

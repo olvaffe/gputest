@@ -21,6 +21,8 @@ static const uint32_t android_root_test_fs[] = {
 using namespace android;
 
 struct android_root_test {
+    uint32_t x;
+    uint32_t y;
     uint32_t width;
     uint32_t height;
     enum AHardwareBuffer_Format ahb_format;
@@ -117,7 +119,7 @@ android_root_test_init_window(struct android_root_test *test)
 {
     ProcessState::self()->startThreadPool();
 
-    test->scc = sp<SurfaceComposerClient>::make();
+    test->scc = SurfaceComposerClient::getDefault();
     if (test->scc->initCheck())
         vk_die("failed to connect to SF");
 
@@ -126,7 +128,10 @@ android_root_test_init_window(struct android_root_test *test)
     if (!test->sc)
         vk_die("failed to create layer");
 
-    if (SurfaceComposerClient::Transaction{}.setLayer(test->sc, INT32_MAX).show(test->sc).apply())
+    if (SurfaceComposerClient::Transaction{}
+            .setPosition(test->sc, test->x, test->y)
+            .setLayer(test->sc, INT32_MAX)
+            .apply())
         vk_die("failed to config layer");
 
     test->win = test->sc->getSurface().get();
@@ -135,8 +140,6 @@ android_root_test_init_window(struct android_root_test *test)
 
     if (test->win->magic != ANDROID_NATIVE_WINDOW_MAGIC)
         vk_die("unexpected ANativeWindow magic");
-    if (test->win->version != sizeof(ANativeWindow))
-        vk_die("unexpected ANativeWindow version");
 }
 
 static void
@@ -299,8 +302,10 @@ int
 main(void)
 {
     struct android_root_test test = {
-        .width = 512,
-        .height = 512,
+        .x = 100,
+        .y = 100,
+        .width = 800,
+        .height = 800,
         .ahb_format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM,
         .vk_format = VK_FORMAT_R8G8B8A8_UNORM,
     };

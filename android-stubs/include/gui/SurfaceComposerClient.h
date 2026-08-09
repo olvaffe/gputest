@@ -14,14 +14,15 @@ namespace android {
 
 using gui::LayerMetadata;
 
-// The padding is chosen such that sizeof(stub) >= sizeof(real). All methods
-// are defined in libgui.
+// memory layout: truncated but not directly constructed/destructed/accessed
+// vtable: truncated
+// methods: resolved to libgui
 class SurfaceComposerClient : public RefBase {
   public:
-    SurfaceComposerClient();
-    virtual ~SurfaceComposerClient();
-
     status_t initCheck() const;
+
+    static sp<SurfaceComposerClient> getDefault();
+
     sp<SurfaceControl> createSurface(const String8 &name,
                                      uint32_t w,
                                      uint32_t h,
@@ -31,13 +32,15 @@ class SurfaceComposerClient : public RefBase {
                                      const LayerMetadata &metadata = LayerMetadata(),
                                      uint32_t *outTransformHint = nullptr);
 
-    // The padding is chosen such that sizeof(stub) >= sizeof(real). All methods
-    // are defined in libgui.
+    // memory layout: incompatible but padded to have enough storage
+    // vtable: omitted and ignored
+    // methods: resolved to libgui
     class Transaction {
       public:
         Transaction();
+
+        Transaction &setPosition(const sp<SurfaceControl> &sc, float x, float y);
         Transaction &setLayer(const sp<SurfaceControl> &sc, int32_t z);
-        Transaction &show(const sp<SurfaceControl> &sc);
         status_t apply(bool synchronous = false, bool oneWay = false);
 
       private:
@@ -45,7 +48,8 @@ class SurfaceComposerClient : public RefBase {
     };
 
   private:
-    [[maybe_unused]] char pad[256];
+    SurfaceComposerClient() = delete;
+    ~SurfaceComposerClient() override = default;
 };
 
 } // namespace android

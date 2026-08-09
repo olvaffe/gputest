@@ -5,7 +5,9 @@
 
 namespace android {
 
-// This is not directly constructible. All methods are defined in libbinder.
+// memory layout: truncated but not directly constructed/destructed/accessed
+// vtable: compatible
+// methods: resolved to libbinder
 class ProcessState : public virtual RefBase {
   public:
     static sp<ProcessState> self();
@@ -13,6 +15,7 @@ class ProcessState : public virtual RefBase {
 
   private:
     ProcessState() = delete;
+    ~ProcessState() override = default;
 };
 
 } // namespace android

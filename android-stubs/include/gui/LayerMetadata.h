@@ -3,8 +3,9 @@
 namespace android {
 namespace gui {
 
-// The padding is chosen such that sizeof(stub) >= sizeof(real). All methods
-// are defined in libgui.
+// memory layout: incompatible but padded to have enough storage
+// vtable: omitted and ignored
+// methods: resolved to libgui
 struct LayerMetadata {
   public:
     LayerMetadata();

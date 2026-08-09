@@ -5,11 +5,13 @@
 
 namespace android {
 
-// This is not directly constructible. But because ANativeWindow is before
-// RefBase, sizeof(stub) and sizeof(real) must be the same for ANativeWindow.
+// memory layout: truncated but not directly constructed/destructed
+// vtable: truncated
+// methods: none exposed
 class Surface : public ANativeWindow, public RefBase {
   private:
     Surface() = delete;
+    ~Surface() override = default;
 };
 
 } // namespace android

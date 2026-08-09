@@ -1,31 +1,31 @@
 #pragma once
 
-#include <utility>
+#include <cstddef>
 
 namespace android {
 
-// sizeof(stub) == sizeof(real). All methods are inlined.
+// memory layout: compatible
+// vtable: none
+// methods: inlined
 template <typename T> class sp {
   public:
-    inline sp() : m_ptr(nullptr) {}
+    constexpr sp() : m_ptr(nullptr) {}
+    sp(std::nullptr_t) : sp() {}
 
-    inline sp(T *other) : m_ptr(other)
-    {
-        if (other)
-            other->incStrong(this);
-    }
-
-    inline sp(const sp<T> &other) : m_ptr(other.m_ptr)
+    sp(const sp<T> &other) : m_ptr(other.m_ptr)
     {
         if (m_ptr)
             m_ptr->incStrong(this);
     }
+    sp(sp<T> &&other) noexcept : m_ptr(other.m_ptr) { other.m_ptr = nullptr; }
 
-    inline sp(sp<T> &&other) noexcept : m_ptr(other.m_ptr) { other.m_ptr = nullptr; }
+    ~sp()
+    {
+        if (m_ptr)
+            m_ptr->decStrong(this);
+    }
 
-    inline ~sp() { clear(); }
-
-    inline void clear()
+    void clear()
     {
         if (m_ptr) {
             m_ptr->decStrong(this);
@@ -33,22 +33,28 @@ template <typename T> class sp {
         }
     }
 
-    inline sp &operator=(sp<T> &&other) noexcept
+    sp &operator=(const sp<T> &other)
     {
-        clear();
+        if (other.m_ptr)
+            other.m_ptr->incStrong(this);
+        if (m_ptr)
+            m_ptr->decStrong(this);
+        m_ptr = other.m_ptr;
+        return *this;
+    }
+
+    sp &operator=(sp<T> &&other) noexcept
+    {
+        if (m_ptr)
+            m_ptr->decStrong(this);
         m_ptr = other.m_ptr;
         other.m_ptr = nullptr;
         return *this;
     }
 
-    inline explicit operator bool() const { return m_ptr != nullptr; }
-    inline T *get() const { return m_ptr; }
-    inline T *operator->() const { return m_ptr; }
-
-    template <typename... Args> static sp<T> make(Args &&...args)
-    {
-        return sp<T>(new T(std::forward<Args>(args)...));
-    }
+    explicit operator bool() const { return m_ptr != nullptr; }
+    T *get() const { return m_ptr; }
+    T *operator->() const { return m_ptr; }
 
   private:
     T *m_ptr;

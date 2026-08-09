@@ -6,14 +6,16 @@
 
 namespace android {
 
-// This is not directly constructible. All methods are defined in libgui.
+// memory layout: truncated but not directly constructed/destructed/accessed
+// vtable: truncated
+// methods: resolved to libgui
 class SurfaceControl : public RefBase {
   public:
-    ~SurfaceControl();
     sp<Surface> getSurface();
 
   private:
     SurfaceControl() = delete;
+    ~SurfaceControl() override = default;
 };
 
 } // namespace android

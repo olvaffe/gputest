@@ -7,6 +7,7 @@ libutils = shared_library(
   'utils',
   files('src/utils_stub.cpp'),
   include_directories : 'include',
+  override_options : ['cpp_rtti=false'],
 )
 
 libbinder = shared_library(
@@ -14,6 +15,7 @@ libbinder = shared_library(
   files('src/binder_stub.cpp'),
   include_directories : 'include',
   link_with : libutils,
+  override_options : ['cpp_rtti=false'],
 )
 
 libgui = shared_library(
@@ -21,6 +23,7 @@ libgui = shared_library(
   files('src/gui_stub.cpp'),
   include_directories : 'include',
   link_with : libutils,
+  override_options : ['cpp_rtti=false'],
 )
 
 idep_android_stubs = declare_dependency(

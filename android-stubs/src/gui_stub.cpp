@@ -10,9 +10,11 @@ LayerMetadata::LayerMetadata() {}
 
 } // namespace gui
 
-SurfaceComposerClient::SurfaceComposerClient() {}
-
-SurfaceComposerClient::~SurfaceComposerClient() {}
+sp<SurfaceComposerClient>
+SurfaceComposerClient::getDefault()
+{
+    return nullptr;
+}
 
 status_t
 SurfaceComposerClient::initCheck() const
@@ -36,13 +38,13 @@ SurfaceComposerClient::createSurface(const String8 &,
 SurfaceComposerClient::Transaction::Transaction() {}
 
 SurfaceComposerClient::Transaction &
-SurfaceComposerClient::Transaction::setLayer(const sp<SurfaceControl> &, int32_t)
+SurfaceComposerClient::Transaction::setPosition(const sp<SurfaceControl> &, float, float)
 {
     return *this;
 }
 
 SurfaceComposerClient::Transaction &
-SurfaceComposerClient::Transaction::show(const sp<SurfaceControl> &)
+SurfaceComposerClient::Transaction::setLayer(const sp<SurfaceControl> &, int32_t)
 {
     return *this;
 }
@@ -52,8 +54,6 @@ SurfaceComposerClient::Transaction::apply(bool, bool)
 {
     return 0;
 }
-
-SurfaceControl::~SurfaceControl() {}
 
 sp<Surface>
 SurfaceControl::getSurface()
