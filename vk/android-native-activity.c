@@ -305,7 +305,7 @@ android_test_handle_frame(int64_t ts, void *arg)
         return;
 
     const uint32_t width = ANativeWindow_getWidth(test->cur.win);
-    const uint32_t height = ANativeWindow_getHeight(test->cur.win);
+    const uint32_t height = ANativeWindow_getHeight(test->cur.win) / 2;
 
     if (test->verbose) {
         android_log("frame: ts %" PRIi64 ", %dx%d, format 0x%x, usage 0x%" PRIx64, ts, width,
@@ -328,6 +328,7 @@ android_test_handle_frame(int64_t ts, void *arg)
     }
 
     ASurfaceTransaction *xact = ASurfaceTransaction_create();
+    ASurfaceTransaction_setPosition(xact, test->ctrl, 0, height / 2);
 #if 1
     ASurfaceTransaction_setBuffer(xact, test->ctrl, ahb, -1);
 #else
