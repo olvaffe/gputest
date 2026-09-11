@@ -8,6 +8,7 @@ tests = [
   'formats',
   'info',
   'model',
+  'pbo',
   'scissor',
   'ssbo',
   'tex',
