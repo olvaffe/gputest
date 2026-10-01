@@ -45,6 +45,7 @@ gbm_test_bo(struct gbm *gbm)
 static void
 gbm_dump(struct gbm *gbm)
 {
+    gbm_log("minigbm: %d", gbm->is_minigbm);
     gbm_log("backend: %s", gbm->backend_name);
 
     for (uint32_t i = 0; i < gbm->format_count; i++) {
