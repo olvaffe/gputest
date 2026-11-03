@@ -67,6 +67,13 @@ dep_libavutil = dependency('libavutil', required: false)
 # for gbmutil
 dep_gbm = dependency('gbm', required: false)
 
+# for mtlutil
+dep_metal = dependency(
+  'appleframeworks',
+  modules: ['Foundation', 'Metal', 'QuartzCore'],
+  required: false,
+)
+
 # for sdlutil
 dep_sdl3 = dependency('sdl3', required: false)
 

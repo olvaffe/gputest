@@ -95,6 +95,15 @@ if dep_gbm.found()
 endif
 util_summary += {'gbmutil': idep_gbmutil}
 
+idep_mtlutil = dep_not_found
+if dep_metal.found()
+  idep_mtlutil = declare_dependency(
+    sources: ['mtlutil.h'],
+    dependencies: [idep_util, dep_metal],
+  )
+endif
+util_summary += {'mtlutil': idep_mtlutil}
+
 idep_rdocutil = declare_dependency(
   sources: ['rdocutil.h'],
   dependencies: [idep_util, dep_dl],
