@@ -58,11 +58,9 @@ struct mtl_texture {
 };
 
 struct mtl_pipeline {
-    NS::SharedPtr<MTL::Library> lib;
-    NS::SharedPtr<MTL4::LibraryFunctionDescriptor> vs_desc;
-    NS::SharedPtr<MTL4::LibraryFunctionDescriptor> fs_desc;
-    NS::SharedPtr<MTL::VertexDescriptor> vertex_desc;
     NS::SharedPtr<MTL4::RenderPipelineDescriptor> desc;
+
+    NS::SharedPtr<MTL::Library> lib;
 
     NS::SharedPtr<MTL::RenderPipelineState> pipeline;
 };
@@ -260,8 +258,6 @@ mtl_create_pipeline(struct mtl *mtl)
 {
     struct mtl_pipeline *pipeline = new mtl_pipeline();
 
-    pipeline->vertex_desc = NS::TransferPtr(MTL::VertexDescriptor::alloc()->init());
-
     pipeline->desc = NS::TransferPtr(MTL4::RenderPipelineDescriptor::alloc()->init());
     pipeline->desc->setInputPrimitiveTopology(MTL::PrimitiveTopologyClassTriangle);
 
@@ -269,11 +265,7 @@ mtl_create_pipeline(struct mtl *mtl)
 }
 
 static inline void
-mtl_add_pipeline_shader(struct mtl *mtl,
-                        struct mtl_pipeline *pipeline,
-                        const char *msl,
-                        const char *vs_name,
-                        const char *fs_name)
+mtl_set_pipeline_library(struct mtl *mtl, struct mtl_pipeline *pipeline, const char *msl)
 {
     NS::SharedPtr<NS::String> src =
         NS::TransferPtr(NS::String::alloc()->init(msl, NS::UTF8StringEncoding));
@@ -283,33 +275,65 @@ mtl_add_pipeline_shader(struct mtl *mtl,
 
     pipeline->lib = NS::TransferPtr(mtl->compiler->newLibrary(lib_desc.get(), &mtl->error));
     mtl_check(mtl, "newLibrary");
+}
 
-    if (vs_name) {
-        NS::SharedPtr<NS::String> name =
-            NS::TransferPtr(NS::String::alloc()->init(vs_name, NS::UTF8StringEncoding));
-        pipeline->vs_desc = NS::TransferPtr(MTL4::LibraryFunctionDescriptor::alloc()->init());
-        pipeline->vs_desc->setLibrary(pipeline->lib.get());
-        pipeline->vs_desc->setName(name.get());
+static inline void
+mtl_set_pipeline_vs(struct mtl *mtl, struct mtl_pipeline *pipeline, const char *vs_name)
+{
+    NS::SharedPtr<NS::String> name =
+        NS::TransferPtr(NS::String::alloc()->init(vs_name, NS::UTF8StringEncoding));
+    NS::SharedPtr<MTL4::LibraryFunctionDescriptor> vs_desc =
+        NS::TransferPtr(MTL4::LibraryFunctionDescriptor::alloc()->init());
+    vs_desc->setLibrary(pipeline->lib.get());
+    vs_desc->setName(name.get());
 
-        pipeline->desc->setVertexFunctionDescriptor(pipeline->vs_desc.get());
-    }
+    pipeline->desc->setVertexFunctionDescriptor(vs_desc.get());
+}
 
-    if (fs_name) {
-        NS::SharedPtr<NS::String> name =
-            NS::TransferPtr(NS::String::alloc()->init(fs_name, NS::UTF8StringEncoding));
-        pipeline->fs_desc = NS::TransferPtr(MTL4::LibraryFunctionDescriptor::alloc()->init());
-        pipeline->fs_desc->setLibrary(pipeline->lib.get());
-        pipeline->fs_desc->setName(name.get());
+static inline void
+mtl_set_pipeline_fs(struct mtl *mtl, struct mtl_pipeline *pipeline, const char *fs_name)
+{
+    NS::SharedPtr<NS::String> name =
+        NS::TransferPtr(NS::String::alloc()->init(fs_name, NS::UTF8StringEncoding));
+    NS::SharedPtr<MTL4::LibraryFunctionDescriptor> fs_desc =
+        NS::TransferPtr(MTL4::LibraryFunctionDescriptor::alloc()->init());
+    fs_desc->setLibrary(pipeline->lib.get());
+    fs_desc->setName(name.get());
 
-        pipeline->desc->setFragmentFunctionDescriptor(pipeline->fs_desc.get());
-    }
+    pipeline->desc->setFragmentFunctionDescriptor(fs_desc.get());
+}
+
+static inline void
+mtl_add_pipeline_vertex_attr(struct mtl *mtl,
+                             struct mtl_pipeline *pipeline,
+                             uint32_t attr_idx,
+                             MTL::VertexFormat format,
+                             uint32_t offset,
+                             uint32_t buf_idx)
+{
+    MTL::VertexAttributeDescriptor *attr =
+        pipeline->desc->vertexDescriptor()->attributes()->object(attr_idx);
+    attr->setFormat(format);
+    attr->setOffset(offset);
+    attr->setBufferIndex(buf_idx);
+}
+
+static inline void
+mtl_add_pipeline_vertex_layout(struct mtl *mtl,
+                               struct mtl_pipeline *pipeline,
+                               uint32_t buf_idx,
+                               uint32_t stride,
+                               MTL::VertexStepFunction step_func)
+{
+    MTL::VertexBufferLayoutDescriptor *layout =
+        pipeline->desc->vertexDescriptor()->layouts()->object(buf_idx);
+    layout->setStride(stride);
+    layout->setStepFunction(step_func);
 }
 
 static inline void
 mtl_compile_pipeline(struct mtl *mtl, struct mtl_pipeline *pipeline)
 {
-    pipeline->desc->setVertexDescriptor(pipeline->vertex_desc.get());
-
     pipeline->pipeline = NS::TransferPtr(
         mtl->compiler->newRenderPipelineState(pipeline->desc.get(), nullptr, &mtl->error));
     mtl_check(mtl, "newRenderPipelineState");

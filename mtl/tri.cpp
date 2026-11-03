@@ -50,19 +50,15 @@ tri_test_init_pipeline(struct tri_test *test)
 
     test->pipeline = mtl_create_pipeline(mtl);
 
-    mtl_add_pipeline_shader(mtl, test->pipeline, tri_test_msl, "vs_main", "fs_main");
+    mtl_set_pipeline_library(mtl, test->pipeline, tri_test_msl);
+    mtl_set_pipeline_vs(mtl, test->pipeline, "vs_main");
+    mtl_set_pipeline_fs(mtl, test->pipeline, "fs_main");
 
-    MTL::VertexAttributeDescriptorArray *attrs = test->pipeline->vertex_desc->attributes();
-    attrs->object(0)->setFormat(MTL::VertexFormatFloat2);
-    attrs->object(0)->setOffset(0);
-    attrs->object(0)->setBufferIndex(0);
-    attrs->object(1)->setFormat(MTL::VertexFormatFloat3);
-    attrs->object(1)->setOffset(sizeof(float) * 2);
-    attrs->object(1)->setBufferIndex(0);
-
-    MTL::VertexBufferLayoutDescriptorArray *layouts = test->pipeline->vertex_desc->layouts();
-    layouts->object(0)->setStride(sizeof(tri_test_vertices[0]));
-    layouts->object(0)->setStepFunction(MTL::VertexStepFunctionPerVertex);
+    mtl_add_pipeline_vertex_attr(mtl, test->pipeline, 0, MTL::VertexFormatFloat2, 0, 0);
+    mtl_add_pipeline_vertex_attr(mtl, test->pipeline, 1, MTL::VertexFormatFloat3,
+                                 sizeof(float) * 2, 0);
+    mtl_add_pipeline_vertex_layout(mtl, test->pipeline, 0, sizeof(tri_test_vertices[0]),
+                                   MTL::VertexStepFunctionPerVertex);
 
     test->pipeline->desc->colorAttachments()->object(0)->setPixelFormat(test->format);
 
