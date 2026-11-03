@@ -38,7 +38,7 @@ struct tri_test {
     struct mtl_buffer *vb;
     NS::SharedPtr<MTL4::ArgumentTable> vb_table;
 
-    struct mtl_image *rt;
+    struct mtl_texture *rt;
 
     struct mtl_pipeline *pipeline;
 };
@@ -74,8 +74,8 @@ tri_test_init_rt(struct tri_test *test)
 {
     struct mtl *mtl = &test->mtl;
 
-    test->rt = mtl_create_image(mtl, test->width, test->height, test->format,
-                                MTL::StorageModePrivate, MTL::TextureUsageRenderTarget);
+    test->rt = mtl_create_texture(mtl, test->width, test->height, test->format,
+                                  MTL::StorageModePrivate, MTL::TextureUsageRenderTarget);
 }
 
 static void
@@ -115,7 +115,7 @@ tri_test_cleanup(struct tri_test *test)
 
     mtl_destroy_pipeline(mtl, test->pipeline);
 
-    mtl_destroy_image(mtl, test->rt);
+    mtl_destroy_texture(mtl, test->rt);
 
     test->vb_table.reset();
     mtl_destroy_buffer(mtl, test->vb);
@@ -133,7 +133,7 @@ tri_test_draw(struct tri_test *test)
         NS::TransferPtr(MTL4::RenderPassDescriptor::alloc()->init());
     MTL::RenderPassColorAttachmentDescriptor *color_att =
         pass_desc->colorAttachments()->object(0);
-    color_att->setTexture(test->rt->img.get());
+    color_att->setTexture(test->rt->tex.get());
     color_att->setLoadAction(MTL::LoadActionClear);
     color_att->setStoreAction(MTL::StoreActionStore);
     color_att->setClearColor(MTL::ClearColor::Make(test->clear_color[0], test->clear_color[1],
@@ -167,7 +167,7 @@ tri_test_draw(struct tri_test *test)
     mtl_end_cmd(mtl, cmd);
     mtl_wait(mtl);
 
-    mtl_dump_image(mtl, test->rt, "rt.ppm");
+    mtl_dump_texture(mtl, test->rt, "rt.ppm");
 }
 
 int

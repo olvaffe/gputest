@@ -56,14 +56,14 @@ struct mtl_buffer {
     void *map;
 };
 
-struct mtl_image {
+struct mtl_texture {
     uint32_t width;
     uint32_t height;
     MTL::PixelFormat format;
     MTL::StorageMode storage_mode;
     MTL::TextureUsage usage;
 
-    NS::SharedPtr<MTL::Texture> img;
+    NS::SharedPtr<MTL::Texture> tex;
 };
 
 struct mtl_pipeline {
@@ -231,21 +231,21 @@ mtl_destroy_buffer(struct mtl *mtl, struct mtl_buffer *buf)
     delete buf;
 }
 
-static inline struct mtl_image *
-mtl_create_image(struct mtl *mtl,
-                 uint32_t width,
-                 uint32_t height,
-                 MTL::PixelFormat format,
-                 MTL::StorageMode storage_mode,
-                 MTL::TextureUsage usage)
+static inline struct mtl_texture *
+mtl_create_texture(struct mtl *mtl,
+                   uint32_t width,
+                   uint32_t height,
+                   MTL::PixelFormat format,
+                   MTL::StorageMode storage_mode,
+                   MTL::TextureUsage usage)
 {
-    struct mtl_image *img = new mtl_image();
+    struct mtl_texture *tex = new mtl_texture();
 
-    img->width = width;
-    img->height = height;
-    img->format = format;
-    img->storage_mode = storage_mode;
-    img->usage = usage;
+    tex->width = width;
+    tex->height = height;
+    tex->format = format;
+    tex->storage_mode = storage_mode;
+    tex->usage = usage;
 
     NS::SharedPtr<MTL::TextureDescriptor> desc =
         NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
@@ -256,21 +256,21 @@ mtl_create_image(struct mtl *mtl,
     desc->setStorageMode(storage_mode);
     desc->setUsage(usage);
 
-    img->img = NS::TransferPtr(mtl->dev->newTexture(desc.get()));
-    if (!img->img)
+    tex->tex = NS::TransferPtr(mtl->dev->newTexture(desc.get()));
+    if (!tex->tex)
         mtl_die("failed to create texture");
 
-    mtl->residency_set->addAllocation(img->img.get());
+    mtl->residency_set->addAllocation(tex->tex.get());
 
-    return img;
+    return tex;
 }
 
 static inline void
-mtl_destroy_image(struct mtl *mtl, struct mtl_image *img)
+mtl_destroy_texture(struct mtl *mtl, struct mtl_texture *tex)
 {
-    mtl->residency_set->removeAllocation(img->img.get());
+    mtl->residency_set->removeAllocation(tex->tex.get());
 
-    delete img;
+    delete tex;
 }
 
 static inline struct mtl_pipeline *
@@ -340,24 +340,24 @@ mtl_destroy_pipeline(struct mtl *mtl, struct mtl_pipeline *pipeline)
 }
 
 static inline void
-mtl_dump_image(struct mtl *mtl, const struct mtl_image *img, const char *filename)
+mtl_dump_texture(struct mtl *mtl, const struct mtl_texture *tex, const char *filename)
 {
-    const uint64_t stride = img->width * 4;
-    const uint64_t size = stride * img->height;
+    const uint64_t stride = tex->width * 4;
+    const uint64_t size = stride * tex->height;
     struct mtl_buffer *buf = mtl_create_buffer(mtl, size, MTL::ResourceStorageModeShared);
 
     MTL4::CommandBuffer *cmd = mtl_begin_cmd(mtl);
 
     MTL4::ComputeCommandEncoder *enc = cmd->computeCommandEncoder();
-    enc->copyFromTexture(img->img.get(), 0, 0, MTL::Origin::Make(0, 0, 0),
-                         MTL::Size::Make(img->width, img->height, 1), buf->buf.get(), 0, stride,
+    enc->copyFromTexture(tex->tex.get(), 0, 0, MTL::Origin::Make(0, 0, 0),
+                         MTL::Size::Make(tex->width, tex->height, 1), buf->buf.get(), 0, stride,
                          size);
     enc->endEncoding();
 
     mtl_end_cmd(mtl, cmd);
     mtl_wait(mtl);
 
-    u_write_ppm(filename, buf->map, img->width, img->height, stride);
+    u_write_ppm(filename, buf->map, tex->width, tex->height, stride);
 
     mtl_destroy_buffer(mtl, buf);
 }
