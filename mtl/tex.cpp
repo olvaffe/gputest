@@ -99,7 +99,6 @@ tex_test_init_tex(struct tex_test *test)
         NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
     sampler_desc->setMinFilter(MTL::SamplerMinMagFilterNearest);
     sampler_desc->setMagFilter(MTL::SamplerMinMagFilterNearest);
-    sampler_desc->setSupportArgumentBuffers(true);
     test->sampler = NS::TransferPtr(mtl->dev->newSamplerState(sampler_desc.get()));
     if (!test->sampler)
         mtl_die("failed to create sampler");
