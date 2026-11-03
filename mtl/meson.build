@@ -3,6 +3,7 @@
 
 mtl_tests = [
   'info',
+  'tex',
   'tri',
 ]
 
