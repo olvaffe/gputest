@@ -147,7 +147,11 @@ u_sleep(uint32_t ms)
         .tv_nsec = (ms % 1000) * 1000000,
     };
 
+#ifdef __APPLE__
+    const int ret = nanosleep(&ts, NULL);
+#else
     const int ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, NULL);
+#endif
     if (ret)
         u_die("util", "failed to sleep");
 }

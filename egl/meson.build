@@ -4,7 +4,6 @@
 tests = [
   'angle_vk',
   'clear',
-  'fence',
   'formats',
   'info',
   'model',
@@ -22,6 +21,9 @@ if idep_androidutil.found() or idep_gbmutil.found()
 endif
 if idep_androidutil.found()
   tests += ['ahb_image', 'ahb_ssbo', 'ahb_yuv_target']
+endif
+if idep_dmautil.found()
+  tests += ['fence']
 endif
 if idep_gbmutil.found()
   tests += ['multithread']
@@ -50,11 +52,13 @@ foreach t : tests
     endif
   endforeach
 
-  test_deps = [idep_eglutil, idep_dmautil, idep_rdocutil]
+  test_deps = [idep_eglutil, idep_rdocutil]
   if t == 'ahb_image' or t == 'ahb_ssbo' or t == 'ahb_yuv_target'
     test_deps += [idep_androidutil]
   elif t == 'image'
     test_deps += [idep_androidutil, idep_gbmutil]
+  elif t == 'fence'
+    test_deps += [idep_dmautil]
   elif t == 'multithread'
     test_deps += [idep_gbmutil]
   elif t == 'sdl'

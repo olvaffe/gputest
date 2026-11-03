@@ -53,10 +53,13 @@ if dep_vkd3d_proton.found()
 endif
 util_summary += {'d3d12util': idep_d3d12util}
 
-idep_dmautil = declare_dependency(
-  sources: ['dmautil.h'],
-  dependencies: [idep_util],
-)
+idep_dmautil = dep_not_found
+if host_machine.system() != 'darwin'
+  idep_dmautil = declare_dependency(
+    sources: ['dmautil.h'],
+    dependencies: [idep_util],
+  )
+endif
 util_summary += {'dmautil': idep_dmautil}
 
 idep_drmutil = dep_not_found
@@ -173,10 +176,13 @@ util_summary += {'spvutil': [
   'tools: ' + ', '.join(spvutil_tools)
 ]}
 
-idep_v4l2util = declare_dependency(
-  sources: ['v4l2util.h'],
-  dependencies: [idep_util],
-)
+idep_v4l2util = dep_not_found
+if host_machine.system() != 'darwin'
+  idep_v4l2util = declare_dependency(
+    sources: ['v4l2util.h'],
+    dependencies: [idep_util],
+  )
+endif
 util_summary += {'v4l2util': idep_v4l2util}
 
 idep_vautil = dep_not_found

@@ -12,14 +12,20 @@
 #include <dlfcn.h>
 #include <strings.h>
 #include <sys/stat.h>
+#ifdef __APPLE__
+#include <sys/types.h>
+#else
 #include <sys/sysmacros.h>
+#endif
 #include <vulkan/vulkan_core.h>
 /* clang-format off */
 #include <vulkan/vulkan_android.h>
 /* clang-format on */
 
-#ifdef __ANDROID__
+#if defined(__ANDROID__)
 #define LIBVULKAN_NAME "libvulkan.so"
+#elif defined(__APPLE__)
+#define LIBVULKAN_NAME "libvulkan.1.dylib"
 #else
 #define LIBVULKAN_NAME "libvulkan.so.1"
 #endif

@@ -234,7 +234,8 @@ egl_init_display(struct egl *egl)
         egl_log("using platform android");
 
         egl->dev = EGL_NO_DEVICE_EXT;
-        egl->dpy = egl->GetPlatformDisplay(EGL_PLATFORM_ANDROID_KHR, EGL_DEFAULT_DISPLAY, NULL);
+        egl->dpy =
+            egl->GetPlatformDisplay(EGL_PLATFORM_ANDROID_KHR, (void *)EGL_DEFAULT_DISPLAY, NULL);
     } else {
         egl_log("using EGL_DEFAULT_DISPLAY");
         egl->dev = EGL_NO_DEVICE_EXT;

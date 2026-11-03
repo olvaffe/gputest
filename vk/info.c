@@ -98,7 +98,7 @@ info_device_memories(struct vk *vk)
 
     for (uint32_t i = 0; i < vk->mem_props.memoryHeapCount; i++) {
         const VkMemoryHeap *heap = &vk->mem_props.memoryHeaps[i];
-        vk_log("    heap %d: size %zu flags 0x%x", i, heap->size, heap->flags);
+        vk_log("    heap %d: size %llu flags 0x%x", i, heap->size, heap->flags);
     }
 
     for (uint32_t i = 0; i < vk->mem_props.memoryTypeCount; i++) {

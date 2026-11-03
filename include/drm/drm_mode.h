@@ -10,8 +10,10 @@
 #ifndef _DRM_MODE_H
 #define _DRM_MODE_H
 
+#if defined(__linux__)
 #include <linux/bits.h>
 #include <linux/const.h>
+#endif
 
 #include "drm.h"
 

@@ -14,7 +14,6 @@ tests = [
   'depth_resolve',
   'desc_buf',
   'display',
-  'dma_heap',
   'dynamic_rendering',
   'dynamic_rendering_suspend_resume',
   'external',
@@ -28,7 +27,6 @@ tests = [
   'loop',
   'mem',
   'mem_alloc',
-  'mem_hog',
   'msaa',
   'msrtss',
   'paced',
@@ -37,7 +35,6 @@ tests = [
   'protected',
   'push_const',
   'renderpass_ops',
-  'sched',
   'separate_ds',
   'sparse_buffer',
   'ssbo_max',
@@ -56,8 +53,15 @@ tests = [
   'ycbcr',
 ]
 
+if host_machine.system() != 'darwin'
+  tests += ['mem_hog', 'sched']
+endif
+
 if idep_androidutil.found()
   tests += ['ahb_rt', 'android-native-activity', 'android-root']
+endif
+if idep_dmautil.found()
+  tests += ['dma_heap']
 endif
 if idep_drmutil.found()
   tests += ['residency']
@@ -110,7 +114,7 @@ foreach t : tests
     endif
   endforeach
 
-  test_deps = [idep_vkutil, idep_dmautil, idep_rdocutil]
+  test_deps = [idep_vkutil, idep_rdocutil]
   test_args = []
 
   if t == 'ahb_rt' or t == 'android-native-activity' or t == 'android-root'
@@ -120,6 +124,8 @@ foreach t : tests
     endif
   elif t == 'compile'
     test_deps += [idep_spvutil]
+  elif t == 'dma_heap'
+    test_deps += [idep_dmautil]
   elif t == 'kms'
     test_deps += [idep_drmutil]
     if idep_androidutil.found()

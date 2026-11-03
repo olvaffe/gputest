@@ -40,7 +40,7 @@ info_dump_device(struct cl *cl, uint32_t plat_idx, uint32_t dev_idx)
     cl_log("  native_vector_width_half: %u", dev->native_vector_width_half);
     cl_log("  max_clock_frequency: %u", dev->max_clock_frequency);
     cl_log("  address_bits: %u", dev->address_bits);
-    cl_log("  max_mem_alloc_size: %lu", dev->max_mem_alloc_size);
+    cl_log("  max_mem_alloc_size: %llu", dev->max_mem_alloc_size);
     cl_log("  image_support: %u", dev->image_support);
     cl_log("  max_read_image_args: %u", dev->max_read_image_args);
     cl_log("  max_write_image_args: %u", dev->max_write_image_args);
@@ -77,15 +77,15 @@ info_dump_device(struct cl *cl, uint32_t plat_idx, uint32_t dev_idx)
     cl_log("  global_mem_cache_type: %s",
            cl_device_mem_cache_type_to_str(dev->global_mem_cache_type));
     cl_log("  global_mem_cacheline_size: %u", dev->global_mem_cacheline_size);
-    cl_log("  global_mem_cache_size: %lu", dev->global_mem_cache_size);
-    cl_log("  global_mem_size: %lu", dev->global_mem_size);
-    cl_log("  max_constant_buffer_size: %lu", dev->max_constant_buffer_size);
+    cl_log("  global_mem_cache_size: %llu", dev->global_mem_cache_size);
+    cl_log("  global_mem_size: %llu", dev->global_mem_size);
+    cl_log("  max_constant_buffer_size: %llu", dev->max_constant_buffer_size);
     cl_log("  max_constant_args: %u", dev->max_constant_args);
     cl_log("  max_global_variable_size: %zu", dev->max_global_variable_size);
     cl_log("  global_variable_preferred_total_size: %zu",
            dev->global_variable_preferred_total_size);
     cl_log("  local_mem_type: %s", cl_device_local_mem_type_to_str(dev->local_mem_type));
-    cl_log("  local_mem_size: %lu", dev->local_mem_size);
+    cl_log("  local_mem_size: %llu", dev->local_mem_size);
     cl_log("  error_correction_support: %d", dev->error_correction_support);
     cl_log("  profiling_timer_resolution: %zu", dev->profiling_timer_resolution);
     cl_log("  endian_little: %d", dev->endian_little);
@@ -147,7 +147,7 @@ info_dump_device(struct cl *cl, uint32_t plat_idx, uint32_t dev_idx)
     for (uint32_t i = 0; i < dev->partition_property_count; i++)
         cl_log("    0x%lx", dev->partition_properties[i]);
 
-    cl_log("  partition_affinity_domain: 0x%lx", dev->partition_affinity_domain);
+    cl_log("  partition_affinity_domain: 0x%llx", dev->partition_affinity_domain);
 
     cl_log("  partition_type:");
     for (uint32_t i = 0; i < dev->partition_type_count; i++)
@@ -172,7 +172,7 @@ info_dump_device(struct cl *cl, uint32_t plat_idx, uint32_t dev_idx)
     cl_log("  work_group_collective_functions_support: %d",
            dev->work_group_collective_functions_support);
     cl_log("  generic_address_space_support: %d", dev->generic_address_space_support);
-    cl_log("  device_enqueue_capabilities: 0x%lx", dev->device_enqueue_capabilities);
+    cl_log("  device_enqueue_capabilities: 0x%llx", dev->device_enqueue_capabilities);
     cl_log("  pipe_support: %d", dev->pipe_support);
     cl_log("  preferred_work_group_size_multiple: %zu", dev->preferred_work_group_size_multiple);
     cl_log("  latest_conformance_version_passed: %s", dev->latest_conformance_version_passed);
@@ -198,7 +198,7 @@ info_dump_platform(struct cl *cl, uint32_t idx)
                CL_VERSION_MINOR(ext->version), CL_VERSION_PATCH(ext->version));
     }
 
-    cl_log("  host timer resolution: %lu", plat->host_timer_resolution);
+    cl_log("  host timer resolution: %llu", plat->host_timer_resolution);
 }
 
 int
