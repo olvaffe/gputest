@@ -49,20 +49,11 @@ struct mtl {
 };
 
 struct mtl_buffer {
-    uint64_t size;
-    MTL::ResourceOptions options;
-
     NS::SharedPtr<MTL::Buffer> buf;
     void *map;
 };
 
 struct mtl_texture {
-    uint32_t width;
-    uint32_t height;
-    MTL::PixelFormat format;
-    MTL::StorageMode storage_mode;
-    MTL::TextureUsage usage;
-
     NS::SharedPtr<MTL::Texture> tex;
 };
 
@@ -208,9 +199,6 @@ mtl_create_buffer(struct mtl *mtl, uint64_t size, MTL::ResourceOptions options)
 {
     struct mtl_buffer *buf = new mtl_buffer();
 
-    buf->size = size;
-    buf->options = options;
-
     buf->buf = NS::TransferPtr(mtl->dev->newBuffer(size, options));
     if (!buf->buf)
         mtl_die("failed to create buffer");
@@ -240,12 +228,6 @@ mtl_create_texture(struct mtl *mtl,
                    MTL::TextureUsage usage)
 {
     struct mtl_texture *tex = new mtl_texture();
-
-    tex->width = width;
-    tex->height = height;
-    tex->format = format;
-    tex->storage_mode = storage_mode;
-    tex->usage = usage;
 
     NS::SharedPtr<MTL::TextureDescriptor> desc =
         NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
@@ -342,22 +324,23 @@ mtl_destroy_pipeline(struct mtl *mtl, struct mtl_pipeline *pipeline)
 static inline void
 mtl_dump_texture(struct mtl *mtl, const struct mtl_texture *tex, const char *filename)
 {
-    const uint64_t stride = tex->width * 4;
-    const uint64_t size = stride * tex->height;
+    const uint32_t width = tex->tex->width();
+    const uint32_t height = tex->tex->height();
+    const uint64_t stride = width * 4;
+    const uint64_t size = stride * height;
     struct mtl_buffer *buf = mtl_create_buffer(mtl, size, MTL::ResourceStorageModeShared);
 
     MTL4::CommandBuffer *cmd = mtl_begin_cmd(mtl);
 
     MTL4::ComputeCommandEncoder *enc = cmd->computeCommandEncoder();
     enc->copyFromTexture(tex->tex.get(), 0, 0, MTL::Origin::Make(0, 0, 0),
-                         MTL::Size::Make(tex->width, tex->height, 1), buf->buf.get(), 0, stride,
-                         size);
+                         MTL::Size::Make(width, height, 1), buf->buf.get(), 0, stride, size);
     enc->endEncoding();
 
     mtl_end_cmd(mtl, cmd);
     mtl_wait(mtl);
 
-    u_write_ppm(filename, buf->map, tex->width, tex->height, stride);
+    u_write_ppm(filename, buf->map, width, height, stride);
 
     mtl_destroy_buffer(mtl, buf);
 }
