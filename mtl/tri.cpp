@@ -1,0 +1,188 @@
+/*
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: MIT
+ */
+
+#include "mtlutil.h"
+
+static const char tri_test_msl[] = {
+#include "tri_test.metal.inc"
+};
+
+static const struct {
+    float pos[2];
+    float color[3];
+} tri_test_vertices[] = {
+    {
+        .pos = { 0.0f, 1.0f },
+        .color = { 1.0f, 0.0f, 0.0f },
+    },
+    {
+        .pos = { 1.0f, -1.0f },
+        .color = { 0.0f, 1.0f, 0.0f },
+    },
+    {
+        .pos = { -1.0f, -1.0f },
+        .color = { 0.0f, 0.0f, 1.0f },
+    },
+};
+
+struct tri_test {
+    uint32_t width;
+    uint32_t height;
+    MTL::PixelFormat format;
+    double clear_color[4];
+
+    struct mtl mtl;
+
+    struct mtl_buffer *vb;
+    MTL4::ArgumentTable *vb_table;
+
+    struct mtl_image *rt;
+
+    struct mtl_pipeline *pipeline;
+};
+
+static void
+tri_test_init_pipeline(struct tri_test *test)
+{
+    struct mtl *mtl = &test->mtl;
+
+    test->pipeline = mtl_create_pipeline(mtl);
+
+    mtl_add_pipeline_shader(mtl, test->pipeline, tri_test_msl, "vs_main", "fs_main");
+
+    MTL::VertexAttributeDescriptorArray *attrs = test->pipeline->vertex_desc->attributes();
+    attrs->object(0)->setFormat(MTL::VertexFormatFloat2);
+    attrs->object(0)->setOffset(0);
+    attrs->object(0)->setBufferIndex(0);
+    attrs->object(1)->setFormat(MTL::VertexFormatFloat3);
+    attrs->object(1)->setOffset(sizeof(float) * 2);
+    attrs->object(1)->setBufferIndex(0);
+
+    MTL::VertexBufferLayoutDescriptorArray *layouts = test->pipeline->vertex_desc->layouts();
+    layouts->object(0)->setStride(sizeof(tri_test_vertices[0]));
+    layouts->object(0)->setStepFunction(MTL::VertexStepFunctionPerVertex);
+
+    test->pipeline->desc->colorAttachments()->object(0)->setPixelFormat(test->format);
+
+    mtl_compile_pipeline(mtl, test->pipeline);
+}
+
+static void
+tri_test_init_rt(struct tri_test *test)
+{
+    struct mtl *mtl = &test->mtl;
+
+    test->rt = mtl_create_image(mtl, test->width, test->height, test->format,
+                                MTL::StorageModePrivate, MTL::TextureUsageRenderTarget);
+}
+
+static void
+tri_test_init_vb(struct tri_test *test)
+{
+    struct mtl *mtl = &test->mtl;
+
+    test->vb = mtl_create_buffer(mtl, sizeof(tri_test_vertices), MTL::ResourceStorageModeShared);
+
+    memcpy(test->vb->map, tri_test_vertices, sizeof(tri_test_vertices));
+
+    MTL4::ArgumentTableDescriptor *table_desc = MTL4::ArgumentTableDescriptor::alloc()->init();
+    table_desc->setMaxBufferBindCount(1);
+    test->vb_table = mtl->dev->newArgumentTable(table_desc, &mtl->error);
+    table_desc->release();
+    mtl_check(mtl, "newArgumentTable");
+
+    test->vb_table->setAddress(test->vb->buf->gpuAddress(), 0);
+}
+
+static void
+tri_test_init(struct tri_test *test)
+{
+    struct mtl *mtl = &test->mtl;
+
+    mtl_init(mtl, NULL);
+
+    tri_test_init_vb(test);
+    tri_test_init_rt(test);
+    tri_test_init_pipeline(test);
+}
+
+static void
+tri_test_cleanup(struct tri_test *test)
+{
+    struct mtl *mtl = &test->mtl;
+
+    mtl_destroy_pipeline(mtl, test->pipeline);
+
+    mtl_destroy_image(mtl, test->rt);
+
+    test->vb_table->release();
+    mtl_destroy_buffer(mtl, test->vb);
+
+    mtl_cleanup(mtl);
+}
+
+static void
+tri_test_draw(struct tri_test *test)
+{
+    struct mtl *mtl = &test->mtl;
+    MTL4::CommandBuffer *cmd = mtl_begin_cmd(mtl);
+
+    MTL4::RenderPassDescriptor *pass_desc = MTL4::RenderPassDescriptor::alloc()->init();
+    MTL::RenderPassColorAttachmentDescriptor *color_att =
+        pass_desc->colorAttachments()->object(0);
+    color_att->setTexture(test->rt->img);
+    color_att->setLoadAction(MTL::LoadActionClear);
+    color_att->setStoreAction(MTL::StoreActionStore);
+    color_att->setClearColor(MTL::ClearColor::Make(test->clear_color[0], test->clear_color[1],
+                                                   test->clear_color[2], test->clear_color[3]));
+
+    MTL4::RenderCommandEncoder *enc = cmd->renderCommandEncoder(pass_desc);
+    pass_desc->release();
+
+    enc->setRenderPipelineState(test->pipeline->pipeline);
+    enc->setArgumentTable(test->vb_table, MTL::RenderStageVertex);
+
+    const MTL::Viewport vp = {
+        .originX = 0.0,
+        .originY = 0.0,
+        .width = (double)test->width,
+        .height = (double)test->height,
+        .znear = 0.0,
+        .zfar = 1.0,
+    };
+    const MTL::ScissorRect scissor = {
+        .x = 0,
+        .y = 0,
+        .width = test->width,
+        .height = test->height,
+    };
+    enc->setViewport(vp);
+    enc->setScissorRect(scissor);
+
+    enc->drawPrimitives(MTL::PrimitiveTypeTriangle, 0, ARRAY_SIZE(tri_test_vertices));
+    enc->endEncoding();
+
+    mtl_end_cmd(mtl, cmd);
+    mtl_wait(mtl);
+
+    mtl_dump_image(mtl, test->rt, "rt.ppm");
+}
+
+int
+main(void)
+{
+    struct tri_test test = {
+        .width = 300,
+        .height = 300,
+        .format = MTL::PixelFormatRGBA8Unorm,
+        .clear_color = { 0.0, 0.2, 0.4, 1.0 },
+    };
+
+    tri_test_init(&test);
+    tri_test_draw(&test);
+    tri_test_cleanup(&test);
+
+    return 0;
+}

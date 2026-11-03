@@ -187,6 +187,10 @@ if idep_eglutil.found()
   subdir('egl')
 endif
 
+if idep_mtlutil.found()
+  subdir('mtl')
+endif
+
 if idep_skutil.found()
   subdir('sk')
 endif
