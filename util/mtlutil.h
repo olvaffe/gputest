@@ -27,23 +27,24 @@ struct mtl_init_params {
 struct mtl {
     struct mtl_init_params params;
 
-    NS::SharedPtr<NS::AutoreleasePool> pool;
     NS::Error *error;
+    NS::SharedPtr<NS::AutoreleasePool> autorelease_pool;
 
     NS::SharedPtr<MTL::Device> dev;
-    NS::SharedPtr<MTL4::Compiler> compiler;
     NS::SharedPtr<MTL4::CommandQueue> queue;
-    NS::SharedPtr<MTL::SharedEvent> event;
     NS::SharedPtr<MTL::ResidencySet> residency_set;
-    uint64_t event_val;
+    NS::SharedPtr<MTL4::Compiler> compiler;
 
     struct {
+        NS::SharedPtr<MTL::SharedEvent> shared_event;
+        uint64_t event_next;
+
+        NS::SharedPtr<MTL4::CommandBuffer> cmd;
+
         NS::SharedPtr<MTL4::CommandAllocator> cmd_allocs[4];
         uint64_t event_vals[4];
         uint32_t count;
         uint32_t next;
-
-        NS::SharedPtr<MTL4::CommandBuffer> cmd;
     } submit;
 };
 
@@ -84,11 +85,6 @@ mtl_init_dev(struct mtl *mtl)
 
     if (!mtl->dev->supportsFamily(MTL::GPUFamilyMetal4))
         mtl_die("Metal 4 required");
-
-    NS::SharedPtr<MTL4::CompilerDescriptor> comp_desc =
-        NS::TransferPtr(MTL4::CompilerDescriptor::alloc()->init());
-    mtl->compiler = NS::TransferPtr(mtl->dev->newCompiler(comp_desc.get(), &mtl->error));
-    mtl_check(mtl, "newCompiler");
 }
 
 static inline void
@@ -97,10 +93,6 @@ mtl_init_queue(struct mtl *mtl)
     mtl->queue = NS::TransferPtr(mtl->dev->newMTL4CommandQueue());
     if (!mtl->queue)
         mtl_die("failed to create command queue");
-
-    mtl->event = NS::TransferPtr(mtl->dev->newSharedEvent());
-    if (!mtl->event)
-        mtl_die("failed to create shared event");
 
     NS::SharedPtr<MTL::ResidencySetDescriptor> res_desc =
         NS::TransferPtr(MTL::ResidencySetDescriptor::alloc()->init());
@@ -111,20 +103,32 @@ mtl_init_queue(struct mtl *mtl)
 }
 
 static inline void
-mtl_init_cmd(struct mtl *mtl)
+mtl_init_compiler(struct mtl *mtl)
 {
+    NS::SharedPtr<MTL4::CompilerDescriptor> comp_desc =
+        NS::TransferPtr(MTL4::CompilerDescriptor::alloc()->init());
+    mtl->compiler = NS::TransferPtr(mtl->dev->newCompiler(comp_desc.get(), &mtl->error));
+    mtl_check(mtl, "newCompiler");
+}
+
+static inline void
+mtl_init_submit(struct mtl *mtl)
+{
+    mtl->submit.shared_event = NS::TransferPtr(mtl->dev->newSharedEvent());
+    if (!mtl->submit.shared_event)
+        mtl_die("failed to create shared event");
+    mtl->submit.event_next = 1;
+
+    mtl->submit.cmd = NS::TransferPtr(mtl->dev->newCommandBuffer());
+    if (!mtl->submit.cmd)
+        mtl_die("failed to create command buffer");
+
     mtl->submit.count = ARRAY_SIZE(mtl->submit.cmd_allocs);
     for (uint32_t i = 0; i < mtl->submit.count; i++) {
         mtl->submit.cmd_allocs[i] = NS::TransferPtr(mtl->dev->newCommandAllocator());
         if (!mtl->submit.cmd_allocs[i])
             mtl_die("failed to create command allocator");
-
-        mtl->submit.event_vals[i] = mtl->event_val;
     }
-
-    mtl->submit.cmd = NS::TransferPtr(mtl->dev->newCommandBuffer());
-    if (!mtl->submit.cmd)
-        mtl_die("failed to create command buffer");
 }
 
 static inline void
@@ -135,32 +139,33 @@ mtl_init(struct mtl *mtl, const struct mtl_init_params *params)
     if (params)
         mtl->params = *params;
 
-    mtl->pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+    mtl->autorelease_pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
 
     mtl_init_dev(mtl);
     mtl_init_queue(mtl);
-    mtl_init_cmd(mtl);
+    mtl_init_compiler(mtl);
+    mtl_init_submit(mtl);
 }
 
 static inline uint64_t
 mtl_signal_event(struct mtl *mtl)
 {
-    const uint64_t v = ++mtl->event_val;
-    mtl->queue->signalEvent(mtl->event.get(), v);
-    return v;
+    const uint64_t val = mtl->submit.event_next++;
+    mtl->queue->signalEvent(mtl->submit.shared_event.get(), val);
+    return val;
 }
 
 static inline void
-mtl_wait_event_val(struct mtl *mtl, uint64_t val)
+mtl_wait_event(struct mtl *mtl, uint64_t val)
 {
-    if (!mtl->event->waitUntilSignaledValue(val, UINT64_MAX))
+    if (!mtl->submit.shared_event->waitUntilSignaledValue(val, UINT64_MAX))
         mtl_die("waitUntilSignaledValue failed");
 }
 
 static inline void
 mtl_wait(struct mtl *mtl)
 {
-    mtl_wait_event_val(mtl, mtl->event_val);
+    mtl_wait_event(mtl, mtl->submit.event_next - 1);
 }
 
 static inline void
@@ -175,12 +180,13 @@ mtl_cleanup(struct mtl *mtl)
 static inline MTL4::CommandBuffer *
 mtl_begin_cmd(struct mtl *mtl)
 {
-    const uint32_t next = mtl->submit.next;
+    const NS::SharedPtr<MTL4::CommandAllocator> &cmd_alloc =
+        mtl->submit.cmd_allocs[mtl->submit.next];
+    const uint64_t event_val = mtl->submit.event_vals[mtl->submit.next];
 
-    mtl_wait_event_val(mtl, mtl->submit.event_vals[next]);
-    mtl->submit.cmd_allocs[next]->reset();
-
-    mtl->submit.cmd->beginCommandBuffer(mtl->submit.cmd_allocs[next].get());
+    mtl_wait_event(mtl, event_val);
+    cmd_alloc->reset();
+    mtl->submit.cmd->beginCommandBuffer(cmd_alloc.get());
 
     return mtl->submit.cmd.get();
 }
@@ -193,9 +199,8 @@ mtl_end_cmd(struct mtl *mtl, MTL4::CommandBuffer *cmd)
     mtl->residency_set->commit();
     mtl->queue->commit(&cmd, 1);
 
-    const uint32_t next = mtl->submit.next;
-    mtl->submit.event_vals[next] = mtl_signal_event(mtl);
-    mtl->submit.next = (next + 1) % mtl->submit.count;
+    mtl->submit.event_vals[mtl->submit.next] = mtl_signal_event(mtl);
+    mtl->submit.next = (mtl->submit.next + 1) % mtl->submit.count;
 }
 
 static inline struct mtl_buffer *

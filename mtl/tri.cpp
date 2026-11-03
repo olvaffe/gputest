@@ -90,8 +90,7 @@ tri_test_init_vb(struct tri_test *test)
     NS::SharedPtr<MTL4::ArgumentTableDescriptor> table_desc =
         NS::TransferPtr(MTL4::ArgumentTableDescriptor::alloc()->init());
     table_desc->setMaxBufferBindCount(1);
-    test->vb_table =
-        NS::TransferPtr(mtl->dev->newArgumentTable(table_desc.get(), &mtl->error));
+    test->vb_table = NS::TransferPtr(mtl->dev->newArgumentTable(table_desc.get(), &mtl->error));
     mtl_check(mtl, "newArgumentTable");
 
     test->vb_table->setAddress(test->vb->buf->gpuAddress(), 0);
