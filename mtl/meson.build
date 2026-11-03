@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 mtl_tests = [
+  'info',
   'tri',
 ]
 
