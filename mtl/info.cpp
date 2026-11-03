@@ -8,12 +8,10 @@
 static void
 info_general(struct mtl *mtl)
 {
-    MTL::Device *dev = mtl->dev;
+    const NS::SharedPtr<MTL::Device> &dev = mtl->dev;
 
-    NS::Array *all_devs = MTL::CopyAllDevices();
+    NS::SharedPtr<NS::Array> all_devs = NS::TransferPtr(MTL::CopyAllDevices());
     const NS::UInteger dev_count = all_devs ? all_devs->count() : 0;
-    if (all_devs)
-        all_devs->release();
 
     const char *loc_str;
     switch (dev->location()) {
@@ -56,7 +54,7 @@ info_general(struct mtl *mtl)
 static void
 info_memory_and_limits(struct mtl *mtl)
 {
-    MTL::Device *dev = mtl->dev;
+    const NS::SharedPtr<MTL::Device> &dev = mtl->dev;
     const MTL::Size max_threads = dev->maxThreadsPerThreadgroup();
 
     mtl_log("Memory and Limits:");
@@ -84,7 +82,7 @@ info_memory_and_limits(struct mtl *mtl)
 static void
 info_gpu_families(struct mtl *mtl)
 {
-    MTL::Device *dev = mtl->dev;
+    const NS::SharedPtr<MTL::Device> &dev = mtl->dev;
 
     static const struct {
         MTL::GPUFamily family;
@@ -121,7 +119,7 @@ info_gpu_families(struct mtl *mtl)
 static void
 info_feature_sets(struct mtl *mtl)
 {
-    MTL::Device *dev = mtl->dev;
+    const NS::SharedPtr<MTL::Device> &dev = mtl->dev;
 
     static const struct {
         MTL::FeatureSet set;
@@ -144,7 +142,7 @@ info_feature_sets(struct mtl *mtl)
 static void
 info_tiers_and_features(struct mtl *mtl)
 {
-    MTL::Device *dev = mtl->dev;
+    const NS::SharedPtr<MTL::Device> &dev = mtl->dev;
 
     const char *arg_buf_str;
     switch (dev->argumentBuffersSupport()) {
@@ -203,7 +201,7 @@ info_tiers_and_features(struct mtl *mtl)
 static void
 info_multisample(struct mtl *mtl)
 {
-    MTL::Device *dev = mtl->dev;
+    const NS::SharedPtr<MTL::Device> &dev = mtl->dev;
 
     mtl_log("Multisampling:");
     mtl_log("  ProgrammableSamplePositions:     %d",
@@ -228,7 +226,7 @@ info_multisample(struct mtl *mtl)
 static void
 info_amplification_and_vrr(struct mtl *mtl)
 {
-    MTL::Device *dev = mtl->dev;
+    const NS::SharedPtr<MTL::Device> &dev = mtl->dev;
 
     mtl_log("Vertex Amplification:");
     static const NS::UInteger amp_counts[] = { 1, 2, 4, 8, 16, 32 };
@@ -250,7 +248,7 @@ info_amplification_and_vrr(struct mtl *mtl)
 static void
 info_sparse_and_heaps(struct mtl *mtl)
 {
-    MTL::Device *dev = mtl->dev;
+    const NS::SharedPtr<MTL::Device> &dev = mtl->dev;
 
     static const struct {
         MTL::SparsePageSize page_size;
@@ -286,7 +284,7 @@ info_sparse_and_heaps(struct mtl *mtl)
 static void
 info_timestamps_and_counters(struct mtl *mtl)
 {
-    MTL::Device *dev = mtl->dev;
+    const NS::SharedPtr<MTL::Device> &dev = mtl->dev;
 
     MTL::Timestamp cpu_ts = 0;
     MTL::Timestamp gpu_ts = 0;

@@ -36,7 +36,7 @@ struct tri_test {
     struct mtl mtl;
 
     struct mtl_buffer *vb;
-    MTL4::ArgumentTable *vb_table;
+    NS::SharedPtr<MTL4::ArgumentTable> vb_table;
 
     struct mtl_image *rt;
 
@@ -87,10 +87,11 @@ tri_test_init_vb(struct tri_test *test)
 
     memcpy(test->vb->map, tri_test_vertices, sizeof(tri_test_vertices));
 
-    MTL4::ArgumentTableDescriptor *table_desc = MTL4::ArgumentTableDescriptor::alloc()->init();
+    NS::SharedPtr<MTL4::ArgumentTableDescriptor> table_desc =
+        NS::TransferPtr(MTL4::ArgumentTableDescriptor::alloc()->init());
     table_desc->setMaxBufferBindCount(1);
-    test->vb_table = mtl->dev->newArgumentTable(table_desc, &mtl->error);
-    table_desc->release();
+    test->vb_table =
+        NS::TransferPtr(mtl->dev->newArgumentTable(table_desc.get(), &mtl->error));
     mtl_check(mtl, "newArgumentTable");
 
     test->vb_table->setAddress(test->vb->buf->gpuAddress(), 0);
@@ -117,7 +118,7 @@ tri_test_cleanup(struct tri_test *test)
 
     mtl_destroy_image(mtl, test->rt);
 
-    test->vb_table->release();
+    test->vb_table.reset();
     mtl_destroy_buffer(mtl, test->vb);
 
     mtl_cleanup(mtl);
@@ -129,20 +130,20 @@ tri_test_draw(struct tri_test *test)
     struct mtl *mtl = &test->mtl;
     MTL4::CommandBuffer *cmd = mtl_begin_cmd(mtl);
 
-    MTL4::RenderPassDescriptor *pass_desc = MTL4::RenderPassDescriptor::alloc()->init();
+    NS::SharedPtr<MTL4::RenderPassDescriptor> pass_desc =
+        NS::TransferPtr(MTL4::RenderPassDescriptor::alloc()->init());
     MTL::RenderPassColorAttachmentDescriptor *color_att =
         pass_desc->colorAttachments()->object(0);
-    color_att->setTexture(test->rt->img);
+    color_att->setTexture(test->rt->img.get());
     color_att->setLoadAction(MTL::LoadActionClear);
     color_att->setStoreAction(MTL::StoreActionStore);
     color_att->setClearColor(MTL::ClearColor::Make(test->clear_color[0], test->clear_color[1],
                                                    test->clear_color[2], test->clear_color[3]));
 
-    MTL4::RenderCommandEncoder *enc = cmd->renderCommandEncoder(pass_desc);
-    pass_desc->release();
+    MTL4::RenderCommandEncoder *enc = cmd->renderCommandEncoder(pass_desc.get());
 
-    enc->setRenderPipelineState(test->pipeline->pipeline);
-    enc->setArgumentTable(test->vb_table, MTL::RenderStageVertex);
+    enc->setRenderPipelineState(test->pipeline->pipeline.get());
+    enc->setArgumentTable(test->vb_table.get(), MTL::RenderStageVertex);
 
     const MTL::Viewport vp = {
         .originX = 0.0,

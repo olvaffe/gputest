@@ -8,6 +8,8 @@
 
 #include "util.h"
 
+#include <new>
+
 #define NS_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
 #include <Metal/Metal.hpp>
@@ -25,24 +27,23 @@ struct mtl_init_params {
 struct mtl {
     struct mtl_init_params params;
 
-    NS::AutoreleasePool *pool;
+    NS::SharedPtr<NS::AutoreleasePool> pool;
     NS::Error *error;
 
-    MTL::Device *dev;
-    MTL4::Compiler *compiler;
-    MTL::ResidencySet *residency_set;
-
-    MTL4::CommandQueue *queue;
-    MTL::SharedEvent *event;
+    NS::SharedPtr<MTL::Device> dev;
+    NS::SharedPtr<MTL4::Compiler> compiler;
+    NS::SharedPtr<MTL4::CommandQueue> queue;
+    NS::SharedPtr<MTL::SharedEvent> event;
+    NS::SharedPtr<MTL::ResidencySet> residency_set;
     uint64_t event_val;
 
     struct {
-        MTL4::CommandAllocator *cmd_allocs[4];
+        NS::SharedPtr<MTL4::CommandAllocator> cmd_allocs[4];
         uint64_t event_vals[4];
         uint32_t count;
         uint32_t next;
 
-        MTL4::CommandBuffer *cmd;
+        NS::SharedPtr<MTL4::CommandBuffer> cmd;
     } submit;
 };
 
@@ -50,7 +51,7 @@ struct mtl_buffer {
     uint64_t size;
     MTL::ResourceOptions options;
 
-    MTL::Buffer *buf;
+    NS::SharedPtr<MTL::Buffer> buf;
     void *map;
 };
 
@@ -61,52 +62,52 @@ struct mtl_image {
     MTL::StorageMode storage_mode;
     MTL::TextureUsage usage;
 
-    MTL::Texture *img;
+    NS::SharedPtr<MTL::Texture> img;
 };
 
 struct mtl_pipeline {
-    MTL::Library *lib;
-    MTL4::LibraryFunctionDescriptor *vs_desc;
-    MTL4::LibraryFunctionDescriptor *fs_desc;
-    MTL::VertexDescriptor *vertex_desc;
-    MTL4::RenderPipelineDescriptor *desc;
+    NS::SharedPtr<MTL::Library> lib;
+    NS::SharedPtr<MTL4::LibraryFunctionDescriptor> vs_desc;
+    NS::SharedPtr<MTL4::LibraryFunctionDescriptor> fs_desc;
+    NS::SharedPtr<MTL::VertexDescriptor> vertex_desc;
+    NS::SharedPtr<MTL4::RenderPipelineDescriptor> desc;
 
-    MTL::RenderPipelineState *pipeline;
+    NS::SharedPtr<MTL::RenderPipelineState> pipeline;
 };
 
 static inline void
 mtl_init_dev(struct mtl *mtl)
 {
-    mtl->dev = MTL::CreateSystemDefaultDevice();
+    mtl->dev = NS::TransferPtr(MTL::CreateSystemDefaultDevice());
     if (!mtl->dev)
         mtl_die("failed to create device");
 
     if (!mtl->dev->supportsFamily(MTL::GPUFamilyMetal4))
         mtl_die("Metal 4 required");
 
-    MTL4::CompilerDescriptor *comp_desc = MTL4::CompilerDescriptor::alloc()->init();
-    mtl->compiler = mtl->dev->newCompiler(comp_desc, &mtl->error);
-    comp_desc->release();
+    NS::SharedPtr<MTL4::CompilerDescriptor> comp_desc =
+        NS::TransferPtr(MTL4::CompilerDescriptor::alloc()->init());
+    mtl->compiler = NS::TransferPtr(mtl->dev->newCompiler(comp_desc.get(), &mtl->error));
     mtl_check(mtl, "newCompiler");
 }
 
 static inline void
 mtl_init_queue(struct mtl *mtl)
 {
-    mtl->queue = mtl->dev->newMTL4CommandQueue();
+    mtl->queue = NS::TransferPtr(mtl->dev->newMTL4CommandQueue());
     if (!mtl->queue)
         mtl_die("failed to create command queue");
 
-    mtl->event = mtl->dev->newSharedEvent();
+    mtl->event = NS::TransferPtr(mtl->dev->newSharedEvent());
     if (!mtl->event)
         mtl_die("failed to create shared event");
 
-    MTL::ResidencySetDescriptor *res_desc = MTL::ResidencySetDescriptor::alloc()->init();
-    mtl->residency_set = mtl->dev->newResidencySet(res_desc, &mtl->error);
-    res_desc->release();
+    NS::SharedPtr<MTL::ResidencySetDescriptor> res_desc =
+        NS::TransferPtr(MTL::ResidencySetDescriptor::alloc()->init());
+    mtl->residency_set = NS::TransferPtr(mtl->dev->newResidencySet(res_desc.get(), &mtl->error));
     mtl_check(mtl, "newResidencySet");
 
-    mtl->queue->addResidencySet(mtl->residency_set);
+    mtl->queue->addResidencySet(mtl->residency_set.get());
 }
 
 static inline void
@@ -114,14 +115,14 @@ mtl_init_cmd(struct mtl *mtl)
 {
     mtl->submit.count = ARRAY_SIZE(mtl->submit.cmd_allocs);
     for (uint32_t i = 0; i < mtl->submit.count; i++) {
-        mtl->submit.cmd_allocs[i] = mtl->dev->newCommandAllocator();
+        mtl->submit.cmd_allocs[i] = NS::TransferPtr(mtl->dev->newCommandAllocator());
         if (!mtl->submit.cmd_allocs[i])
             mtl_die("failed to create command allocator");
 
         mtl->submit.event_vals[i] = mtl->event_val;
     }
 
-    mtl->submit.cmd = mtl->dev->newCommandBuffer();
+    mtl->submit.cmd = NS::TransferPtr(mtl->dev->newCommandBuffer());
     if (!mtl->submit.cmd)
         mtl_die("failed to create command buffer");
 }
@@ -129,12 +130,12 @@ mtl_init_cmd(struct mtl *mtl)
 static inline void
 mtl_init(struct mtl *mtl, const struct mtl_init_params *params)
 {
-    memset(mtl, 0, sizeof(*mtl));
+    new (mtl) struct mtl();
 
     if (params)
         mtl->params = *params;
 
-    mtl->pool = NS::AutoreleasePool::alloc()->init();
+    mtl->pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
 
     mtl_init_dev(mtl);
     mtl_init_queue(mtl);
@@ -145,7 +146,7 @@ static inline uint64_t
 mtl_signal_event(struct mtl *mtl)
 {
     const uint64_t v = ++mtl->event_val;
-    mtl->queue->signalEvent(mtl->event, v);
+    mtl->queue->signalEvent(mtl->event.get(), v);
     return v;
 }
 
@@ -167,19 +168,8 @@ mtl_cleanup(struct mtl *mtl)
 {
     mtl_wait(mtl);
 
-    mtl->submit.cmd->release();
-
-    for (uint32_t i = 0; i < mtl->submit.count; i++)
-        mtl->submit.cmd_allocs[i]->release();
-
-    mtl->residency_set->release();
-    mtl->event->release();
-    mtl->queue->release();
-
-    mtl->compiler->release();
-    mtl->dev->release();
-
-    mtl->pool->release();
+    mtl->~mtl();
+    new (mtl) struct mtl();
 }
 
 static inline MTL4::CommandBuffer *
@@ -190,9 +180,9 @@ mtl_begin_cmd(struct mtl *mtl)
     mtl_wait_event_val(mtl, mtl->submit.event_vals[next]);
     mtl->submit.cmd_allocs[next]->reset();
 
-    mtl->submit.cmd->beginCommandBuffer(mtl->submit.cmd_allocs[next]);
+    mtl->submit.cmd->beginCommandBuffer(mtl->submit.cmd_allocs[next].get());
 
-    return mtl->submit.cmd;
+    return mtl->submit.cmd.get();
 }
 
 static inline void
@@ -211,21 +201,19 @@ mtl_end_cmd(struct mtl *mtl, MTL4::CommandBuffer *cmd)
 static inline struct mtl_buffer *
 mtl_create_buffer(struct mtl *mtl, uint64_t size, MTL::ResourceOptions options)
 {
-    struct mtl_buffer *buf = (struct mtl_buffer *)calloc(1, sizeof(*buf));
-    if (!buf)
-        mtl_die("failed to allocate buffer");
+    struct mtl_buffer *buf = new mtl_buffer();
 
     buf->size = size;
     buf->options = options;
 
-    buf->buf = mtl->dev->newBuffer(size, options);
+    buf->buf = NS::TransferPtr(mtl->dev->newBuffer(size, options));
     if (!buf->buf)
         mtl_die("failed to create buffer");
 
     if (buf->buf->storageMode() == MTL::StorageModeShared)
         buf->map = buf->buf->contents();
 
-    mtl->residency_set->addAllocation(buf->buf);
+    mtl->residency_set->addAllocation(buf->buf.get());
 
     return buf;
 }
@@ -233,10 +221,9 @@ mtl_create_buffer(struct mtl *mtl, uint64_t size, MTL::ResourceOptions options)
 static inline void
 mtl_destroy_buffer(struct mtl *mtl, struct mtl_buffer *buf)
 {
-    mtl->residency_set->removeAllocation(buf->buf);
+    mtl->residency_set->removeAllocation(buf->buf.get());
 
-    buf->buf->release();
-    free(buf);
+    delete buf;
 }
 
 static inline struct mtl_image *
@@ -247,9 +234,7 @@ mtl_create_image(struct mtl *mtl,
                  MTL::StorageMode storage_mode,
                  MTL::TextureUsage usage)
 {
-    struct mtl_image *img = (struct mtl_image *)calloc(1, sizeof(*img));
-    if (!img)
-        mtl_die("failed to allocate image");
+    struct mtl_image *img = new mtl_image();
 
     img->width = width;
     img->height = height;
@@ -257,7 +242,8 @@ mtl_create_image(struct mtl *mtl,
     img->storage_mode = storage_mode;
     img->usage = usage;
 
-    MTL::TextureDescriptor *desc = MTL::TextureDescriptor::alloc()->init();
+    NS::SharedPtr<MTL::TextureDescriptor> desc =
+        NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
     desc->setTextureType(MTL::TextureType2D);
     desc->setPixelFormat(format);
     desc->setWidth(width);
@@ -265,12 +251,11 @@ mtl_create_image(struct mtl *mtl,
     desc->setStorageMode(storage_mode);
     desc->setUsage(usage);
 
-    img->img = mtl->dev->newTexture(desc);
-    desc->release();
+    img->img = NS::TransferPtr(mtl->dev->newTexture(desc.get()));
     if (!img->img)
         mtl_die("failed to create texture");
 
-    mtl->residency_set->addAllocation(img->img);
+    mtl->residency_set->addAllocation(img->img.get());
 
     return img;
 }
@@ -278,22 +263,19 @@ mtl_create_image(struct mtl *mtl,
 static inline void
 mtl_destroy_image(struct mtl *mtl, struct mtl_image *img)
 {
-    mtl->residency_set->removeAllocation(img->img);
+    mtl->residency_set->removeAllocation(img->img.get());
 
-    img->img->release();
-    free(img);
+    delete img;
 }
 
 static inline struct mtl_pipeline *
 mtl_create_pipeline(struct mtl *mtl)
 {
-    struct mtl_pipeline *pipeline = (struct mtl_pipeline *)calloc(1, sizeof(*pipeline));
-    if (!pipeline)
-        mtl_die("failed to allocate pipeline");
+    struct mtl_pipeline *pipeline = new mtl_pipeline();
 
-    pipeline->vertex_desc = MTL::VertexDescriptor::alloc()->init();
+    pipeline->vertex_desc = NS::TransferPtr(MTL::VertexDescriptor::alloc()->init());
 
-    pipeline->desc = MTL4::RenderPipelineDescriptor::alloc()->init();
+    pipeline->desc = NS::TransferPtr(MTL4::RenderPipelineDescriptor::alloc()->init());
     pipeline->desc->setInputPrimitiveTopology(MTL::PrimitiveTopologyClassTriangle);
 
     return pipeline;
@@ -306,61 +288,50 @@ mtl_add_pipeline_shader(struct mtl *mtl,
                         const char *vs_name,
                         const char *fs_name)
 {
-    NS::String *src = NS::String::alloc()->init(msl, NS::UTF8StringEncoding);
-    MTL4::LibraryDescriptor *lib_desc = MTL4::LibraryDescriptor::alloc()->init();
-    lib_desc->setSource(src);
+    NS::SharedPtr<NS::String> src =
+        NS::TransferPtr(NS::String::alloc()->init(msl, NS::UTF8StringEncoding));
+    NS::SharedPtr<MTL4::LibraryDescriptor> lib_desc =
+        NS::TransferPtr(MTL4::LibraryDescriptor::alloc()->init());
+    lib_desc->setSource(src.get());
 
-    pipeline->lib = mtl->compiler->newLibrary(lib_desc, &mtl->error);
-    lib_desc->release();
-    src->release();
+    pipeline->lib = NS::TransferPtr(mtl->compiler->newLibrary(lib_desc.get(), &mtl->error));
     mtl_check(mtl, "newLibrary");
 
     if (vs_name) {
-        NS::String *name = NS::String::alloc()->init(vs_name, NS::UTF8StringEncoding);
-        pipeline->vs_desc = MTL4::LibraryFunctionDescriptor::alloc()->init();
-        pipeline->vs_desc->setLibrary(pipeline->lib);
-        pipeline->vs_desc->setName(name);
-        name->release();
+        NS::SharedPtr<NS::String> name =
+            NS::TransferPtr(NS::String::alloc()->init(vs_name, NS::UTF8StringEncoding));
+        pipeline->vs_desc = NS::TransferPtr(MTL4::LibraryFunctionDescriptor::alloc()->init());
+        pipeline->vs_desc->setLibrary(pipeline->lib.get());
+        pipeline->vs_desc->setName(name.get());
 
-        pipeline->desc->setVertexFunctionDescriptor(pipeline->vs_desc);
+        pipeline->desc->setVertexFunctionDescriptor(pipeline->vs_desc.get());
     }
 
     if (fs_name) {
-        NS::String *name = NS::String::alloc()->init(fs_name, NS::UTF8StringEncoding);
-        pipeline->fs_desc = MTL4::LibraryFunctionDescriptor::alloc()->init();
-        pipeline->fs_desc->setLibrary(pipeline->lib);
-        pipeline->fs_desc->setName(name);
-        name->release();
+        NS::SharedPtr<NS::String> name =
+            NS::TransferPtr(NS::String::alloc()->init(fs_name, NS::UTF8StringEncoding));
+        pipeline->fs_desc = NS::TransferPtr(MTL4::LibraryFunctionDescriptor::alloc()->init());
+        pipeline->fs_desc->setLibrary(pipeline->lib.get());
+        pipeline->fs_desc->setName(name.get());
 
-        pipeline->desc->setFragmentFunctionDescriptor(pipeline->fs_desc);
+        pipeline->desc->setFragmentFunctionDescriptor(pipeline->fs_desc.get());
     }
 }
 
 static inline void
 mtl_compile_pipeline(struct mtl *mtl, struct mtl_pipeline *pipeline)
 {
-    pipeline->desc->setVertexDescriptor(pipeline->vertex_desc);
+    pipeline->desc->setVertexDescriptor(pipeline->vertex_desc.get());
 
-    pipeline->pipeline =
-        mtl->compiler->newRenderPipelineState(pipeline->desc, nullptr, &mtl->error);
+    pipeline->pipeline = NS::TransferPtr(
+        mtl->compiler->newRenderPipelineState(pipeline->desc.get(), nullptr, &mtl->error));
     mtl_check(mtl, "newRenderPipelineState");
 }
 
 static inline void
 mtl_destroy_pipeline(struct mtl *mtl, struct mtl_pipeline *pipeline)
 {
-    if (pipeline->pipeline)
-        pipeline->pipeline->release();
-    pipeline->desc->release();
-    pipeline->vertex_desc->release();
-    if (pipeline->fs_desc)
-        pipeline->fs_desc->release();
-    if (pipeline->vs_desc)
-        pipeline->vs_desc->release();
-    if (pipeline->lib)
-        pipeline->lib->release();
-
-    free(pipeline);
+    delete pipeline;
 }
 
 static inline void
@@ -373,8 +344,9 @@ mtl_dump_image(struct mtl *mtl, const struct mtl_image *img, const char *filenam
     MTL4::CommandBuffer *cmd = mtl_begin_cmd(mtl);
 
     MTL4::ComputeCommandEncoder *enc = cmd->computeCommandEncoder();
-    enc->copyFromTexture(img->img, 0, 0, MTL::Origin::Make(0, 0, 0),
-                         MTL::Size::Make(img->width, img->height, 1), buf->buf, 0, stride, size);
+    enc->copyFromTexture(img->img.get(), 0, 0, MTL::Origin::Make(0, 0, 0),
+                         MTL::Size::Make(img->width, img->height, 1), buf->buf.get(), 0, stride,
+                         size);
     enc->endEncoding();
 
     mtl_end_cmd(mtl, cmd);
