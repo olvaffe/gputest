@@ -120,6 +120,10 @@ mtl_init_cmd(struct mtl *mtl)
 
         mtl->submit.event_vals[i] = mtl->event_val;
     }
+
+    mtl->submit.cmd = mtl->dev->newCommandBuffer();
+    if (!mtl->submit.cmd)
+        mtl_die("failed to create command buffer");
 }
 
 static inline void
@@ -163,8 +167,7 @@ mtl_cleanup(struct mtl *mtl)
 {
     mtl_wait(mtl);
 
-    if (mtl->submit.cmd)
-        mtl->submit.cmd->release();
+    mtl->submit.cmd->release();
 
     for (uint32_t i = 0; i < mtl->submit.count; i++)
         mtl->submit.cmd_allocs[i]->release();
@@ -184,14 +187,8 @@ mtl_begin_cmd(struct mtl *mtl)
 {
     const uint32_t next = mtl->submit.next;
 
-    if (!mtl->submit.cmd) {
-        mtl->submit.cmd = mtl->dev->newCommandBuffer();
-        if (!mtl->submit.cmd)
-            mtl_die("failed to create command buffer");
-    } else {
-        mtl_wait_event_val(mtl, mtl->submit.event_vals[next]);
-        mtl->submit.cmd_allocs[next]->reset();
-    }
+    mtl_wait_event_val(mtl, mtl->submit.event_vals[next]);
+    mtl->submit.cmd_allocs[next]->reset();
 
     mtl->submit.cmd->beginCommandBuffer(mtl->submit.cmd_allocs[next]);
 
