@@ -678,6 +678,9 @@ vk_init_device(struct vk *vk)
     vk->GetPhysicalDeviceQueueFamilyProperties2(vk->physical_dev, &queue_count, &queue_props);
     if (!(queue_props.queueFamilyProperties.queueFlags & VK_QUEUE_GRAPHICS_BIT))
         vk_die("queue family 0 does not support graphics");
+    if (vk->params.require_sparse &&
+        !(queue_props.queueFamilyProperties.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT))
+        vk_die("queue family 0 does not support sparse");
     if (vk->params.protected_memory &&
         !(queue_props.queueFamilyProperties.queueFlags & VK_QUEUE_PROTECTED_BIT))
         vk_die("queue family 0 does not support protected");

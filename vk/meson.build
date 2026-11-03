@@ -39,6 +39,7 @@ tests = [
   'renderpass_ops',
   'sched',
   'separate_ds',
+  'sparse_buffer',
   'ssbo_max',
   'stencil',
   'storage_3d',
